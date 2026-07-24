@@ -24,12 +24,17 @@ jobs:
       - name: Install Qt declarative tools
         run: sudo apt-get update -q && sudo apt-get install -y qt6-declarative-dev-tools
       - name: Parse-check all shell QML
+        # No `set -e`: qmlformat --check returns 1 when a file merely needs
+        # reformatting, which is expected and must NOT fail the job. Only a
+        # genuine parse error (rc >= 2) counts. `|| rc=$?` keeps the captured
+        # exit code from tripping the runner's default errexit.
         run: |
+          set +e
           QMLFORMAT="$(command -v qmlformat || echo /usr/lib/qt6/bin/qmlformat)"
           fail=0
           while IFS= read -r -d '' f; do
-            "$QMLFORMAT" --check "$f" >/dev/null 2>&1; rc=$?
-            # rc 1 = formatting differs (fine), >=2 = parse error
+            rc=0
+            "$QMLFORMAT" --check "$f" >/dev/null 2>&1 || rc=$?
             if [ "$rc" -ge 2 ]; then echo "PARSE FAIL: $f"; fail=1; fi
           done < <(find dots/.config/quickshell -name '*.qml' -print0)
           exit "$fail"
