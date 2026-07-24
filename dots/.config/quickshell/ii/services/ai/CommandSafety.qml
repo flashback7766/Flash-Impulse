@@ -26,7 +26,7 @@ QtObject {
     property bool yoloMode: false
 
     readonly property string logDir: Quickshell.env("HOME") + "/.local/share/flash-impulse/logs"
-    readonly property string judgeModel: "gemini-3.1-flash-lite"
+    readonly property string judgeModel: "gemini-3.5-flash-lite"
     readonly property string judgeEndpoint:
         `https://generativelanguage.googleapis.com/v1beta/models/${judgeModel}:generateContent`
 

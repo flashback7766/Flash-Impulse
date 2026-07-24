@@ -37,7 +37,7 @@ Singleton {
     property string previousChatSummary: ""
     property string sessionSummary: "" // Accumulated summary of compressed conversation
     property bool condensing: false // Indicates background summarization is active
-    readonly property string summarizerModelId: "gemini-3.1-flash-lite"
+    readonly property string summarizerModelId: "gemini-3.5-flash-lite"
 
     function abortAll() {
         // Mark aborted so onExited handlers don't auto-restart the conversation
@@ -110,15 +110,16 @@ Singleton {
 
     // Pricing per million tokens: [input, output] — 0 means free
     readonly property var modelPricing: ({
-        "gemini-3.1-flash-lite": [0.25, 1.50],
-        "gemini-3-flash": [0.50, 3.00],
+        "gemini-3.5-flash-lite": [0.30, 2.50],
+        "gemini-3.6-flash": [1.50, 7.50],
         "gemini-3.1-pro": [2.00, 12.00],
-        "claude-haiku-4-5": [0.80, 4.00],
-        "claude-sonnet-4-6": [3.00, 15.00],
-        "claude-opus-4-7": [15.00, 75.00],
-        "gpt-5.4-nano": [0.20, 1.25],
-        "gpt-5.4-mini": [0.75, 4.50],
-        "gpt-5.4": [2.50, 15.00],
+        "claude-haiku-4-5": [1.00, 5.00],
+        "claude-sonnet-5": [3.00, 15.00],
+        "claude-opus-4-8": [5.00, 25.00],
+        "claude-fable-5": [10.00, 50.00],
+        "gpt-5.6-luna": [1.00, 5.00],
+        "gpt-5.6-terra": [2.50, 15.00],
+        "gpt-5.6-sol": [5.00, 30.00],
     })
 
     function calculateCost(modelId, inputTokens, outputTokens, cacheReadTokens = 0, cacheWriteTokens = 0) {
@@ -379,30 +380,30 @@ Singleton {
     // - api_format: The API format of the model. Can be "openai" or "gemini". Default is "openai".
     // - extraParams: Extra parameters to be passed to the model. This is a JSON object.
     property var models: Config.options.policies.ai === 2 ? {} : {
-        "gemini-3.1-flash-lite": aiModelComponent.createObject(this, {
+        "gemini-3.5-flash-lite": aiModelComponent.createObject(this, {
             "name": "Gemini Flash-Lite",
             "icon": "google-gemini-symbolic",
-            "description": Translation.tr("Online | Google's model\nFastest & cheapest. Best for high-volume tasks, translation, and simple queries."),
+            "description": Translation.tr("Online | Google's model\nFastest & cheapest. Generous free tier. Best for high-volume tasks and simple queries."),
             "homepage": "https://aistudio.google.com",
-            "endpoint": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:streamGenerateContent",
-            "model": "gemini-3.1-flash-lite-preview",
+            "endpoint": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:streamGenerateContent",
+            "model": "gemini-3.5-flash-lite",
             "requires_key": true,
             "key_id": "gemini",
             "key_get_link": "https://aistudio.google.com/app/apikey",
-            "key_get_description": Translation.tr("**Pricing**: ~$0.25/M input, ~$1.50/M output\n\n**Instructions**: Log into Google account → AI Studio → Get API key"),
+            "key_get_description": Translation.tr("**Pricing**: free tier; paid ~$0.30/M input, ~$2.50/M output\n\n**Instructions**: Log into Google account → AI Studio → Get API key"),
             "api_format": "gemini",
         }),
-        "gemini-3-flash": aiModelComponent.createObject(this, {
+        "gemini-3.6-flash": aiModelComponent.createObject(this, {
             "name": "Gemini Flash",
             "icon": "google-gemini-symbolic",
-            "description": Translation.tr("Online | Google's model\nPro-level intelligence at Flash speed. Great for agentic workflows and coding."),
+            "description": Translation.tr("Online | Google's model\nLatest stable Flash. Pro-level intelligence at Flash speed, great for agentic workflows and coding."),
             "homepage": "https://aistudio.google.com",
-            "endpoint": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:streamGenerateContent",
-            "model": "gemini-3-flash-preview",
+            "endpoint": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:streamGenerateContent",
+            "model": "gemini-3.6-flash",
             "requires_key": true,
             "key_id": "gemini",
             "key_get_link": "https://aistudio.google.com/app/apikey",
-            "key_get_description": Translation.tr("**Pricing**: ~$0.50/M input, ~$3/M output\n\n**Instructions**: Log into Google account → AI Studio → Get API key"),
+            "key_get_description": Translation.tr("**Pricing**: free tier; paid ~$1.50/M input, ~$7.50/M output\n\n**Instructions**: Log into Google account → AI Studio → Get API key"),
             "api_format": "gemini",
         }),
         "gemini-3.1-pro": aiModelComponent.createObject(this, {
@@ -431,65 +432,78 @@ Singleton {
             "key_get_description": Translation.tr("**Pricing**: ~$0.80/M input, ~$4/M output\n\n**Instructions**: Anthropic Console → API Keys → Create Key"),
             "api_format": "anthropic",
         }),
-        "claude-sonnet-4-6": aiModelComponent.createObject(this, {
+        "claude-sonnet-5": aiModelComponent.createObject(this, {
             "name": "Claude Sonnet",
             "icon": "anthropic-symbolic",
             "description": Translation.tr("Online | Anthropic's model\nSmart, efficient. Great at coding, analysis and writing."),
             "homepage": "https://anthropic.com",
             "endpoint": "https://api.anthropic.com/v1/messages",
-            "model": "claude-sonnet-4-6",
+            "model": "claude-sonnet-5",
             "requires_key": true,
             "key_id": "anthropic",
             "key_get_link": "https://console.anthropic.com/settings/keys",
             "key_get_description": Translation.tr("**Pricing**: ~$3/M input, ~$15/M output\n\n**Instructions**: Anthropic Console → API Keys → Create Key"),
             "api_format": "anthropic",
         }),
-        "claude-opus-4-7": aiModelComponent.createObject(this, {
+        "claude-opus-4-8": aiModelComponent.createObject(this, {
             "name": "Claude Opus",
             "icon": "anthropic-symbolic",
-            "description": Translation.tr("Online | Anthropic's model\nMost intelligent Claude. Best for complex reasoning and creative tasks."),
+            "description": Translation.tr("Online | Anthropic's model\nMost intelligent generally-available Opus. Best for complex reasoning and coding."),
             "homepage": "https://anthropic.com",
             "endpoint": "https://api.anthropic.com/v1/messages",
-            "model": "claude-opus-4-7",
+            "model": "claude-opus-4-8",
             "requires_key": true,
             "key_id": "anthropic",
             "key_get_link": "https://console.anthropic.com/settings/keys",
-            "key_get_description": Translation.tr("**Pricing**: ~$15/M input, ~$75/M output\n\n**Instructions**: Anthropic Console → API Keys → Create Key"),
+            "key_get_description": Translation.tr("**Pricing**: ~$5/M input, ~$25/M output\n\n**Instructions**: Anthropic Console → API Keys → Create Key"),
             "api_format": "anthropic",
         }),
-        "gpt-5.4-nano": aiModelComponent.createObject(this, {
-            "name": "GPT Nano",
+        "claude-fable-5": aiModelComponent.createObject(this, {
+            "name": "Claude Fable",
+            "icon": "anthropic-symbolic",
+            "description": Translation.tr("Online | Anthropic's model\nFrontier Mythos-class model above Opus. Best for the hardest reasoning tasks."),
+            "homepage": "https://anthropic.com",
+            "endpoint": "https://api.anthropic.com/v1/messages",
+            "model": "claude-fable-5",
+            "requires_key": true,
+            "key_id": "anthropic",
+            "key_get_link": "https://console.anthropic.com/settings/keys",
+            "key_get_description": Translation.tr("**Pricing**: ~$10/M input, ~$50/M output\n\n**Instructions**: Anthropic Console → API Keys → Create Key"),
+            "api_format": "anthropic",
+        }),
+        "gpt-5.6-luna": aiModelComponent.createObject(this, {
+            "name": "GPT Luna",
             "icon": "openai-symbolic",
             "description": Translation.tr("Online | OpenAI's model\nFastest & cheapest GPT. Best for simple tasks, classification, and data extraction."),
             "homepage": "https://platform.openai.com",
             "endpoint": "https://api.openai.com/v1/chat/completions",
-            "model": "gpt-5.4-nano",
+            "model": "gpt-5.6-luna",
             "requires_key": true,
             "key_id": "openai",
             "key_get_link": "https://platform.openai.com/api-keys",
-            "key_get_description": Translation.tr("**Pricing**: ~$0.20/M input, ~$1.25/M output\n\n**Instructions**: platform.openai.com → API Keys → Create new secret key"),
+            "key_get_description": Translation.tr("**Pricing**: ~$1/M input, ~$5/M output\n\n**Instructions**: platform.openai.com → API Keys → Create new secret key"),
             "api_format": "openai",
         }),
-        "gpt-5.4-mini": aiModelComponent.createObject(this, {
-            "name": "GPT Mini",
+        "gpt-5.6-terra": aiModelComponent.createObject(this, {
+            "name": "GPT Terra",
             "icon": "openai-symbolic",
             "description": Translation.tr("Online | OpenAI's model\nFast & capable. Great balance of speed, quality, and cost."),
             "homepage": "https://platform.openai.com",
             "endpoint": "https://api.openai.com/v1/chat/completions",
-            "model": "gpt-5.4-mini",
+            "model": "gpt-5.6-terra",
             "requires_key": true,
             "key_id": "openai",
             "key_get_link": "https://platform.openai.com/api-keys",
-            "key_get_description": Translation.tr("**Pricing**: ~$0.75/M input, ~$4.50/M output\n\n**Instructions**: platform.openai.com → API Keys → Create new secret key"),
+            "key_get_description": Translation.tr("**Pricing**: ~$2.50/M input, ~$15/M output\n\n**Instructions**: platform.openai.com → API Keys → Create new secret key"),
             "api_format": "openai",
         }),
-        "gpt-5.4": aiModelComponent.createObject(this, {
-            "name": "GPT Standard",
+        "gpt-5.6-sol": aiModelComponent.createObject(this, {
+            "name": "GPT Sol",
             "icon": "openai-symbolic",
             "description": Translation.tr("Online | OpenAI's model\nFlagship. Best for complex reasoning, coding, and professional work."),
             "homepage": "https://platform.openai.com",
             "endpoint": "https://api.openai.com/v1/chat/completions",
-            "model": "gpt-5.4",
+            "model": "gpt-5.6-sol",
             "requires_key": true,
             "key_id": "openai",
             "key_get_link": "https://platform.openai.com/api-keys",
@@ -537,9 +551,9 @@ Singleton {
     property var currentModelId: Persistent.states?.ai?.model || modelList[0]
     // Track built-in model IDs so we know which ones are removable
     readonly property var builtinModelIds: [
-        "gemini-3.1-flash-lite", "gemini-3-flash", "gemini-3.1-pro",
-        "claude-haiku-4-5", "claude-sonnet-4-6", "claude-opus-4-7",
-        "gpt-5.4-nano", "gpt-5.4-mini", "gpt-5.4",
+        "gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-3.1-pro",
+        "claude-haiku-4-5", "claude-sonnet-5", "claude-opus-4-8", "claude-fable-5",
+        "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol",
         "cc-haiku", "cc-sonnet", "cc-opus", "cc-fable"
     ]
 
