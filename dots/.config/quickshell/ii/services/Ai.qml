@@ -25,6 +25,7 @@ Singleton {
     property Component openaiApiStrategy: OpenAiApiStrategy {}
 
     property Component anthropicApiStrategy: AnthropicApiStrategy {}
+    property Component claudeCodeApiStrategy: ClaudeCodeApiStrategy {}
     GeminiApiStrategy { id: geminiStrategy }
     readonly property string interfaceRole: "interface"
     readonly property string apiKeyEnvVarName: "API_KEY"
@@ -495,6 +496,42 @@ Singleton {
             "key_get_description": Translation.tr("**Pricing**: paid\n\n**Instructions**: platform.openai.com → API Keys → Create new secret key"),
             "api_format": "openai",
         }),
+        "cc-haiku": aiModelComponent.createObject(this, {
+            "name": "Claude Code · Haiku",
+            "icon": "anthropic-symbolic",
+            "description": Translation.tr("Local claude CLI | Uses your Claude subscription, no API key\nFastest Claude. Runs with Claude Code's own tools and permission system."),
+            "homepage": "https://claude.com/claude-code",
+            "model": "haiku",
+            "requires_key": false,
+            "api_format": "claude-code",
+        }),
+        "cc-sonnet": aiModelComponent.createObject(this, {
+            "name": "Claude Code · Sonnet",
+            "icon": "anthropic-symbolic",
+            "description": Translation.tr("Local claude CLI | Uses your Claude subscription, no API key\nBalanced Claude. Runs with Claude Code's own tools and permission system."),
+            "homepage": "https://claude.com/claude-code",
+            "model": "sonnet",
+            "requires_key": false,
+            "api_format": "claude-code",
+        }),
+        "cc-opus": aiModelComponent.createObject(this, {
+            "name": "Claude Code · Opus",
+            "icon": "anthropic-symbolic",
+            "description": Translation.tr("Local claude CLI | Uses your Claude subscription, no API key\nMost capable Opus. Runs with Claude Code's own tools and permission system."),
+            "homepage": "https://claude.com/claude-code",
+            "model": "opus",
+            "requires_key": false,
+            "api_format": "claude-code",
+        }),
+        "cc-fable": aiModelComponent.createObject(this, {
+            "name": "Claude Code · Fable",
+            "icon": "anthropic-symbolic",
+            "description": Translation.tr("Local claude CLI | Uses your Claude subscription, no API key\nAnthropic's frontier Mythos-class model. Availability depends on your plan."),
+            "homepage": "https://claude.com/claude-code",
+            "model": "fable",
+            "requires_key": false,
+            "api_format": "claude-code",
+        }),
     }
     property var modelList: Object.keys(root.models)
     property var currentModelId: Persistent.states?.ai?.model || modelList[0]
@@ -502,7 +539,8 @@ Singleton {
     readonly property var builtinModelIds: [
         "gemini-3.1-flash-lite", "gemini-3-flash", "gemini-3.1-pro",
         "claude-haiku-4-5", "claude-sonnet-4-6", "claude-opus-4-7",
-        "gpt-5.4-nano", "gpt-5.4-mini", "gpt-5.4"
+        "gpt-5.4-nano", "gpt-5.4-mini", "gpt-5.4",
+        "cc-haiku", "cc-sonnet", "cc-opus", "cc-fable"
     ]
 
     function isRemovableModel(modelId) {
@@ -525,6 +563,7 @@ Singleton {
         "openai": openaiApiStrategy.createObject(this),
         "gemini": geminiApiStrategy.createObject(this),
         "anthropic": anthropicApiStrategy.createObject(this),
+        "claude-code": claudeCodeApiStrategy.createObject(this),
     }
     property ApiStrategy currentApiStrategy: apiStrategies[models[currentModelId]?.api_format || "openai"]
 
@@ -934,6 +973,8 @@ Singleton {
         root.generationStartTime = 0;
         root.generationSpeed = 0;
         root.condensing = false;
+        // The Claude Code CLI session belongs to the conversation being discarded
+        root.apiStrategies["claude-code"]?.clearSession();
         root.responseFinished();
     }
 
