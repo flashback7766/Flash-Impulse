@@ -110,6 +110,17 @@ Item {
             }
         },
         {
+            name: "yolo",
+            description: Translation.tr("Auto-approve ALL AI shell commands, including dangerous ones (risky!). Usage: /yolo on|off"),
+            execute: args => {
+                if (args[0] === "on") Ai.setYolo(true);
+                else if (args[0] === "off") Ai.setYolo(false);
+                else Ai.addMessage(Ai.commandSafety.yoloMode
+                    ? Translation.tr("YOLO mode is ON. Disable with /yolo off")
+                    : Translation.tr("YOLO mode is off. Enable with /yolo on (risky!)"), Ai.interfaceRole);
+            }
+        },
+        {
             name: "key",
             description: Translation.tr("Set API key"),
             execute: args => {

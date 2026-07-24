@@ -1609,39 +1609,20 @@ Singleton {
         commandExecutionProc.running = true;
     }
 
+    // Command safety pipeline (whitelist / blacklist / Gemini judge / YOLO + audit log)
+    property CommandSafety commandSafety: CommandSafety {}
+
     function isDangerousCommand(cmd) {
-        if (!cmd) return false;
-        const dangerousPatterns = [
-            // Deletion or modification of root/system dirs
-            /\brm\s+.*-[rfRF]+.*\s+\/(?:bin|boot|dev|etc|home|lib|lib64|lost\+found|mnt|opt|proc|root|run|sbin|srv|sys|tmp|usr|var|[^\w\-]|$)/,
-            /\bmv\s+.*\s+\/(?:bin|boot|dev|etc|home|lib|lib64|lost\+found|mnt|opt|proc|root|run|sbin|srv|sys|tmp|usr|var|[^\w\-]|$)/,
-            /\bchmod\s+.*-R.*\s+\/(?:bin|boot|dev|etc|home|lib|lib64|lost\+found|mnt|opt|proc|root|run|sbin|srv|sys|tmp|usr|var|[^\w\-]|$)/,
-            /\bchown\s+.*-R.*\s+\/(?:bin|boot|dev|etc|home|lib|lib64|lost\+found|mnt|opt|proc|root|run|sbin|srv|sys|tmp|usr|var|[^\w\-]|$)/,
-            // Recursive delete of HOME / cwd / glob — covers `rm -rf ~`, `rm -rf $HOME`, `rm -rf .`, `rm -rf *`
-            /\brm\s+(?:-[a-zA-Z]*\s+)*-[rfRF]+[a-zA-Z]*(?:\s+-[a-zA-Z]+)*\s+(?:~|\$HOME|\$\{HOME\}|\.|\.\/|\*|\.\*)(?:\s|$)/,
-            /\brm\s+.*\s+(?:~|\$HOME|\$\{HOME\}|\*|\.\*)(?:\s|$)/,
-            // Low level disk access
-            /\bdd\s+.*of=\/dev\//,
-            /\bmkfs\b/,
-            // Writing to block devices directly
-            />\s*\/dev\/(?:sd[a-z]|nvme|hd[a-z]|mmcblk)/,
-            // Pipe-to-shell from network — classic supply-chain footgun
-            /\bcurl\b.*\|\s*(?:bash|sh|zsh|fish)\b/,
-            /\bwget\b.*\|\s*(?:bash|sh|zsh|fish)\b/,
-            // Fork bomb
-            /:\s*\(\s*\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:/,
-            // System control
-            /\breboot\b/,
-            /\bshutdown\b/,
-            /\bpoweroff\b/,
-            /\bhalt\b/,
-            // Destructive git
-            /\bgit\s+clean\s+.*-[a-zA-Z]*[fdx]/,
-            /\bgit\s+reset\s+.*--hard/,
-            /\bgit\s+push\s+.*--force\b/,
-            /\bgit\s+push\s+.*-f\b/
-        ];
-        return dangerousPatterns.some(pattern => pattern.test(cmd));
+        return commandSafety.isBlacklisted(cmd);
+    }
+
+    function setYolo(enabled) {
+        commandSafety.yoloMode = enabled;
+        if (enabled) {
+            root.addMessage(Translation.tr("⚠️ **YOLO mode ON** — every command the AI runs is auto-approved, including destructive ones. You accept full responsibility. Disable with /yolo off."), root.interfaceRole);
+        } else {
+            root.addMessage(Translation.tr("YOLO mode off. The safety pipeline is active again."), root.interfaceRole);
+        }
     }
 
     Process {
@@ -1769,14 +1750,16 @@ Singleton {
             message.functionPending = true;
             message.functionName = name; // Ensure functionName is set for UI usage
 
-            const dangerous = root.isDangerousCommand(args.command);
-            if (dangerous) {
-                // Dangerous: warn and leave the Approve/Reject buttons up for the user
-                message.content += "\n\n" + Translation.tr("⚠️ **Potentially dangerous command** — review carefully before approving.");
-            } else {
-                // Safe: auto-execute
-                root.approveCommand(message);
-            }
+            // Three-tier safety pipeline: YOLO / blacklist / Gemini judge (see CommandSafety.qml)
+            const geminiKey = root.apiKeys ? (root.apiKeys["gemini"] ?? "") : "";
+            commandSafety.evaluate(args.command, geminiKey,
+                reason => { // allow
+                    message.content += `\n\n🛡️ *${reason}*`;
+                    root.approveCommand(message);
+                },
+                reason => { // confirm — leave the Approve/Reject buttons up for the user
+                    message.content += "\n\n" + Translation.tr("⚠️ **%1** — review before approving.").arg(reason);
+                });
         } else {
             root.addMessage(Translation.tr("Unknown function call: %1").arg(name), root.interfaceRole);
         }
