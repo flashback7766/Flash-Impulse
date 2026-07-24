@@ -184,5 +184,13 @@ All areas matter equally, no single priority:
 7. ⬜ Material 3 Expressive × One UI visual pass (colors, shapes, animations).
 8. ⬜ Bundle default wallpapers + logo/branding.
 9. ✅ Docs (README, CONTRIBUTING, docs/ai-architecture.md) + CI (shellcheck + QML parse
-   gate). Note: Actions currently blocked by a GitHub account billing lock — resolve in
-   GitHub settings, the workflow itself is ready.
+   gate). CI is green (billing lock resolved 2026-07-24).
+10. ✅ Setup-engine rewrite (2026-07-24): two-layer library (`sdata/lib/engine.sh`
+    driving both `./setup` and `./install.sh`), functions.sh de-crufted (−11 dead
+    helpers) with a global DRY_RUN, AUR-helper auto-detection (yay/paru), exp-merge
+    removed, exp-update replaced by a thin `update`, and end-4 branding stripped from
+    engine output. ~2600 net lines removed; full `--dry-run` walk verified.
+
+Remaining: **7** (Material 3 Expressive × One UI visual pass) and **8** (wallpapers +
+logo/branding) — the design work, best done as a dedicated session starting from
+`Appearance.qml`.
