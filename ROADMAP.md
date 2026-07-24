@@ -169,15 +169,20 @@ All areas matter equally, no single priority:
 
 ## 8. Suggested build order
 
-1. Scaffold repo (squashed history from both sources), GPL-3.0 LICENSE, README stub.
-2. Rewrite `install.sh` (modular Bash: component selection, backup/rollback, migration
-   prompt, keyring integration, multi-distro package-manager branches).
-3. Merge better-ii-ai QML into the dots-hyprland module tree as the permanent AI sidebar.
-4. Build the Claude Code CLI bridge (provider backend + AskUserQuestion parsing +
-   session continuity) — the highest-risk, most novel piece; prototype this first before
-   polishing UI.
-5. Implement the whitelist/blacklist/judge pipeline + logging + YOLO flag.
-6. Update Gemini/OpenAI model lists to current IDs; wire Gemini Flash-Lite as default.
-7. One UI visual pass (colors, shapes, animations) across the merged shell.
-8. Bundle default wallpapers + logo/branding.
-9. Docs (README, CONTRIBUTING, AI architecture doc) + GitHub Actions CI.
+1. ✅ Scaffold repo (squashed history from both sources), GPL-3.0 LICENSE, README.
+2. ✅ Rewrite `install.sh` (component selection, backup/rollback, migration prompt,
+   keyring secrets, doctor). Done 2026-07-24.
+3. ✅ Merge better-ii-ai QML into the tree (incl. the FileUtils.qml fix its installer
+   missed). Done 2026-07-24.
+4. ✅ Claude Code CLI bridge (`ClaudeCodeApiStrategy.qml`): stream-json parsing,
+   --resume sessions (cwd-pinned), AskUserQuestion rendered as options list, verified
+   live against CLI 2.1.217. Remaining: GUI permission-prompt bridge (MCP) and real
+   button UI for question blocks.
+5. ✅ Whitelist/blacklist/Gemini-judge pipeline + audit log + /yolo. Done 2026-07-24.
+6. ✅ Model rosters updated to July 2026 IDs (Gemini 3.5/3.6, Claude Sonnet 5 /
+   Opus 4.8 / Fable 5, GPT-5.6); Gemini 3.5 Flash-Lite default.
+7. ⬜ Material 3 Expressive × One UI visual pass (colors, shapes, animations).
+8. ⬜ Bundle default wallpapers + logo/branding.
+9. ✅ Docs (README, CONTRIBUTING, docs/ai-architecture.md) + CI (shellcheck + QML parse
+   gate). Note: Actions currently blocked by a GitHub account billing lock — resolve in
+   GitHub settings, the workflow itself is ready.
