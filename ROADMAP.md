@@ -182,7 +182,12 @@ All areas matter equally, no single priority:
 6. ✅ Model rosters updated to July 2026 IDs (Gemini 3.5/3.6, Claude Sonnet 5 /
    Opus 4.8 / Fable 5, GPT-5.6); Gemini 3.5 Flash-Lite default.
 7. ⬜ Material 3 Expressive × One UI visual pass (colors, shapes, animations).
-8. ⬜ Bundle default wallpapers + logo/branding.
+   Seed palette extracted from the wallpaper — see brand/README.md.
+8. ✅ Wallpaper + logo/branding (2026-07-24): original One-UI-8.5-style SVG art
+   (brand/wallpaper.svg → default_wallpaper.png, brand/logo.svg → flash-impulse
+   icon), About panel rebranded to Flash-Impulse. Note: the reference was a
+   Samsung update-screen wallpaper — NOT redistributed; the shipped art is drawn
+   from scratch to stay GPL-clean.
 9. ✅ Docs (README, CONTRIBUTING, docs/ai-architecture.md) + CI (shellcheck + QML parse
    gate). CI is green (billing lock resolved 2026-07-24).
 10. ✅ Setup-engine rewrite (2026-07-24): two-layer library (`sdata/lib/engine.sh`
@@ -191,6 +196,6 @@ All areas matter equally, no single priority:
     removed, exp-update replaced by a thin `update`, and end-4 branding stripped from
     engine output. ~2600 net lines removed; full `--dry-run` walk verified.
 
-Remaining: **7** (Material 3 Expressive × One UI visual pass) and **8** (wallpapers +
-logo/branding) — the design work, best done as a dedicated session starting from
-`Appearance.qml`.
+Remaining: **7** (Material 3 Expressive × One UI visual pass) — the theme wiring, best
+done as a dedicated session starting from `Appearance.qml`, using the seed palette in
+`brand/README.md`.

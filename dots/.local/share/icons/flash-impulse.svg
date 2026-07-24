@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0"   stop-color="#eceadd"/>
+      <stop offset="1"   stop-color="#e2e5d8"/>
+    </linearGradient>
+    <radialGradient id="blue" cx="0.38" cy="0.32" r="0.85">
+      <stop offset="0"    stop-color="#c2d8e2"/>
+      <stop offset="0.55" stop-color="#8fb6cf"/>
+      <stop offset="1"    stop-color="#6b98b8"/>
+    </radialGradient>
+    <radialGradient id="cream" cx="0.4" cy="0.34" r="0.9">
+      <stop offset="0"   stop-color="#f7f2e8"/>
+      <stop offset="0.6" stop-color="#ece4d5"/>
+      <stop offset="1"   stop-color="#dccfba"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0"    stop-color="#ff4d14"/>
+      <stop offset="0.28" stop-color="#ff7118"/>
+      <stop offset="0.55" stop-color="#ff9d2e" stop-opacity="0.7"/>
+      <stop offset="1"    stop-color="#ffb347" stop-opacity="0"/>
+    </radialGradient>
+    <!-- One UI squircle (superellipse) -->
+    <path id="squircle" d="M256 8
+      C 120 8, 8 120, 8 256
+      C 8 392, 120 504, 256 504
+      C 392 504, 504 392, 504 256
+      C 504 120, 392 8, 256 8 Z"/>
+    <clipPath id="tileClip"><use href="#squircle"/></clipPath>
+    <clipPath id="creamClip"><circle cx="196" cy="206" r="150"/></clipPath>
+  </defs>
+
+  <use href="#squircle" fill="url(#tile)"/>
+  <g clip-path="url(#tileClip)">
+    <!-- blue sphere, lower-right -->
+    <circle cx="340" cy="330" r="196" fill="url(#blue)"/>
+    <!-- cream sphere, upper-left, overlapping -->
+    <circle cx="196" cy="206" r="150" fill="url(#cream)"/>
+    <!-- hot orange seam on the cream sphere's rim facing the blue -->
+    <g clip-path="url(#creamClip)">
+      <circle cx="300" cy="300" r="180" fill="url(#glow)"/>
+    </g>
+  </g>
+</svg>

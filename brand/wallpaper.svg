@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3840" height="2160" viewBox="0 0 3840 2160">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0"    stop-color="#e0e3d6"/>
+      <stop offset="0.5"  stop-color="#e9e7d9"/>
+      <stop offset="1"    stop-color="#ece7d5"/>
+    </linearGradient>
+    <linearGradient id="band" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0"   stop-color="#e7cd9c" stop-opacity="0.5"/>
+      <stop offset="0.5" stop-color="#ead9bd" stop-opacity="0.2"/>
+      <stop offset="1"   stop-color="#e8e6d8" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- Softer, matte blue sphere -->
+    <radialGradient id="blue" cx="0.37" cy="0.32" r="0.85">
+      <stop offset="0"    stop-color="#bfd6e1"/>
+      <stop offset="0.5"  stop-color="#8fb6cf"/>
+      <stop offset="0.85" stop-color="#72a0bf"/>
+      <stop offset="1"    stop-color="#6b98b8"/>
+    </radialGradient>
+
+    <radialGradient id="cream" cx="0.4" cy="0.34" r="0.9">
+      <stop offset="0"    stop-color="#f5f0e5"/>
+      <stop offset="0.6"  stop-color="#eae2d3"/>
+      <stop offset="1"    stop-color="#ded4c3"/>
+    </radialGradient>
+    <radialGradient id="creamWarm" cx="0.42" cy="0.36" r="0.9">
+      <stop offset="0"    stop-color="#f3ecdd"/>
+      <stop offset="0.55" stop-color="#eddec7"/>
+      <stop offset="1"    stop-color="#e6d2b4"/>
+    </radialGradient>
+
+    <!-- Hot orange seam: intense red-orange core, quick falloff to transparent -->
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0"    stop-color="#ff4d14"/>
+      <stop offset="0.22" stop-color="#ff6f18"/>
+      <stop offset="0.5"  stop-color="#ff9d2e" stop-opacity="0.75"/>
+      <stop offset="1"    stop-color="#ffb347" stop-opacity="0"/>
+    </radialGradient>
+
+    <filter id="soft" x="-15%" y="-15%" width="130%" height="130%">
+      <feGaussianBlur stdDeviation="3"/>
+    </filter>
+
+    <!-- Front sphere used to clip the orange into crescents along its rim -->
+    <clipPath id="clipCentre"><circle cx="1760" cy="1060" r="720"/></clipPath>
+    <clipPath id="clipLower"><circle cx="820" cy="1660" r="640"/></clipPath>
+  </defs>
+
+  <rect width="3840" height="2160" fill="url(#bg)"/>
+  <path d="M 3840 0 L 3840 2160 L 2380 2160 Z" fill="url(#band)"/>
+
+  <g filter="url(#soft)">
+    <!-- Big blue sphere, right of centre -->
+    <circle cx="2740" cy="1000" r="920" fill="url(#blue)"/>
+    <!-- Cream spheres: top-left, lower-left, and the central bridging one -->
+    <circle cx="760"  cy="520"  r="780" fill="url(#cream)"/>
+    <circle cx="820"  cy="1660" r="640" fill="url(#creamWarm)"/>
+    <circle cx="1760" cy="1060" r="720" fill="url(#cream)"/>
+  </g>
+
+  <!-- Orange lives only at the seams: each glow is clipped to the front sphere,
+       so it reads as a hot crescent where two forms meet, not a floating blob. -->
+  <g filter="url(#soft)">
+    <g clip-path="url(#clipCentre)">
+      <!-- seam with the top-left cream sphere (upper-left rim of the centre sphere) -->
+      <circle cx="1150" cy="640"  r="620" fill="url(#glow)"/>
+      <!-- seam with the lower-left sphere (lower-left rim) -->
+      <circle cx="1120" cy="1560" r="560" fill="url(#glow)"/>
+    </g>
+    <g clip-path="url(#clipLower)">
+      <!-- reciprocal glow on the lower-left sphere facing the centre -->
+      <circle cx="1360" cy="1360" r="520" fill="url(#glow)"/>
+    </g>
+  </g>
+</svg>
