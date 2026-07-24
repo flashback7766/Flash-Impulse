@@ -215,10 +215,14 @@ fi_doctor() {
 # Install wizard
 
 fi_choose_components() {
-  # Populates FI_SETUP_FLAGS array. Interactive unless --yes.
-  FI_SETUP_FLAGS=()
+  # Sets the engine's SKIP_* variables (read by engine_run_install). The greeting
+  # step is always skipped — install.sh provides its own UX. Records a human-readable
+  # summary in FI_SELECTED for the install manifest.
+  export SKIP_ALLGREETING=true
+  FI_SELECTED=()
   if [[ "$FI_ASSUME_YES" == true ]]; then
     log "Non-interactive mode: full installation."
+    FI_SELECTED=(deps setups files fish fontconfig misc)
     return 0
   fi
 
@@ -231,12 +235,12 @@ fi_choose_components() {
   read -r -p "  5) Fontconfig?                            [Y/n] " fontconfig
   read -r -p "  6) Misc app configs (terminal, qt, gtk)?  [Y/n] " misc
 
-  [[ "$deps"       =~ ^[nN] ]] && FI_SETUP_FLAGS+=(--skip-alldeps)
-  [[ "$setups"     =~ ^[nN] ]] && FI_SETUP_FLAGS+=(--skip-allsetups)
-  [[ "$files"      =~ ^[nN] ]] && FI_SETUP_FLAGS+=(--skip-allfiles)
-  [[ "$fish"       =~ ^[nN] ]] && FI_SETUP_FLAGS+=(--skip-fish)
-  [[ "$fontconfig" =~ ^[nN] ]] && FI_SETUP_FLAGS+=(--skip-fontconfig)
-  [[ "$misc"       =~ ^[nN] ]] && FI_SETUP_FLAGS+=(--skip-miscconf)
+  if [[ "$deps"       =~ ^[nN] ]]; then export SKIP_ALLDEPS=true;   else FI_SELECTED+=(deps);       fi
+  if [[ "$setups"     =~ ^[nN] ]]; then export SKIP_ALLSETUPS=true; else FI_SELECTED+=(setups);     fi
+  if [[ "$files"      =~ ^[nN] ]]; then export SKIP_ALLFILES=true;  else FI_SELECTED+=(files);      fi
+  if [[ "$fish"       =~ ^[nN] ]]; then export SKIP_FISH=true;      else FI_SELECTED+=(fish);       fi
+  if [[ "$fontconfig" =~ ^[nN] ]]; then export SKIP_FONTCONFIG=true;else FI_SELECTED+=(fontconfig); fi
+  if [[ "$misc"       =~ ^[nN] ]]; then export SKIP_MISCCONF=true;  else FI_SELECTED+=(misc);       fi
   return 0
 }
 
@@ -273,7 +277,7 @@ fi_write_install_manifest() {
     printf '{\n'
     printf '  "installer": "flash-impulse",\n'
     printf '  "date": "%s",\n' "$(date -Iseconds)"
-    printf '  "setup_flags": "%s",\n' "${FI_SETUP_FLAGS[*]}"
+    printf '  "components": "%s",\n' "${FI_SELECTED[*]}"
     printf '  "backup": "%s"\n' "$(cat "${FI_STATE_DIR}/last-backup" 2> /dev/null)"
     printf '}\n'
   } > "$FI_INSTALL_MANIFEST"
@@ -287,21 +291,32 @@ fi_install() {
   fi_choose_components
   fi_migration_prompt
 
+  # Non-interactive engine runs (--yes) shouldn't pause/confirm per command.
+  [[ "$FI_ASSUME_YES" == true ]] && export ask=false
+
+  # Load the engine as a library (two-layer: this file is UX, the engine is logic).
+  # shellcheck source=sdata/lib/engine.sh
+  source ./sdata/lib/engine.sh
+
   if [[ "$FI_DRY_RUN" == true ]]; then
-    log "[dry-run] Would create backup of: ${FI_BACKUP_TARGETS[*]}"
-    log "[dry-run] Would run: ./setup install ${FI_SETUP_FLAGS[*]} $*"
+    log "Dry run — walking the full engine flow without changing anything:"
+    export DRY_RUN=true ask=false
+    engine_run_install
+    log "[dry-run] Would have backed up: ${FI_BACKUP_TARGETS[*]}"
     return 0
   fi
 
   mkdir -p "$FI_STATE_DIR"
   fi_backup_create
 
-  log "Handing over to the setup engine..."
-  local extra_flags=()
-  [[ "$FI_ASSUME_YES" == true ]] && extra_flags+=(--force)
-  # Our own backup already ran; skip the legacy single-dir backup.
-  bash ./setup install --skip-backup "${extra_flags[@]}" "${FI_SETUP_FLAGS[@]}" "$@" \
-    || die "Setup engine failed. Your pre-install backup is intact — see: ./install.sh backups"
+  # Our own timestamped backup already ran; tell the engine to skip its own.
+  export SKIP_BACKUP=true
+  log "Running the install engine..."
+  # Run under `set -e` (the step scripts are written for it) without imposing that on
+  # install.sh's own error handling.
+  if ! ( set -e; engine_run_install ); then
+    die "Install engine failed. Your pre-install backup is intact — see: ./install.sh backups"
+  fi
 
   fi_write_install_manifest
 
@@ -333,16 +348,14 @@ Subcommands:
 
 Options for install:
   -y, --yes       Non-interactive: full install, migrate existing configs
-      --dry-run   Print what would happen without changing anything
-  Anything else is passed through to the underlying \"./setup install\".
+      --dry-run   Walk the whole engine flow without changing anything
 
-Power users can still call ./setup directly for fine-grained control.
+Power users can call ./setup directly for fine-grained flags (per-step skips, fontsets).
 "
 }
 
 FI_ASSUME_YES=false
 FI_DRY_RUN=false
-FI_SETUP_FLAGS=()
 
 main() {
   local subcmd="${1:-install}"
@@ -364,17 +377,16 @@ main() {
     *) die "Unknown subcommand \"$subcmd\". See: ./install.sh help" ;;
   esac
 
-  # Parse install options; unknown ones are passed to ./setup install.
-  local passthrough=()
+  # Parse install options.
   while [[ $# -gt 0 ]]; do
     case "$1" in
       -y | --yes) FI_ASSUME_YES=true ;;
       --dry-run) FI_DRY_RUN=true ;;
-      *) passthrough+=("$1") ;;
+      *) die "Unknown option \"$1\". See ./install.sh help, or use ./setup for advanced flags." ;;
     esac
     shift
   done
-  fi_install "${passthrough[@]}"
+  fi_install
 }
 
 main "$@"

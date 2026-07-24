@@ -32,7 +32,7 @@ implicitize_old_dependencies(){
 
   echo "Attempting to set previously explicitly installed deps as implicit..."
   for i in "${explicitly_installed[@]}"; do for j in "${old_deps_list[@]}"; do
-    [ "$i" = "$j" ] && yay -D --asdeps "$i"
+    [ "$i" = "$j" ] && "$AUR_HELPER" -D --asdeps "$i"
   done; done
 
   return 0
@@ -58,13 +58,15 @@ case $SKIP_SYSUPDATE in
   *) v sudo pacman -Syu;;
 esac
 
-# Use yay. Because paru does not support cleanbuild.
-# Also see https://wiki.hyprland.org/FAQ/#how-do-i-update
-if ! command -v yay >/dev/null 2>&1;then
-  echo -e "${STY_YELLOW}[$0]: \"yay\" not found.${STY_RST}"
+# Pick an AUR helper: reuse an existing yay or paru, otherwise install yay.
+# (Only used to resolve deps; the metapackages themselves are built with makepkg.)
+if ! detect_aur_helper; then
+  echo -e "${STY_YELLOW}[$0]: No AUR helper (yay/paru) found, installing yay.${STY_RST}"
   showfun install-yay
   v install-yay
+  detect_aur_helper
 fi
+echo -e "${STY_CYAN}[$0]: Using AUR helper: ${AUR_HELPER}${STY_RST}"
 
 showfun implicitize_old_dependencies
 v implicitize_old_dependencies
@@ -78,7 +80,7 @@ install-local-pkgbuild() {
   x pushd $location
 
   source ./PKGBUILD
-  x yay -S --sudoloop $installflags --asdeps "${depends[@]}"
+  x "$AUR_HELPER" -S --sudoloop $installflags --asdeps "${depends[@]}"
   # man makepkg:
   # -A, --ignorearch: Ignore a missing or incomplete arch field in the build script.
   # -s, --syncdeps: Install missing dependencies using pacman. When build-time or run-time dependencies are not found, pacman will try to resolve them.

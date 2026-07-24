@@ -249,8 +249,9 @@ printf "${STY_CYAN}If you are already running Hyprland,${STY_RST}\n"
 printf "${STY_CYAN}Press ${STY_INVERT} Ctrl+Super+T ${STY_RST}${STY_CYAN} to select a wallpaper${STY_RST}\n"
 printf "${STY_CYAN}Press ${STY_INVERT} Super+/ ${STY_RST}${STY_CYAN} for a list of keybinds${STY_RST}\n"
 printf "\n"
-printf "${STY_CYAN}For suggestions/hints after installation:${STY_RST}\n"
-printf "${STY_CYAN}${STY_UNDERLINE} https://ii.clsty.link/en/ii-qs/01setup/#post-installation ${STY_RST}\n"
+printf "${STY_CYAN}AI sidebar: set an API key with ${STY_RST}./install.sh secrets set gemini${STY_CYAN}, or use the${STY_RST}\n"
+printf "${STY_CYAN}Claude Code models (no key needed) after installing the ${STY_RST}claude${STY_CYAN} CLI.${STY_RST}\n"
+printf "${STY_CYAN}Upstream docs still apply to most of the desktop: ${STY_UNDERLINE}https://ii.clsty.link${STY_RST}\n"
 printf "\n"
 
 if [[ -z "${ILLOGICAL_IMPULSE_VIRTUAL_ENV}" ]]; then

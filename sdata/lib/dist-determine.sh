@@ -22,12 +22,9 @@ function print_os_group_id_alike(){
 function print_os_group_id_unofficial(){
     printf "${STY_PURPLE}"
     printf "===NOTICE===\n"
-    printf "The support for your distro is provided by the community.\n"
-    printf "It is not officially supported by github:end-4/dots-hyprland .\n"
+    printf "Support for your distro is best-effort. Arch/CachyOS is the primary tested target.\n"
     printf "${STY_BOLD}"
-    printf "If you find out any problems about it, PR is welcomed if you are able to address it.\n"
-    printf "Or, create a discussion about it, but please do not submit issue, \n"
-    printf "because the developers do not use this distro, therefore they cannot help.${STY_RST}\n"
+    printf "If something breaks here, a PR fixing it is very welcome.${STY_RST}\n"
     printf "${STY_PURPLE}"
     printf "Proceed only at your own risk.\n"
     printf "============\n\n"
@@ -116,6 +113,23 @@ else
   INSTALL_VIA_NIX=true
   print_os_group_id_functions=(print_os_group_id{,_fallback,_unsupported})
 fi
+
+####################
+# Detect an AUR helper (Arch). Prefers an already-installed helper so a paru user
+# isn't forced onto yay; leaves AUR_HELPER empty if neither is present, letting the
+# caller install one. The local metapackages are built with makepkg directly, so the
+# helper is only used to resolve dependencies — yay and paru are interchangeable here.
+function detect_aur_helper(){
+  local helper
+  for helper in yay paru; do
+    if command -v "$helper" >/dev/null 2>&1; then
+      export AUR_HELPER="$helper"
+      return 0
+    fi
+  done
+  export AUR_HELPER=""
+  return 1
+}
 
 ####################
 # Detect architecture

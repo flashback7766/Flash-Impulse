@@ -20,9 +20,6 @@ STY_BLINK='\e[5m'
 STY_INVERT='\e[7m'
 STY_RST='\e[00m'
 
-# Used by register_temp_file()
-declare -a TEMP_FILES_TO_CLEANUP=()
-
 # Used by install script
 BACKUP_DIR="${BACKUP_DIR:-$HOME/ii-original-dots-backup}"
 DOTS_CORE_CONFDIR="${XDG_CONFIG_HOME}/illogical-impulse"

@@ -14,7 +14,7 @@ Options for install:
       --skip-alldeps        Skip the whole process installing dependency
       --skip-allsetups      Skip the whole process setting up permissions/services etc
       --skip-allfiles       Skip the whole process copying configuration files
-      --ignore-outdate      Ignore outdate checking for community supported \"dist-*\".
+      --ignore-outdate      Ignore the outdate check for best-effort \"dist-*\" scripts.
   -s, --skip-sysupdate      Skip system package upgrade e.g. \"sudo pacman -Syu\"
       --skip-plasmaintg     Skip installing plasma-browser-integration
       --skip-backup         Skip backup conflicting files
