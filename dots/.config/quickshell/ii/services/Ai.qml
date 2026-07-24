@@ -511,7 +511,7 @@ Singleton {
             "api_format": "openai",
         }),
         "cc-haiku": aiModelComponent.createObject(this, {
-            "name": "Claude Code · Haiku",
+            "name": "Haiku · Claude Code",
             "icon": "anthropic-symbolic",
             "description": Translation.tr("Local claude CLI | Uses your Claude subscription, no API key\nFastest Claude. Runs with Claude Code's own tools and permission system."),
             "homepage": "https://claude.com/claude-code",
@@ -520,7 +520,7 @@ Singleton {
             "api_format": "claude-code",
         }),
         "cc-sonnet": aiModelComponent.createObject(this, {
-            "name": "Claude Code · Sonnet",
+            "name": "Sonnet · Claude Code",
             "icon": "anthropic-symbolic",
             "description": Translation.tr("Local claude CLI | Uses your Claude subscription, no API key\nBalanced Claude. Runs with Claude Code's own tools and permission system."),
             "homepage": "https://claude.com/claude-code",
@@ -529,7 +529,7 @@ Singleton {
             "api_format": "claude-code",
         }),
         "cc-opus": aiModelComponent.createObject(this, {
-            "name": "Claude Code · Opus",
+            "name": "Opus · Claude Code",
             "icon": "anthropic-symbolic",
             "description": Translation.tr("Local claude CLI | Uses your Claude subscription, no API key\nMost capable Opus. Runs with Claude Code's own tools and permission system."),
             "homepage": "https://claude.com/claude-code",
@@ -538,7 +538,7 @@ Singleton {
             "api_format": "claude-code",
         }),
         "cc-fable": aiModelComponent.createObject(this, {
-            "name": "Claude Code · Fable",
+            "name": "Fable · Claude Code",
             "icon": "anthropic-symbolic",
             "description": Translation.tr("Local claude CLI | Uses your Claude subscription, no API key\nAnthropic's frontier Mythos-class model. Availability depends on your plan."),
             "homepage": "https://claude.com/claude-code",
