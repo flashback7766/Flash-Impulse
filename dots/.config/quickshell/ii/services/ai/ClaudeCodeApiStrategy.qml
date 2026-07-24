@@ -165,7 +165,14 @@ ApiStrategy {
                     if (block.name === "AskUserQuestion") {
                         message.rawContent += root.formatAskUserQuestion(block.input);
                     } else {
-                        message.rawContent += `\n\`\`\`command\n🔧 ${root.summarizeToolUse(block.name, block.input)}\n\`\`\`\n`;
+                        // One thin inline-code line per tool call. A fenced ```command```
+                        // block here would render as a tall collapsible "Running command"
+                        // row — Claude Code fires dozens of tools per turn and that
+                        // becomes a wall (it's designed for single run_shell_command use).
+                        let summary = root.summarizeToolUse(block.name, block.input)
+                            .replace(/`/g, "'").replace(/\n/g, " ");
+                        if (summary.length > 90) summary = summary.slice(0, 90) + "…";
+                        message.rawContent += `\n\`🔧 ${summary}\`\n`;
                     }
                 }
             }
