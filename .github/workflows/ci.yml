@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  shellcheck:
+    name: shellcheck installer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install shellcheck
+        run: sudo apt-get update -q && sudo apt-get install -y shellcheck
+      - name: Lint install.sh
+        run: shellcheck install.sh
+
+  qml-parse:
+    name: QML parse gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Qt declarative tools
+        run: sudo apt-get update -q && sudo apt-get install -y qt6-declarative-dev-tools
+      - name: Parse-check all shell QML
+        run: |
+          QMLFORMAT="$(command -v qmlformat || echo /usr/lib/qt6/bin/qmlformat)"
+          fail=0
+          while IFS= read -r -d '' f; do
+            "$QMLFORMAT" --check "$f" >/dev/null 2>&1; rc=$?
+            # rc 1 = formatting differs (fine), >=2 = parse error
+            if [ "$rc" -ge 2 ]; then echo "PARSE FAIL: $f"; fail=1; fi
+          done < <(find dots/.config/quickshell -name '*.qml' -print0)
+          exit "$fail"

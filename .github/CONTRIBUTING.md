@@ -1,8 +1,30 @@
-# Contributing
+# Contributing to Flash-Impulse
 
-- Please, please, please, make multiple PRs if you have many features/fixes, and don't shove your personal changes along with the PR, including changed defaults
-- We can accept features that we do not personally want, but in that case we will ask you to make it configurable/optionally loaded.
-- If you want to start working on something _big_ to contribute, it might be a good idea to ask first to not waste your effort (but if you've already done it for yourself, it doesn't hurt to submit).
+## Repo map
+
+| Path | What it is |
+|---|---|
+| `dots/` | The actual dotfiles deployed to `~` (Hyprland, Quickshell shell, terminals, …) |
+| `dots/.config/quickshell/ii/services/Ai.qml` | AI sidebar orchestrator |
+| `dots/.config/quickshell/ii/services/ai/` | Provider strategies + command safety pipeline |
+| `install.sh` | User-facing installer (backup/rollback/secrets/doctor) |
+| `setup`, `sdata/` | Lower-level install engine inherited from upstream |
+| `docs/` | Architecture docs |
+| `ROADMAP.md` | Direction and design decisions — read this first |
+
+## Fork rules
+
+- **Bash** must pass `shellcheck`; **QML** must parse (`qmlformat --check`). CI enforces
+  both.
+- **AI subsystem changes**: read [docs/ai-architecture.md](../docs/ai-architecture.md)
+  first, and update it when you change the architecture.
+- **Model IDs / pricing**: never from memory — check the provider's official docs and put
+  the date in the commit message.
+- **No upstream-sync PRs**: this fork is independent from end-4/dots-hyprland; discuss in
+  an issue first if you think something should be pulled in.
+- Make multiple PRs if you have many features/fixes; don't shove personal changes
+  (including changed defaults) along with a PR.
+- Commits: imperative subject, body explains *why*. One logical change per commit.
 
 # Translations
 
@@ -26,9 +48,9 @@ See `dots/.config/quickshell/ii/translations/tools`
 - Spaces
   - Space properties and children data into meaningful groups. (but of course, don't use 2+ blanks in a row)
   - Put spaces between text and operators: `if (condition) { ... } else { ... }` instead of `if(condition){ ... }else{ ... }`
-- As you can see, it's pretty easy to use lots of nesting. There's no hard limit, end-4 himself nests a lot too, but avoid/mitigate that:
+- It's pretty easy to use lots of nesting. There's no hard limit, but avoid/mitigate that:
   - Prefer early return: Use something like `if (!condition) return; doStuff();` instead of `if (condition) { doStuff() }`
-  - If you feel it's a bother to refractor something into a new file, remember there's `component` to declare reusable components in the same file.
+  - If you feel it's a bother to refactor something into a new file, remember there's `component` to declare reusable components in the same file.
 
 # Setting up
 
@@ -38,7 +60,7 @@ The following instruction assumes that you have an Arch(-based) Linux system.
 
 _Might not be necessary depending on what you change, but this is recommended._
 
-- [Install](https://ii.clsty.link/en/ii-qs/01setup/) the dotfiles (if you don't wanna replace your stuff completely, do it on a new user).
+- Install the dotfiles with `./install.sh` (if you don't wanna replace your stuff completely, do it on a new user).
 - Make changes, copy changes to a fork, create PR.
 
 ## Partially working shell
@@ -62,3 +84,9 @@ If your changes involves using python package or script, please use the virtual 
   - Open `~/.config/quickshell/ii` in your code editor.
   - In a terminal run `pkill qs; qs -c ii` to start the shell in the terminal (for logs).
   - Make edits in the opened folder. Changes are reloaded live.
+
+# Testing the installer
+
+1. `bash -n` / `shellcheck` your shell changes.
+2. Run with `--dry-run` first; then on a spare user account verify that
+   `install.sh backups` shows a backup and `install.sh rollback` restores it.

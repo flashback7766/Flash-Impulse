@@ -7,6 +7,10 @@
 # API-key storage and an environment doctor.
 #
 # Usage: ./install.sh [subcommand] [options]   (see ./install.sh help)
+#
+# shellcheck disable=SC1091  # sourced libs live in sdata/, not followed by shellcheck
+# shellcheck disable=SC2059  # printf formats deliberately embed the STY_* color vars
+# shellcheck disable=SC2012  # ls is only used on our own timestamp-named backup dirs
 
 set -o pipefail
 
