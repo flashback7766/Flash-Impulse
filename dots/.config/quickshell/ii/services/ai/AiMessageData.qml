@@ -9,9 +9,10 @@ QtObject {
     property string rawContent
     property string fileMimeType
     property string fileUri
+    property string fileBase64
+    property string fileTextContent  // Extracted text content from non-image files
     property string localFilePath
     property string model
-    property bool thinking: true
     property bool done: false
     property var annotations: []
     property var annotationSources: []
@@ -20,5 +21,7 @@ QtObject {
     property var functionCall
     property string functionResponse
     property bool functionPending: false
+    property string contentBeforeCommand
+    property var functionCallParts
     property bool visibleToUser: true
 }

@@ -10,6 +10,7 @@ Singleton {
      * @returns {string}
      */
     function trimFileProtocol(str) {
+        if (str === undefined || str === null) return "";
         let s = str;
         if (typeof s !== "string") s = str.toString(); // Convert to string if it's an url or whatever
         return s.startsWith("file://") ? s.slice(7) : s;
@@ -67,5 +68,15 @@ Singleton {
         if (parts.length <= 1) return "";
         parts.pop();
         return parts.join("/");
+    }
+
+    /**
+     * Creates a directory at the given path
+     * @param {string} str
+     */
+    function createDir(str) {
+        if (!str) return;
+        const trimmed = trimFileProtocol(str);
+        Quickshell.execDetached(["mkdir", "-p", trimmed]);
     }
 }

@@ -2,13 +2,22 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.services
 import QtQuick
+import QtQuick.Layouts
 
 GroupButton {
     id: button
     property string buttonIcon
     property bool activated: false
     toggled: activated
-    baseWidth: height
+    
+    Layout.fillWidth: false
+    Layout.fillHeight: false
+    
+    implicitWidth: 32
+    implicitHeight: 32
+    baseWidth: 32
+    baseHeight: 32
+    
     colBackgroundHover: Appearance.colors.colSecondaryContainerHover
     colBackgroundActive: Appearance.colors.colSecondaryContainerActive
 

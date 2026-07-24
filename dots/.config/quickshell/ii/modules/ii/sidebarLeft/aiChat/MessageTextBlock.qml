@@ -42,12 +42,13 @@ ColumnLayout {
     }
 
     function renderLatex() {
-        // Regex for $...$, $$...$$, \[...\]
-        // Note: This is a simple approach and may need refinement for edge cases
+        // Regex for $$...$$, $...$, \[...\], \(...\). We pass the full delimited
+        // match to the renderer so the later content.replace(expression, image)
+        // can find and substitute the original delimited substring back.
         let regex = /(\$\$([\s\S]+?)\$\$)|(\$([^\$]+?)\$)|(\\\[((?:.|\n)+?)\\\])|(\\\(([\s\S]+?)\\\))/g;
         let match;
         while ((match = regex.exec(segmentContent)) !== null) {
-            let expression = match[1] || match[2] || match[3] || match[4] || match[5] || match[6] || match[7] || match[8];
+            let expression = match[1] || match[3] || match[5] || match[7];
             if (expression) {
                 Qt.callLater(() => {
                     const [renderHash, isNew] = LatexRenderer.requestRender(expression.trim());

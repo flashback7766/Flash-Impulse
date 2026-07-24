@@ -10,24 +10,28 @@ ApiStrategy {
     property string buffer: ""
     
     function buildEndpoint(model: AiModel): string {
-        const result = model.endpoint + `?key=\$\{${root.apiKeyEnvVarName}\}`
-        // console.log("[AI] Endpoint: " + result);
+        const result = model.endpoint + `?key=\$\{${apiKeyEnvVarName}\}`
         return result;
     }
 
     function buildRequestData(model: AiModel, messages, systemPrompt: string, temperature: real, tools: list<var>, filePath: string) {
+        console.log("[AI] Gemini Request Start: " + model.model);
+        // Google Search grounding is mutually exclusive with function calling, so the
+        // function-call/result branches below are skipped entirely when search is on.
+        const usingSearch = Array.isArray(tools) && tools.length > 0 && tools[0]?.google_search !== undefined;
         let contents = messages.map(message => {
-            // console.log("[AI] Building request data for message:", JSON.stringify(message, null, 2));
             const geminiApiRoleName = (message.role === "assistant") ? "model" : message.role;
-            const usingSearch = tools[0]?.google_search !== undefined
             if (!usingSearch && message.functionCall != undefined && message.functionName.length > 0) {
+                // Use saved parts (includes thought_signature from API response)
+                if (message.functionCallParts && message.functionCallParts.length > 0) {
+                    return {
+                        "role": geminiApiRoleName,
+                        "parts": message.functionCallParts
+                    }
+                }
                 return {
                     "role": geminiApiRoleName,
-                    "parts": [{
-                        functionCall: {
-                            "name": message.functionName,
-                        }
-                    }]
+                    "parts": [{ functionCall: { "name": message.functionName, "args": message.functionCall?.args ?? {} } }]
                 }
             }
             if (!usingSearch && message.functionResponse != undefined && message.functionName.length > 0) {
@@ -44,146 +48,289 @@ ApiStrategy {
             return {
                 "role": geminiApiRoleName,
                 "parts": [
-                    { text: message.rawContent },
+                    { text: message.rawContent || " " },
+                    // Inline binary data (images, etc)
+                    ...(message.fileBase64 && message.fileBase64.length > 0 ? [{
+                        "inline_data": {
+                            "mime_type": message.fileMimeType,
+                            "data": message.fileBase64
+                        }
+                    }] : []),
+                    // File URI (uploaded via File API)
                     ...(message.fileUri && message.fileUri.length > 0 ? [{ 
                         "file_data": {
                             "mime_type": message.fileMimeType,
                             "file_uri": message.fileUri
                         }
+                    }] : []),
+                    // Text file content (non-image files read as text)
+                    ...(message.fileTextContent && message.fileTextContent.length > 0 ? [{
+                        "text": "[Attached file: " + (message.localFilePath ? message.localFilePath.split("/").pop() : "file") + " (" + (message.fileMimeType || "text") + ")]\n```\n" + message.fileTextContent + "\n```"
                     }] : [])
                 ]
             }
         })
         if (filePath && filePath.length > 0) {
-            const trimmedFilePath = CF.FileUtils.trimFileProtocol(filePath);
-            // Add file_data part to the last message's parts array
             contents[contents.length - 1].parts.unshift({
-                file_data: {
+                inline_data: {
                     mime_type: fileMimeTypeSubstitutionString,
-                    file_uri: fileUriSubstitutionString
+                    data: fileUriSubstitutionString
                 }
             });
         }
-        let baseData = {
-            "contents": contents,
-            "tools": tools,
-            "system_instruction": {
-                "parts": [{ text: systemPrompt }]
-            },
-            "generationConfig": {
-                "temperature": temperature,
-            },
+        
+        let generationConfig = {
+            "temperature": temperature,
+            "topP": 0.95,
+            "topK": 40,
+            "maxOutputTokens": 8192,
         };
-        // print("Gemini API call payload:", JSON.stringify(baseData, null, 2));
-        return model.extraParams ? Object.assign({}, baseData, model.extraParams) : baseData;
+
+        // Gemini requires alternating roles (user, model, user, model).
+        let alternatingContents = [];
+        if (contents.length > 0) {
+            let lastRole = "";
+            for (let i = 0; i < contents.length; i++) {
+                if (contents[i].role === lastRole && alternatingContents.length > 0) {
+                    alternatingContents[alternatingContents.length - 1].parts = 
+                        alternatingContents[alternatingContents.length - 1].parts.concat(contents[i].parts);
+                } else {
+                    alternatingContents.push(contents[i]);
+                    lastRole = contents[i].role;
+                }
+            }
+        }
+
+        const requestData = {
+            "contents": alternatingContents,
+            "generationConfig": generationConfig
+        };
+
+        if (systemPrompt && systemPrompt.length > 0) {
+            requestData.system_instruction = { "parts": [{ "text": systemPrompt }] };
+        }
+
+        if (tools && tools.length > 0) {
+            requestData.tools = tools;
+        }
+
+        print("[AI] Gemini Request: " + alternatingContents.length + " messages");
+        return model.extraParams ? Object.assign({}, requestData, model.extraParams) : requestData;
     }
 
     function buildAuthorizationHeader(apiKeyEnvVarName: string): string {
-        // Gemini doesn't use Authorization header, key is in URL
         return "";
     }
 
     function parseResponseLine(line, message) {
-        if (line.startsWith("[")) {
-            buffer += line.slice(1).trim();
-        } else if (line === "]") {
-            buffer += line.slice(0, -1).trim();
-            return parseBuffer(message);
-        } else if (line.startsWith(",")) {
-            return parseBuffer(message);
-        } else {
-            buffer += line.trim();
-        }
-        return {};
+        let cleanLine = line.trim();
+        if (cleanLine.length === 0) return {};
+
+        // Accumulate line to buffer
+        buffer += cleanLine;
+
+        // Try to parse what we have.
+        return parseBuffer(message, true);
     }
 
-    function parseBuffer(message) {
-        // console.log("[Ai] Gemini buffer: ", buffer);
+    /**
+     * Find the first complete top-level JSON object inside `text`. Returns
+     * { object: parsed-or-null, end: index-past-its-closing-brace, broken: bool }.
+     * Skips leading array tokens / commas / whitespace. `broken` means the input
+     * starts with `{` but the matching `}` hasn't arrived yet (caller should keep
+     * accumulating).
+     */
+    function _firstJsonObject(text) {
+        let i = 0;
+        const n = text.length;
+        while (i < n) {
+            const c = text[i];
+            if (c === ' ' || c === '\n' || c === '\r' || c === '\t' || c === ',' || c === '[' || c === ']') { i++; continue; }
+            break;
+        }
+        if (i >= n) return { object: null, end: i, broken: false };
+        if (text[i] !== '{') {
+            // Junk we don't recognise — drop one char and keep looking
+            return { object: null, end: i + 1, broken: false };
+        }
+        const start = i;
+        let depth = 0;
+        let inString = false;
+        let escaped = false;
+        for (; i < n; i++) {
+            const ch = text[i];
+            if (escaped) { escaped = false; continue; }
+            if (ch === '\\') { escaped = true; continue; }
+            if (ch === '"') { inString = !inString; continue; }
+            if (inString) continue;
+            if (ch === '{') depth++;
+            else if (ch === '}') {
+                depth--;
+                if (depth === 0) { i++; break; }
+            }
+        }
+        if (depth !== 0) return { object: null, end: start, broken: true };
+        const slice = text.slice(start, i);
+        try {
+            return { object: JSON.parse(slice), end: i, broken: false };
+        } catch (e) {
+            // Malformed — skip past it
+            return { object: null, end: i, broken: false };
+        }
+    }
+
+    function parseBuffer(message, isPartial = false) {
+        if (buffer.length === 0) return {};
+
+        // Drain every complete top-level object. Combine their effects so a single
+        // call to parseResponseLine handling N objects still reports the strongest
+        // signal back to Ai.qml (functionCall > finished > tokenUsage > content).
+        let combined = {};
+        let progressed = true;
+        while (progressed) {
+            progressed = false;
+            const found = _firstJsonObject(buffer);
+            if (found.broken) {
+                // Wait for more bytes
+                buffer = buffer.slice(found.end);
+                break;
+            }
+            if (found.end > 0) {
+                const dataJson = found.object;
+                buffer = buffer.slice(found.end);
+                progressed = true;
+                if (dataJson) {
+                    const r = _processJsonObject(dataJson, message);
+                    combined = _mergeResult(combined, r);
+                }
+            }
+        }
+        return combined;
+    }
+
+    function _mergeResult(a, b) {
+        if (!b) return a;
+        const out = Object.assign({}, a);
+        // functionCall trumps everything (drives the next turn)
+        if (b.functionCall) out.functionCall = b.functionCall;
+        if (b.tokenUsage) out.tokenUsage = b.tokenUsage;
+        if (b.errorCode !== undefined) out.errorCode = b.errorCode;
+        // `finished` is sticky — once any object reports it we stay finished
+        if (b.finished) out.finished = true;
+        return out;
+    }
+
+    function _processJsonObject(dataJson, message) {
         let finished = false;
         try {
-            if (buffer.length === 0) return {};
-            const dataJson = JSON.parse(buffer);
 
-            // Uploaded file
+            // Uploaded file (legacy File API)
             if (dataJson.uploadedFile) {
                 message.fileUri = dataJson.uploadedFile.uri;
                 message.fileMimeType = dataJson.uploadedFile.mimeType;
                 return ({})
             }
 
+            // Inline file (base64 approach for images)
+            if (dataJson.inlineFile) {
+                message.fileBase64 = dataJson.inlineFile.data;
+                message.fileMimeType = dataJson.inlineFile.mimeType;
+                return ({});
+            }
+
+            // Text file (non-image content extracted by shell)
+            if (dataJson.textFile) {
+                message.fileTextContent = dataJson.textFile.content;
+                message.fileMimeType = dataJson.textFile.mimeType;
+                if (dataJson.textFile.name) message.localFilePath = dataJson.textFile.name;
+                return ({});
+            }
+
             // Error response handling
             if (dataJson.error) {
                 const errorMsg = `**Error ${dataJson.error.code}**: ${dataJson.error.message}`;
                 message.rawContent += errorMsg;
-                message.content += errorMsg;
-                return { finished: true };
+                return { finished: true, errorCode: dataJson.error.code };
             }
 
+            // Usage metadata can arrive in a chunk on its own (no candidates) — extract first
+            // so the final cost/speed numbers aren't dropped.
+            const usageMetadata = dataJson.usageMetadata;
+
             // No candidates?
-            if (!dataJson.candidates) return {};
-            
-            // Finished?
+            if (!dataJson.candidates) {
+                if (usageMetadata) {
+                    return {
+                        tokenUsage: {
+                            input: usageMetadata.promptTokenCount ?? -1,
+                            output: usageMetadata.candidatesTokenCount ?? -1,
+                            total: usageMetadata.totalTokenCount ?? -1,
+                        }
+                    };
+                }
+                return {};
+            }
+
+            // Finished? Any non-empty finishReason means the model is done with
+            // this turn (STOP for normal completion, plus SAFETY/MAX_TOKENS/etc).
             if (dataJson.candidates[0]?.finishReason) {
                 finished = true;
             }
-            
-            // Function call handling
-            if (dataJson.candidates[0]?.content?.parts[0]?.functionCall) {
-                const functionCall = dataJson.candidates[0]?.content?.parts[0]?.functionCall;
+
+            const parts = dataJson.candidates[0]?.content?.parts;
+            if (!parts || parts.length === 0) return { finished: finished };
+
+            // Find and process parts
+            for (let i = 0; i < parts.length; i++) {
+                const part = parts[i];
+                if (!part) continue;
+
+                // Handle text parts
+                const text = part.text || "";
+                if (text && text.length > 0) {
+                    message.rawContent += text;
+                }
+                
+                // Handle thinking/reasoning parts (Gemini 3.1 Pro might use 'thought')
+                // We keep it invisible as requested, but we could log it for debug
+                const thought = part.thought || "";
+                if (thought && thought.length > 0) {
+                    console.log("[AI] Gemini Thought: " + thought);
+                }
+            }
+
+            // Find functionCall part
+            let functionCallPart = null;
+            for (let i = 0; i < parts.length; i++) {
+                if (parts[i] && parts[i].functionCall) {
+                    functionCallPart = parts[i];
+                    break;
+                }
+            }
+            if (functionCallPart) {
+                const functionCall = functionCallPart.functionCall;
                 message.functionName = functionCall.name;
-                message.functionCall = functionCall.name;
-                const newContent = `\n\n[[ Function: ${functionCall.name}(${JSON.stringify(functionCall.args, null, 2)}) ]]\n`
-                message.rawContent += newContent;
-                message.content += newContent;
+                message.functionCall = { name: functionCall.name, args: functionCall.args ?? {} };
+                message.functionCallParts = parts;
+                const rawEntry = `\n\n[[ Function: ${functionCall.name}(${JSON.stringify(functionCall.args)}) ]]\n`;
+                message.rawContent += rawEntry;
                 return { functionCall: { name: functionCall.name, args: functionCall.args }, finished: finished };
             }
 
-            // Normal text response
-            const responseContent = dataJson.candidates[0]?.content?.parts[0]?.text
-            message.rawContent += responseContent;
-            message.content += responseContent;
-            
-            // Handle annotations and metadata
-            const annotationSources = dataJson.candidates[0]?.groundingMetadata?.groundingChunks?.map(chunk => {
-                return {
-                    "type": "url_citation",
-                    "text": chunk?.web?.title,
-                    "url": chunk?.web?.uri,
-                }
-            }) ?? [];
-
-            const annotations = dataJson.candidates[0]?.groundingMetadata?.groundingSupports?.map(citation => {
-                return {
-                    "type": "url_citation",
-                    "start_index": citation.segment?.startIndex,
-                    "end_index": citation.segment?.endIndex,
-                    "text": citation?.segment.text,
-                    "url": annotationSources[citation.groundingChunkIndices[0]]?.url,
-                    "sources": citation.groundingChunkIndices
-                }
-            });
-            message.annotationSources = annotationSources;
-            message.annotations = annotations;
-            message.searchQueries = dataJson.candidates[0]?.groundingMetadata?.webSearchQueries ?? [];
-
-            // Usage metadata
-            if (dataJson.usageMetadata) {
+            // Token Usage
+            if (usageMetadata) {
                 return {
                     tokenUsage: {
-                        input: dataJson.usageMetadata.promptTokenCount ?? -1,
-                        output: dataJson.usageMetadata.candidatesTokenCount ?? -1,
-                        total: dataJson.usageMetadata.totalTokenCount ?? -1
+                        input: usageMetadata.promptTokenCount ?? -1,
+                        output: usageMetadata.candidatesTokenCount ?? -1,
+                        total: usageMetadata.totalTokenCount ?? -1,
                     },
                     finished: finished
                 };
             }
-            
+
         } catch (e) {
-            console.log("[AI] Gemini: Could not parse buffer: ", e);
-            message.rawContent += buffer;
-            message.content += buffer;
-        } finally {
-            buffer = "";
+            console.log("[AI] Gemini: Could not process JSON object: ", e);
         }
         return { finished: finished };
     }
@@ -198,52 +345,27 @@ ApiStrategy {
 
     function buildScriptFileSetup(filePath) {
         const trimmedFilePath = CF.FileUtils.trimFileProtocol(filePath);
-        let content = ""
-
-        // print("file path:", filePath)
-        // print("trimmed file path:", trimmedFilePath)
-        // print("escaped file path:", CF.StringUtils.shellSingleQuoteEscape(trimmedFilePath))
-
-        content += `IMAGE_PATH='${CF.StringUtils.shellSingleQuoteEscape(trimmedFilePath)}'\n`;
-        content += `${fileMimeTypeVarName}=$(file -b --mime-type "$IMAGE_PATH")\n`;
-        content += 'NUM_BYTES=$(wc -c < "${IMAGE_PATH}")\n';
-        content += 'tmp_header_file="/tmp/quickshell/ai/upload-header.tmp"\n';
-        content += 'tmp_file_info_file="/tmp/quickshell/ai/file-info.json.tmp"\n';
-
-        // Initial resumable request defining metadata.
-        // The upload url is in the response headers dump them to a file.
-        content += 'curl "https://generativelanguage.googleapis.com/upload/v1beta/files"'
-            + ` -H "x-goog-api-key: \$${apiKeyEnvVarName}"`
-            + ' -D $tmp_header_file'
-            + ' -H "X-Goog-Upload-Protocol: resumable"'
-            + ' -H "X-Goog-Upload-Command: start"'
-            + ' -H "X-Goog-Upload-Header-Content-Length: ${NUM_BYTES}"'
-            + ` -H "X-Goog-Upload-Header-Content-Type: \${${fileMimeTypeVarName}}"`
-            + ' -H "Content-Type: application/json"'
-            + ` -d "{'file': {'display_name': 'Image'}}" 2> /dev/null`
-            + '\n';
-
-        // Get file upload header
-        content += 'upload_url=$(grep -i "x-goog-upload-url: " "${tmp_header_file}" | cut -d" " -f2 | tr -d "\r")\n';
-        content += 'rm "${tmp_header_file}"\n';
-
-        // Upload the actual file
-        content += 'curl "${upload_url}"'
-            + ` -H "x-goog-api-key: \$${apiKeyEnvVarName}"`
-            + ' -H "Content-Length: ${NUM_BYTES}"'
-            + ' -H "X-Goog-Upload-Offset: 0"'
-            + ' -H "X-Goog-Upload-Command: upload, finalize"'
-            + ' --data-binary "@${IMAGE_PATH}" 2> /dev/null > "${tmp_file_info_file}"'
-            + '\n';
-
-        content += `${fileUriVarName}=$(jq -r ".file.uri" "$tmp_file_info_file")\n`
-        content += `printf "{\\"uploadedFile\\": {\\"uri\\": \\"$${fileUriVarName}\\", \\"mimeType\\": \\"$${fileMimeTypeVarName}\\"}}\\n,\\n"\n`
-
-        return content
+        const escapedPath = CF.StringUtils.shellSingleQuoteEscape(trimmedFilePath);
+        let content = "";
+        content += "IMAGE_PATH='" + escapedPath + "'\n";
+        content += fileMimeTypeVarName + "=$(file -b --mime-type \"$IMAGE_PATH\")\n";
+        // For images: encode as base64 inline data (Gemini native)
+        // For other types: read as text content
+        content += "if echo \"$" + fileMimeTypeVarName + "\" | grep -qE '^(image|audio|video)/'; then\n";
+        content += "  " + fileUriVarName + "=$(base64 -w0 \"$IMAGE_PATH\")\n";
+        content += "  printf '{\"inlineFile\": {\"data\": \"%s\", \"mimeType\": \"%s\"}}\\n,\\n' \"$" + fileUriVarName + "\" \"$" + fileMimeTypeVarName + "\"\n";
+        content += "else\n";
+        content += "  ATTACH_TEXT=$(head -c 100000 \"$IMAGE_PATH\" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))' 2>/dev/null || head -c 50000 \"$IMAGE_PATH\")\n";
+        content += "  ATTACH_NAME=$(basename \"$IMAGE_PATH\")\n";
+        content += "  printf '{\"textFile\": {\"content\": %s, \"mimeType\": \"%s\", \"name\": \"%s\"}}\\n,\\n' \"$ATTACH_TEXT\" \"$" + fileMimeTypeVarName + "\" \"$ATTACH_NAME\"\n";
+        content += "fi\n";
+        return content;
     }
 
     function finalizeScriptContent(scriptContent: string): string {
-        return scriptContent.replace(fileMimeTypeSubstitutionString, `'"\$${fileMimeTypeVarName}"'`)
-                            .replace(fileUriSubstitutionString, `'"\$${fileUriVarName}"'`);
+        // Use split/join to replace ALL occurrences (QML JS lacks String.replaceAll)
+        return scriptContent
+            .split(fileMimeTypeSubstitutionString).join(`'"\$${fileMimeTypeVarName}"'`)
+            .split(fileUriSubstitutionString).join(`'"\$${fileUriVarName}"'`);
     }
 }

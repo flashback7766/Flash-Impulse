@@ -46,14 +46,15 @@ Singleton {
     }
 
     /**
-     * Splits markdown blocks into three different types: text, think, and code.
+     * Splits markdown into text and fenced-code blocks.
      * @param { string } markdown
-     * @returns {Array<{type: "text" | "think" | "code", content: string, lang?: string, completed?: boolean}>}
+     * @returns {Array<{type: "text" | "code", content: string, lang?: string, completed?: boolean}>}
      */
     function splitMarkdownBlocks(markdown) {
-        const regex = /```(\w+)?\n([\s\S]*?)```|<think>([\s\S]*?)<\/think>/g;
+        // Two alternatives: with-language-then-newline, or one-liner with no language.
+        const regex = /```(\w+)\n([\s\S]*?)```|```([\s\S]*?)```/g;
         /**
-         * @type {{type: "text" | "think" | "code"; content: string; lang: string | undefined; completed: boolean | undefined}[]}
+         * @type {{type: "text" | "code"; content: string; lang: string | undefined; completed: boolean | undefined}[]}
          */
         let result = [];
         let lastIndex = 0;
@@ -68,49 +69,22 @@ Singleton {
                     });
                 }
             }
-            if (match[0].startsWith('```')) {
-                if (match[2] && match[2].trim()) {
-                    result.push({
-                        type: "code",
-                        lang: match[1] || "",
-                        content: match[2],
-                        completed: true
-                    });
-                }
-            } else if (match[0].startsWith('<think>')) {
-                if (match[3] && match[3].trim()) {
-                    result.push({
-                        type: "think",
-                        content: match[3],
-                        completed: true
-                    });
-                }
+            const lang = match[1] || "";
+            const content = match[2] !== undefined ? match[2] : (match[3] || "");
+            if (content.trim()) {
+                result.push({
+                    type: "code",
+                    lang,
+                    content,
+                    completed: true
+                });
             }
             lastIndex = regex.lastIndex;
         }
-        // Handle any remaining text after the last match
         if (lastIndex < markdown.length) {
             const text = markdown.slice(lastIndex);
-            // Check for unfinished <think> block
-            const thinkStart = text.indexOf('<think>');
             const codeStart = text.indexOf('```');
-            if (thinkStart !== -1 && (codeStart === -1 || thinkStart < codeStart)) {
-                const beforeThink = text.slice(0, thinkStart);
-                if (beforeThink.trim()) {
-                    result.push({
-                        type: "text",
-                        content: beforeThink
-                    });
-                }
-                const thinkContent = text.slice(thinkStart + 7);
-                if (thinkContent.trim()) {
-                    result.push({
-                        type: "think",
-                        content: thinkContent,
-                        completed: false
-                    });
-                }
-            } else if (codeStart !== -1) {
+            if (codeStart !== -1) {
                 const beforeCode = text.slice(0, codeStart);
                 if (beforeCode.trim()) {
                     result.push({
@@ -291,7 +265,7 @@ Singleton {
         return str.replace(/[-_]/g, " ").replace(
             /\w\S*/g,
             function(txt) {
-            return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+            return txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase();
             }
         );
     }

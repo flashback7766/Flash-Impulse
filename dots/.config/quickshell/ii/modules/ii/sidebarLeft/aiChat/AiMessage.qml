@@ -14,13 +14,14 @@ Rectangle {
     property var messageInputField
 
     property real messagePadding: 7
-    property real contentSpacing: 3
+    property real contentSpacing: 4
 
     property bool enableMouseSelection: false
     property bool renderMarkdown: true
     property bool editing: false
+    property bool isContinuation: false
 
-    property list<var> messageBlocks: StringUtils.splitMarkdownBlocks(root.messageData?.content)
+    property list<var> messageBlocks: StringUtils.splitMarkdownBlocks(root.messageData?.content ?? "")
 
     anchors.left: parent?.left
     anchors.right: parent?.right
@@ -31,25 +32,25 @@ Rectangle {
 
     function saveMessage() {
         if (!root.editing) return;
-        // Get all Loader children (each represents a segment)
-        const segments = messageContentColumnLayout.children
-            .map(child => child.segment)
-            .filter(segment => (segment));
-
-        // Reconstruct markdown
-        const newContent = segments.map(segment => {
-            if (segment.type === "code") {
-                const lang = segment.lang ? segment.lang : "";
-                // Remove trailing newlines
-                const code = segment.content.replace(/\n+$/, "");
-                return "```" + lang + "\n" + code + "\n```";
+        let newContent = "";
+        const children = messageContentColumnLayout.children;
+        for (let i = 0; i < children.length; i++) {
+            const child = children[i];
+            if (child["segmentContent"] === undefined) continue;
+            const content = child["segmentContent"] ?? "";
+            const lang = child["segmentLang"];
+            const isCmd = child["isCommandRequest"];
+            if (lang !== undefined) {
+                if (isCmd) continue;
+                const cleanCode = content.replace(/\n+$/, "");
+                newContent += "```" + (lang ?? "") + "\n" + cleanCode + "\n```";
             } else {
-                return segment.content;
+                newContent += content;
             }
-        }).join("");
-
-        root.editing = false
+        }
+        root.editing = false;
         root.messageData.content = newContent;
+        root.messageData.rawContent = newContent;
     }
 
     Keys.onPressed: (event) => {
@@ -68,16 +69,40 @@ Rectangle {
         }
     }
 
+    ListView.onReused: {
+        root.editing = false;
+        root.renderMarkdown = true;
+        root.enableMouseSelection = false;
+    }
+
+    visible: messageData?.visibleToUser ?? true
+    height: visible ? implicitHeight : 0
+    opacity: visible ? 1 : 0
+
+    Behavior on height {
+        animation: Appearance.animation.elementMove.numberAnimation.createObject(this)
+    }
+    Behavior on opacity {
+        NumberAnimation {
+            duration: Appearance.animation.elementMoveFast.duration
+            easing.type: Easing.InOutQuad
+        }
+    }
+
     ColumnLayout { // Main layout of the whole thing
         id: columnLayout
-
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        anchors.margins: messagePadding
+        anchors.leftMargin: messagePadding
+        anchors.rightMargin: messagePadding
+        anchors.bottomMargin: messagePadding
+        anchors.topMargin: root.isContinuation ? 4 : messagePadding
         spacing: root.contentSpacing
 
         Rectangle {
+            id: headerRect
+            visible: !root.isContinuation
             Layout.fillWidth: true
             implicitWidth: headerRowLayout.implicitWidth + 4 * 2
             implicitHeight: headerRowLayout.implicitHeight + 4 * 2
@@ -116,10 +141,10 @@ Rectangle {
                             CustomIcon {
                                 id: modelIcon
                                 anchors.centerIn: parent
-                                visible: messageData?.role == 'assistant' && Ai.models[messageData?.model].icon
+                                visible: messageData?.role == 'assistant' && Ai.models[messageData?.model]?.icon
                                 width: Appearance.font.pixelSize.large
                                 height: Appearance.font.pixelSize.large
-                                source: messageData?.role == 'assistant' ? Ai.models[messageData?.model].icon :
+                                source: messageData?.role == 'assistant' ? (Ai.models[messageData?.model]?.icon ?? '') :
                                     messageData?.role == 'user' ? 'linux-symbolic' : 'desktop-symbolic'
 
                                 colorize: true
@@ -144,9 +169,9 @@ Rectangle {
                             Layout.alignment: Qt.AlignVCenter
                             Layout.fillWidth: true
                             elide: Text.ElideRight
-                            font.pixelSize: Appearance.font.pixelSize.normal
+                            font.pixelSize: Appearance.font.pixelSize.normal + 2
                             color: Appearance.m3colors.m3onSecondaryContainer
-                            text: messageData?.role == 'assistant' ? Ai.models[messageData?.model].name :
+                            text: messageData?.role == 'assistant' ? (Ai.models[messageData?.model]?.name ?? messageData?.model ?? 'Assistant') :
                                 (messageData?.role == 'user' && SystemInfo.username) ? SystemInfo.username :
                                 Translation.tr("Interface")
                         }
@@ -174,7 +199,7 @@ Rectangle {
                     }
                 }
 
-                ButtonGroup {
+                RowLayout {
                     spacing: 5
 
                     AiMessageControlButton {
@@ -183,7 +208,7 @@ Rectangle {
                         visible: messageData?.role === 'assistant'
 
                         onClicked: {
-                            Ai.regenerate(root.messageIndex)
+                            Ai.regenerateById(root.modelData)
                         }
                         
                         StyledToolTip {
@@ -242,12 +267,22 @@ Rectangle {
                     }
                     AiMessageControlButton {
                         id: deleteButton
-                        buttonIcon: "close"
+                        buttonIcon: activated ? "delete_forever" : "delete"
                         onClicked: {
-                            Ai.removeMessage(root.messageIndex)
+                            if (activated) {
+                                Ai.removeMessageById(root.modelData);
+                            } else {
+                                activated = true;
+                                deleteConfirmTimer.restart();
+                            }
+                        }
+                        Timer {
+                            id: deleteConfirmTimer
+                            interval: 2000
+                            onTriggered: deleteButton.activated = false
                         }
                         StyledToolTip {
-                            text: Translation.tr("Delete")
+                            text: deleteButton.activated ? Translation.tr("Click again to confirm delete") : Translation.tr("Delete message")
                         }
                     }
                 }
@@ -256,7 +291,7 @@ Rectangle {
 
         Loader {
             Layout.fillWidth: true
-            active: root.messageData?.localFilePath && root.messageData?.localFilePath.length > 0
+            active: (root.messageData?.localFilePath ?? "").length > 0
             sourceComponent: AttachedFileIndicator {
                 filePath: root.messageData?.localFilePath
                 canRemove: false
@@ -279,7 +314,7 @@ Rectangle {
                 FadeLoader {
                     id: loadingIndicatorLoader
                     anchors.centerIn: parent
-                    shown: (root.messageBlocks.length < 1) && (!root.messageData.done)
+                    shown: (root.messageBlocks.length < 1) && (!root.messageData?.done ?? false)
                     sourceComponent: MaterialLoadingIndicator {
                         loading: true
                     }
@@ -301,15 +336,6 @@ Rectangle {
                         segmentLang: modelData.lang
                         messageData: root.messageData
                     } }
-                    DelegateChoice { roleValue: "think"; MessageThinkBlock {
-                        editing: root.editing
-                        renderMarkdown: root.renderMarkdown
-                        enableMouseSelection: root.enableMouseSelection
-                        segmentContent: modelData.content
-                        messageData: root.messageData
-                        done: root.messageData?.done ?? false
-                        completed: modelData.completed ?? false
-                    } }
                     DelegateChoice { roleValue: "text"; MessageTextBlock {
                         editing: root.editing
                         renderMarkdown: root.renderMarkdown
@@ -317,7 +343,7 @@ Rectangle {
                         segmentContent: modelData.content
                         messageData: root.messageData
                         done: root.messageData?.done ?? false
-                        forceDisableChunkSplitting: root.messageData?.content.includes("```") ?? true
+                        forceDisableChunkSplitting: /```\w*\n/.test(root.messageData?.content ?? "")
                     } }
                 }
             }

@@ -18,7 +18,9 @@ Rectangle {
     property real maxHeight: 200
     property real imageWidth: -1
     property real imageHeight: -1
-    property real scale: Math.min(root.maxHeight / imageHeight, root.width / imageWidth)
+    property real scale: (imageWidth > 0 && imageHeight > 0)
+        ? Math.min(root.maxHeight / imageHeight, root.width / imageWidth)
+        : 1
     onFilePathChanged: refresh()
     visible: filePath !== ""
 
@@ -127,7 +129,7 @@ Rectangle {
                 StyledImage {
                     id: imagePreview
                     anchors.fill: parent
-                    source: Qt.resolvedUrl(root.filePath)
+                    source: root.filePath === "" ? "" : (root.filePath.startsWith("file://") ? root.filePath : ("file://" + root.filePath))
                     fillMode: Image.PreserveAspectFit
                     antialiasing: true
                     width: root.imageWidth * root.scale

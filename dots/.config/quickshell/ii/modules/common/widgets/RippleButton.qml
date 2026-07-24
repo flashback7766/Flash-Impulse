@@ -60,7 +60,7 @@ Button {
     MouseArea {
         anchors.fill: parent
         cursorShape: root.pointingHandCursor ? Qt.PointingHandCursor : Qt.ArrowCursor
-        acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+        acceptedButtons: Qt.RightButton | Qt.MiddleButton
         onPressed: (event) => { 
             if(event.button === Qt.RightButton) {
                 if (root.altAction) root.altAction(event);
@@ -70,25 +70,20 @@ Button {
                 if (root.middleClickAction) root.middleClickAction();
                 return;
             }
-            root.down = true
-            if (root.downAction) root.downAction();
-            if (!root.rippleEnabled) return;
-            const {x,y} = event
-            startRipple(x, y)
         }
-        onReleased: (event) => {
-            root.down = false
-            if (event.button != Qt.LeftButton) return;
-            if (root.releaseAction) root.releaseAction();
-            root.click() // Because the MouseArea already consumed the event
-            if (!root.rippleEnabled) return;
-            rippleFadeAnim.restart();
-        }
-        onCanceled: (event) => {
-            root.down = false
-            if (!root.rippleEnabled) return;
-            rippleFadeAnim.restart();
-        }
+    }
+
+    // Handle ripple on the base button's pressed state
+    onPressed: {
+        if (!root.rippleEnabled) return;
+        // Since we can't easily get the mouse position from the Button component's pressed state 
+        // without a MouseArea, we'll ripple from the center.
+        startRipple(width / 2, height / 2);
+    }
+
+    onReleased: {
+        if (!root.rippleEnabled) return;
+        rippleFadeAnim.restart();
     }
 
     RippleAnim {
