@@ -119,15 +119,25 @@ Three-tier hybrid, all three tiers active simultaneously:
 - All shell invocations, judge verdicts, and outcomes get **logged to a file** (under
   `~/.local/share/flash-impulse/logs/`) for audit/debugging.
 
-## 4. Visual redesign — One UI 8.5/9 direction
+## 4. Visual redesign — Material 3 Expressive × One UI 8.5/9
 
-All three areas matter equally, no single priority:
+The shell is already Material-based (Material You dynamic palette, MD3-style Quickshell
+components), so **Material 3 Expressive is the foundation** and **One UI 8.5/9 is the
+flavor layered on top**. Division of responsibility:
 
-- **Form**: large rounded corners, pill shapes, generous padding/spacing throughout
-  (bar, popups, buttons) — matching Samsung One UI's geometry language.
-- **Color**: Samsung-style palette — soft pastel accents on a dark base.
-- **Motion**: smooth spring-based animations for panel open/close and transitions,
-  One-UI style.
+- **Foundation — M3 Expressive**: component behavior and motion. Springy physics-based
+  animations, emphasized easing, shape morphing on press, bolder type scale. When
+  touching any component, the M3 Expressive spec is the default answer for how it moves
+  and behaves.
+- **Flavor — One UI**: geometry and palette. Large rounded corners, pill shapes,
+  generous padding/spacing (bar, popups, buttons), Samsung-style soft pastel accents on
+  a dark base.
+- **Conflict rule**: where the two disagree (e.g. M3E's loud saturated colors vs One
+  UI's restrained pastels), One UI wins on color, M3 Expressive wins on motion and
+  component behavior. This keeps the result coherent instead of a mix of two half
+  design languages.
+
+All areas matter equally, no single priority:
 - **Wallpapers**: curate/bundle existing abstract One-UI-style wallpapers as defaults, no
   runtime generation pipeline needed.
 
