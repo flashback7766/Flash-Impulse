@@ -67,6 +67,20 @@ if [[ "$OS_GROUP_ID" == "gentoo" ]]; then
   v sudo chown -R $(whoami):$(whoami) ~/.local/
 fi
 
-v gsettings set org.gnome.desktop.interface font-name 'Google Sans Flex Medium 11 @opsz=11,wght=500'
-v gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
+# gsettings needs a session D-Bus. On a bare TTY (fresh install, no DE/WM yet)
+# there is none — run it under a transient bus instead; dconf still persists to
+# ~/.config/dconf/user. If even that's unavailable, skip: these are cosmetic
+# defaults and the shell sets sane values on first run anyway.
+function gsettings_safe(){
+  if [[ -n "${DBUS_SESSION_BUS_ADDRESS}" ]]; then
+    x gsettings "$@"
+  elif command -v dbus-run-session >/dev/null 2>&1; then
+    x dbus-run-session -- gsettings "$@"
+  else
+    echo -e "${STY_YELLOW}[$0]: No session D-Bus; skipping: gsettings $*${STY_RST}"
+  fi
+}
+showfun gsettings_safe
+v gsettings_safe set org.gnome.desktop.interface font-name 'Google Sans Flex Medium 11 @opsz=11,wght=500'
+v gsettings_safe set org.gnome.desktop.interface color-scheme 'prefer-dark'
 v kwriteconfig6 --file kdeglobals --group KDE --key widgetStyle Darkly
