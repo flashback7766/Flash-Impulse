@@ -198,17 +198,18 @@ Singleton {
         property color colOnErrorContainer: m3colors.m3onErrorContainer
     }
 
+    // One UI-flavoured rounding: generously rounded, pill-leaning. (Flash-Impulse)
     rounding: QtObject {
         property int unsharpen: 2
         property int unsharpenmore: 6
-        property int verysmall: 8
-        property int small: 12
-        property int normal: 17
-        property int large: 23
-        property int verylarge: 30
+        property int verysmall: 10
+        property int small: 15
+        property int normal: 21
+        property int large: 28
+        property int verylarge: 38
         property int full: 9999
         property int screenRounding: large
-        property int windowRounding: 18
+        property int windowRounding: 26
     }
 
     font: QtObject {
@@ -396,7 +397,7 @@ Singleton {
         property real elevationMargin: 10
         property real fabShadowRadius: 5
         property real fabHoveredShadowRadius: 7
-        property real hyprlandGapsOut: 5
+        property real hyprlandGapsOut: 10
         property real mediaControlsWidth: 440
         property real mediaControlsHeight: 160
         property real notificationPopupWidth: 410

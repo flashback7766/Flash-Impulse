@@ -181,8 +181,17 @@ All areas matter equally, no single priority:
 5. ✅ Whitelist/blacklist/Gemini-judge pipeline + audit log + /yolo. Done 2026-07-24.
 6. ✅ Model rosters updated to July 2026 IDs (Gemini 3.5/3.6, Claude Sonnet 5 /
    Opus 4.8 / Fable 5, GPT-5.6); Gemini 3.5 Flash-Lite default.
-7. ⬜ Material 3 Expressive × One UI visual pass (colors, shapes, animations).
-   Seed palette extracted from the wallpaper — see brand/README.md.
+7. ✅ Material 3 Expressive × One UI visual pass (2026-07-24):
+   - Shapes: rounding scale bumped throughout (Appearance.rounding, window
+     rounding 18→26, gentle squircle power 3.0), roomier gaps (6/10).
+   - Color: matugen seeded from brand orange #ff7a1a with scheme-content →
+     pastel-orange primary on warm dark neutrals (One UI pastel-accent look).
+     Note for posterity: `auto` washes out on our pastel wallpaper and
+     scheme-expressive hue-rotates to pink — content + explicit accent is
+     the combo that works.
+   - Motion: upstream already ships the M3 Expressive spring curves
+     (expressive*Spatial); per the §4 conflict rule nothing to change.
+   Deployed live and verified (hyprctl options, qs restart clean, screenshot).
 8. ✅ Wallpaper + logo/branding (2026-07-24): original One-UI-8.5-style SVG art
    (brand/wallpaper.svg → default_wallpaper.png, brand/logo.svg → flash-impulse
    icon), About panel rebranded to Flash-Impulse. Note: the reference was a
@@ -196,6 +205,6 @@ All areas matter equally, no single priority:
     removed, exp-update replaced by a thin `update`, and end-4 branding stripped from
     engine output. ~2600 net lines removed; full `--dry-run` walk verified.
 
-Remaining: **7** (Material 3 Expressive × One UI visual pass) — the theme wiring, best
-done as a dedicated session starting from `Appearance.qml`, using the seed palette in
-`brand/README.md`.
+**All build-order items complete.** Future niceties (not blockers): GUI
+permission-prompt MCP bridge for Claude Code, real button UI for AskUserQuestion
+blocks, deeper One UI component polish.

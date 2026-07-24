@@ -134,8 +134,13 @@ Singleton {
                     }
                 }
                 property JsonObject palette: JsonObject {
-                    property string type: "auto" // Allowed: auto, scheme-content, scheme-expressive, scheme-fidelity, scheme-fruit-salad, scheme-monochrome, scheme-neutral, scheme-rainbow, scheme-tonal-spot
-                    property string accentColor: ""
+                    // Flash-Impulse default: seed matugen from the brand orange with the
+                    // faithful "content" scheme → pastel-orange primary (#ffb68e-ish) on
+                    // warm dark neutrals, One UI style. (The wallpaper itself is too
+                    // pastel to seed from — auto picks its cream and washes out, and
+                    // scheme-expressive hue-rotates the accent to pink.)
+                    property string type: "scheme-content" // Allowed: auto, scheme-content, scheme-expressive, scheme-fidelity, scheme-fruit-salad, scheme-monochrome, scheme-neutral, scheme-rainbow, scheme-tonal-spot
+                    property string accentColor: "#ff7a1a"
                 }
             }
 

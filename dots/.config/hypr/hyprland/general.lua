@@ -46,9 +46,9 @@ hl.config({
         workspace_swipe_create_new = true
     },
     general = {
-        -- Gaps and border
-        gaps_in = 4,
-        gaps_out = 5,
+        -- Gaps and border (One UI breathes: slightly roomier than upstream)
+        gaps_in = 6,
+        gaps_out = 10,
         gaps_workspaces = 50,
 
         border_size = 1,
@@ -63,16 +63,16 @@ hl.config({
         allow_tearing = true, -- This just allows the `immediate` window rule to work
         snap = {
             enabled = true,
-            window_gap = 4,
-            monitor_gap = 5,
+            window_gap = 6,
+            monitor_gap = 10,
             respect_gaps = true
         }
     },
     decoration = {
         -- 2 = circle, higher = squircle, 4 = very obvious squircle
-        -- Fuck clearly visible squircles. 100% Apple brainrot.
-        rounding_power = 2.5,
-        rounding = 18,
+        -- One UI corners: big radius, gentle squircle (matches Appearance.windowRounding)
+        rounding_power = 3.0,
+        rounding = 26,
 
         blur = {
             enabled = true,
