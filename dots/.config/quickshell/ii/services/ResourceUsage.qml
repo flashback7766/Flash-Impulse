@@ -175,7 +175,18 @@ Singleton {
             const used = parseInt(fileVramUsed.text());
             if (!isNaN(used)) root.vramUsed = used;
         }
-        if (fileVramMclk.path.length > 0) root.vramFreqMhz = root.parseDpmClock(fileVramMclk.text());
+        if (fileVramMclk.path.length > 0) {
+            const mclk = fileVramMclk.text();
+            root.vramFreqMhz = root.parseDpmClock(mclk);
+            // On an APU the GPU's memory controller *is* the system memory
+            // controller, so its top DPM state gives the real DRAM data rate —
+            // which is what people mean by "DDR5-4800". The SPD only says what
+            // the module is rated for, and platforms routinely run it slower.
+            if (root.vramType === "System") {
+                const maxMclk = root.parseDpmMax(mclk);
+                if (maxMclk > 0) root.memorySpeedMts = maxMclk * 2;
+            }
+        }
         root.systemPowerW = root.readPower();
         root.cpuPowerW = root.readCpuPower();
         root.updateSwapType();
@@ -191,6 +202,18 @@ Singleton {
         if (!text) return 0;
         const match = text.match(/^\s*\d+:\s*(\d+)\s*Mhz\s*\*/mi);
         return match ? Number(match[1]) : 0;
+    }
+
+    /** Highest clock the DPM table offers, i.e. the full-speed state. */
+    function parseDpmMax(text) {
+        if (!text) return 0;
+        let max = 0;
+        const regex = /^\s*\d+:\s*(\d+)\s*Mhz/gmi;
+        let match;
+        while ((match = regex.exec(text)) !== null) {
+            max = Math.max(max, Number(match[1]));
+        }
+        return max;
     }
 
     function updateSwapType() {
