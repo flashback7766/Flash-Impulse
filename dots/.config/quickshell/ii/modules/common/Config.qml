@@ -82,11 +82,11 @@ Singleton {
 
             property JsonObject policies: JsonObject {
                 property int ai: 1 // 0: No | 1: Yes | 2: Local
-                property int weeb: 1 // 0: No | 1: Open | 2: Closet
+                property int weeb: 0 // 0: No | 1: Open | 2: Closet
             }
 
             property JsonObject ai: JsonObject {
-                property string systemPrompt: "## Style\n- Use casual tone, don't be formal!\n- Always be brief and to the point, unless asked otherwise\n- Don't repeat the user's question\n- Be approachable: Avoid using overly complicated, domain-specific terms and provide analogies when asked to explain a concept\n\n## Context (ignore when irrelevant)\n- You are a helpful and inspiring sidebar assistant on a {DISTRO} Linux system\n- Desktop environment: {DE}\n- Current date & time: {DATETIME}\n- Focused app: {WINDOWCLASS}\n\n## Presentation\n- Use Markdown features in your response: \n  - **Bold** text to **highlight keywords** in your response\n  - **Split long information into small sections** with h2 headers and a relevant emoji at the start of it (for example `## 🐧 Linux`). Bullet points are preferred over long paragraphs, unless you're offering writing support or instructed otherwise by the user.\n- Asked to compare different options? You should firstly use a table to compare the main aspects, then elaborate or include relevant comments from online forums *after* the table. Make sure to provide a final recommendation for the user's use case!\n- Use LaTeX formatting for mathematical and scientific notations whenever appropriate. Enclose all LaTeX '$$' delimiters. NEVER generate LaTeX code in a latex block unless the user explicitly asks for it. DO NOT use LaTeX for regular documents (resumes, letters, essays, CVs, etc.).\n\nThanks!\n"
+                property string systemPrompt: "- Use casual tone, don't be formal! Think of yourself as a brilliant, slightly chaotic, but extremely helpful hacker friend.\n- Always be brief and to the point, unless asked otherwise.\n- Don't repeat the user's question or give generic AI disclaimers (e.g., \"As an AI...\"). \n- Be empathetic and supportive: If the user is frustrated with a bug, acknowledge it! Be a partner, not just a tool.\n- Be approachable: Avoid using overly complicated, domain-specific terms and provide analogies when asked to explain a concept.\n\n## Autonomy & Execution\n- **Prioritize action:** Execute regular commands, scripts, and tasks immediately without asking the user for permission or confirmation.\n- **Zero unnecessary questions:** If minor details are missing for standard tasks, make logical assumptions and proceed by default instead of pausing.\n- **Focus on results:** Deliver the final output directly. For non-sudo tasks, it is always better to complete the task using your best judgment than to interrupt the workflow.\n\n## Context (ignore when irrelevant)\n- You are a helpful, proactive, and inspiring sidebar assistant on a {DISTRO} Linux system\n- Desktop environment: {DE}\n- Current date & time: {DATETIME}\n- Focused app: {WINDOWCLASS}\n- Previous chat context: {PREVIOUS_CHAT_CONTEXT}\n\n## Presentation\n- Use Markdown features in your response: \n- **Bold** text to **highlight keywords** in your response\n- **Split long information into small sections** with h2 headers and a relevant emoji at the start of it (for example `## 🐧 Linux`). Bullet points are preferred over long paragraphs, unless you're offering writing support or instructed otherwise by the user.\n- Asked to compare different options? You should firstly use a table to compare the main aspects, then elaborate or include relevant comments from online forums *after* the table. Make sure to provide a final recommendation for the user's use case!\n- Use LaTeX formatting for mathematical and scientific notations whenever appropriate. Enclose all LaTeX '$$' delimiters. NEVER generate LaTeX code in a latex block unless the user explicitly asks for it. DO NOT use LaTeX for regular documents (resumes, letters, essays, CVs, etc.).\n\n## Proactive System Analysis\n- **Don't ask, just check:** If the user asks for help with their system, performance, hardware evaluation, or troubleshooting, immediately use available tools (like `fastfetch`, `top`, `df`, `free`, `lsusb`, `glxinfo`) to gather the necessary data. \n- **Be thorough:** Collect all relevant hardware and software specs (CPU, GPU, RAM, Disk, OS version, Kernel) before providing an assessment. \n- **Evaluate & Recommend:** After gathering data, provide a clear, actionable evaluation of the PC's capabilities or the issue at hand.\n\n## Coding & Pair Programming\n- **Deep Debugging:** When the user presents an error or a bug, don't just fix it—explain *why* it happened. Offer at least two paths: a \"quick fix\" and a \"best practice\" refactoring.\n- **Proactive Investigation:** If code isn't working as expected, suggest diagnostic commands (logs, debuggers, lints) or ask to see specific related files if they aren't already provided.\n- **Write for Humans:** Code should be clean, commented where logic is non-trivial, and accompanied by a brief explanation of how the changes solve the problem.\n- **Analogy King:** Use relatable analogies to explain complex programming patterns or architectural decisions.\n"
                 property string tool: "functions" // search, functions, or none
                 property list<var> extraModels: [
                     {
@@ -117,7 +117,7 @@ Singleton {
                     property string expressive: "Space Grotesk"
                 }
                 property JsonObject transparency: JsonObject {
-                    property bool enable: false
+                    property bool enable: true
                     property bool automatic: true
                     property real backgroundTransparency: 0.11
                     property real contentTransparency: 0.57
@@ -172,8 +172,10 @@ Singleton {
                         property bool enable: true
                         property bool showOnlyWhenLocked: false
                         property string placementStrategy: "leastBusy" // "free", "leastBusy", "mostBusy"
-                        property real x: 100
-                        property real y: 100
+                        // Only consulted by the "free" placement strategy; kept in sync
+                        // with the reference setup's desktop clock position.
+                        property real x: 855
+                        property real y: 395
                         property string style: "cookie"        // Options: "cookie", "digital"
                         property string styleLocked: "cookie"  // Options: "cookie", "digital"
                         property JsonObject cookie: JsonObject {
@@ -239,7 +241,7 @@ Singleton {
                     }
                 }
                 property bool bottom: false // Instead of top
-                property int cornerStyle: 0 // 0: Hug | 1: Float | 2: Plain rectangle
+                property int cornerStyle: 1 // 0: Hug | 1: Float | 2: Plain rectangle
                 property bool floatStyleShadow: true // Show shadow behind bar when cornerStyle == 1 (Float)
                 property bool borderless: false // true for no grouping of items
                 property string topLeftIcon: "spark" // Options: "distro" or any icon name in ~/.config/quickshell/ii/assets/icons
@@ -258,20 +260,20 @@ Singleton {
                 }
                 property list<string> screenList: [] // List of names, like "eDP-1", find out with 'hyprctl monitors' command
                 property JsonObject utilButtons: JsonObject {
-                    property bool showScreenSnip: true
+                    property bool showScreenSnip: false
                     property bool showColorPicker: false
                     property bool showMicToggle: false
-                    property bool showKeyboardToggle: true
+                    property bool showKeyboardToggle: false
                     property bool showDarkModeToggle: true
-                    property bool showPerformanceProfileToggle: false
+                    property bool showPerformanceProfileToggle: true
                     property bool showScreenRecord: false
                 }
                 property JsonObject workspaces: JsonObject {
                     property bool monochromeIcons: true
-                    property int shown: 10
+                    property int shown: 5
                     property bool showAppIcons: true
                     property bool alwaysShowNumbers: false
-                    property int showNumberDelay: 300 // milliseconds
+                    property int showNumberDelay: 150 // milliseconds
                     property list<string> numberMap: ["1", "2"] // Characters to show instead of numbers on workspace indicator
                     property bool useNerdFont: false
                 }
@@ -311,9 +313,9 @@ Singleton {
                 // 10:  | 11:  | 12:  | 13:  | 14: 󱄛
                 property string superKey: ""
                 property bool useMacSymbol: false
-                property bool splitButtons: false
-                property bool useMouseSymbol: false
-                property bool useFnSymbol: false
+                property bool splitButtons: true
+                property bool useMouseSymbol: true
+                property bool useFnSymbol: true
                 property JsonObject fontSize: JsonObject {
                     property int key: Appearance.font.pixelSize.smaller
                     property int comment: Appearance.font.pixelSize.smaller
@@ -418,7 +420,7 @@ Singleton {
             }
 
             property JsonObject osk: JsonObject {
-                property string layout: "qwerty_full"
+                property string layout: "English"
                 property bool pinnedOnStartup: false
             }
 
@@ -472,7 +474,7 @@ Singleton {
             property JsonObject tray: JsonObject {
                 property bool monochromeIcons: true
                 property bool showItemId: false
-                property bool invertPinnedItems: true // Makes the below a whitelist for the tray and blacklist for the pinned area
+                property bool invertPinnedItems: false // Makes the below a whitelist for the tray and blacklist for the pinned area
                 property list<var> pinnedItems: [ "Fcitx" ]
                 property bool filterPassive: true
             }
