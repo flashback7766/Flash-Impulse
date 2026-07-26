@@ -1,3 +1,26 @@
+-- Load defaults + user overrides so `performanceMode` is known before it is used
+-- below. keybinds.lua does the same; requiring twice is a no-op in Lua.
+require("hyprland.variables")
+if is_file_exists(HOME .. "/.config/hypr/custom/variables.lua") then
+    require("custom.variables")
+end
+
+-- Low-end profile: same shapes, spacing and colours, but effects that scale with
+-- pixel count are dialled back. Blur cost is roughly passes x radius x area, so
+-- 1 pass at radius 4 is around an order of magnitude cheaper than 3 at 10 while
+-- still reading as frosted glass. Set `performanceMode = true` in
+-- ~/.config/hypr/custom/variables.lua on old hardware.
+local perf = (performanceMode == true)
+
+-- Hyprland animation speed is a duration in deciseconds. Shortening every
+-- animation cuts the number of composited frames per interaction, which is
+-- where a weak GPU actually stutters. Floor at 0.5 so nothing becomes an
+-- instant cut.
+local function aspeed(s)
+    if not perf then return s end
+    return math.max(0.5, s * 0.6)
+end
+
 -- MONITOR CONFIG
 hl.monitor({
     output = "",
@@ -79,8 +102,8 @@ hl.config({
             xray = true,
             special = false,
             new_optimizations = true,
-            size = 10,
-            passes = 3,
+            size = perf and 4 or 10,
+            passes = perf and 1 or 3,
             brightness = 1,
             noise = 0.05,
             contrast = 0.89,
@@ -92,10 +115,11 @@ hl.config({
             input_methods_ignorealpha = 0.8
         },
         shadow = {
-            enabled = true,
-            range = 20,
+            -- render_power is the expensive knob here; 10 is a very soft falloff.
+            enabled = not perf,
+            range = perf and 8 or 20,
             offset = {0, 2},
-            render_power = 10,
+            render_power = perf and 2 or 10,
             color = "rgba(00000020)"
 
         },
@@ -156,40 +180,40 @@ hl.curve("stall", {
 hl.animation({
     leaf = "windowsIn",
     enabled = true,
-    speed = 3,
+    speed = aspeed(3),
     bezier = "emphasizedDecel",
     style = "popin 80%"
 })
 hl.animation({
     leaf = "fadeIn",
     enabled = true,
-    speed = 3,
+    speed = aspeed(3),
     bezier = "emphasizedDecel"
 })
 hl.animation({
     leaf = "windowsOut",
     enabled = true,
-    speed = 2,
+    speed = aspeed(2),
     bezier = "emphasizedDecel",
     style = "popin 90%"
 })
 hl.animation({
     leaf = "fadeOut",
     enabled = true,
-    speed = 2,
+    speed = aspeed(2),
     bezier = "emphasizedDecel"
 })
 hl.animation({
     leaf = "windowsMove",
     enabled = true,
-    speed = 3,
+    speed = aspeed(3),
     bezier = "emphasizedDecel",
     style = "slide"
 })
 hl.animation({
     leaf = "border",
     enabled = true,
-    speed = 10,
+    speed = aspeed(10),
     bezier = "emphasizedDecel"
 })
 
@@ -197,14 +221,14 @@ hl.animation({
 hl.animation({
     leaf = "layersIn",
     enabled = true,
-    speed = 2.7,
+    speed = aspeed(2.7),
     bezier = "emphasizedDecel",
     style = "popin 93%"
 })
 hl.animation({
     leaf = "layersOut",
     enabled = true,
-    speed = 2.4,
+    speed = aspeed(2.4),
     bezier = "menu_accel",
     style = "popin 94%"
 })
@@ -212,20 +236,20 @@ hl.animation({
 hl.animation({
     leaf = "fadeLayersIn",
     enabled = true,
-    speed = 0.5,
+    speed = aspeed(0.5),
     bezier = "menu_decel"
 })
 hl.animation({
     leaf = "fadeLayersOut",
     enabled = true,
-    speed = 2.7,
+    speed = aspeed(2.7),
     bezier = "stall"
 })
 -- workspaces
 hl.animation({
     leaf = "workspaces",
     enabled = true,
-    speed = 7,
+    speed = aspeed(7),
     bezier = "menu_decel",
     style = "slide"
 })
@@ -233,14 +257,14 @@ hl.animation({
 hl.animation({
     leaf = "specialWorkspaceIn",
     enabled = true,
-    speed = 2.8,
+    speed = aspeed(2.8),
     bezier = "emphasizedDecel",
     style = "slidevert"
 })
 hl.animation({
     leaf = "specialWorkspaceOut",
     enabled = true,
-    speed = 1.2,
+    speed = aspeed(1.2),
     bezier = "emphasizedAccel",
     style = "slidevert"
 })
@@ -248,7 +272,7 @@ hl.animation({
 hl.animation({
     leaf = "zoomFactor",
     enabled = true,
-    speed = 3,
+    speed = aspeed(3),
     bezier = "standardDecel"
 })
 

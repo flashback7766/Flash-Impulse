@@ -17,3 +17,9 @@ settingsApp = "XDG_CURRENT_DESKTOP=gnome ~/.config/hypr/hyprland/scripts/launch_
 taskManager = "~/.config/hypr/hyprland/scripts/launch_first_available.sh 'gnome-system-monitor' 'plasma-systemmonitor --page-name Processes' 'command -v btop && kitty -1 fish -c btop'"
 
 workspaceGroupSize = 10
+
+-- Low-end hardware profile. Keeps the layout, shapes and colours identical but
+-- trades effect quality for frame time: cheaper blur, no window shadows, shorter
+-- animations. Worth turning on for pre-2015 integrated graphics.
+-- Toggle at runtime with `flash-impulse-performance on|off`.
+performanceMode = false

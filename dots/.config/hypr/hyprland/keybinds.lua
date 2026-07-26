@@ -7,7 +7,15 @@ end
 local qsScripts = "$HOME/.config/quickshell/$qsConfig/scripts"
 local hyprScripts = "$HOME/.config/hypr/hyprland/scripts"
 local qsIpcCall = "qs -c $qsConfig ipc call"
-local qsIsAlive = qsIpcCall .. " TEST_ALIVE"
+-- Guard for the fuzzel fallbacks below: these binds fire alongside the
+-- quickshell global shortcuts, so the fallback must not run when the shell is
+-- up or fuzzel pops open on top of the shell's own search.
+--
+-- This used to probe `qs ipc call TEST_ALIVE`, but no such IPC target exists
+-- (quickshell 0.2.1 answers "Function required to send message"), so the probe
+-- always failed and fuzzel always launched. A plain process check has no such
+-- dependency on the IPC surface.
+local qsIsAlive = "pgrep -x 'qs|quickshell' >/dev/null"
 
 hl.bind("SUPER + SUPER_L", hl.dsp.global("quickshell:searchToggleRelease"), { description = "Shell: Toggle search" })
 hl.bind("SUPER + SUPER_R", hl.dsp.global("quickshell:searchToggleRelease"))

@@ -25,6 +25,9 @@ with [better-ii-ai](https://github.com/flashback7766/better-ii-ai), heading towa
 - **Real hardware readouts in the bar** — CPU (htop-style per-thread aggregate),
   temperature, frequency, GPU load/temp and system power draw, all read straight from
   sysfs with zero processes spawned on the polling path.
+- **Low-end profile** — `performance-mode.sh on` keeps the layout, shapes and colours
+  identical while cutting blur passes, dropping window shadows and shortening
+  animations, for machines whose GPU is fill-rate starved.
 - **Sane installer** — component selection, timestamped backups with one-command
   rollback, migration of your existing configs, API keys in the system keyring.
 - **RU layout out of the box** — `us,ru` with Alt+Shift toggle as the shipped default.
@@ -68,6 +71,25 @@ log in once — `./install.sh doctor` will tell you if anything is missing. Logs
 `~/.local/share/flash-impulse/logs/`.
 
 Architecture details: [docs/ai-architecture.md](docs/ai-architecture.md).
+
+## Running on older hardware
+
+```bash
+~/.config/hypr/hyprland/scripts/performance-mode.sh on     # or off / toggle / status
+```
+
+Blur costs roughly `passes × radius × area`, so the profile drops it from 3 passes at
+radius 10 to 1 at 4 — still frosted, around an order of magnitude less fill rate. It
+also disables window shadows (`render_power 10` is a very soft, very expensive
+falloff), shortens every animation to 60% of its duration, and halves the resource
+polling rate. Layout, rounding, spacing and colours are untouched.
+
+The setting persists in `~/.config/hypr/custom/variables.lua` as `performanceMode`, so
+it survives reloads and updates.
+
+Worth knowing before blaming the shell for GPU load: at idle this desktop draws **0%**
+GPU. Spikes come from whatever window is actively repainting (Electron apps are the
+usual suspect) and from brief panel animations — not from the bar sitting there.
 
 ## Credits & license
 
