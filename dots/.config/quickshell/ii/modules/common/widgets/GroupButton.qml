@@ -31,20 +31,10 @@ Button {
     property int clickIndex: parentGroup?.clickIndex ?? -1
     property bool isAtSide: indexInParent === 0 || indexInParent === (parentGroup?.childrenCount - 1)
 
-    // Layout.fillWidth: (clickIndex - 1 <= indexInParent && indexInParent <= clickIndex + 1)
-    // Layout.fillHeight: (clickIndex - 1 <= indexInParent && indexInParent <= clickIndex + 1)
-    Layout.fillWidth: false
-    Layout.fillHeight: false
-    Binding {
-        target: root
-        property: "implicitWidth"
-        value: (root.down && bounce) ? clickedWidth : baseWidth
-    }
-    Binding {
-        target: root
-        property: "implicitHeight"
-        value: (root.down && bounce) ? clickedHeight : baseHeight
-    }
+    Layout.fillWidth: (clickIndex - 1 <= indexInParent && indexInParent <= clickIndex + 1)
+    Layout.fillHeight: (clickIndex - 1 <= indexInParent && indexInParent <= clickIndex + 1)
+    implicitWidth: (root.down && bounce) ? clickedWidth : baseWidth
+    implicitHeight: (root.down && bounce) ? clickedHeight : baseHeight
 
     property color colBackground: ColorUtils.transparentize(colBackgroundHover, 1) || "transparent"
     property color colBackgroundHover: Appearance?.colors.colLayer1Hover ?? "#E5DFED"
@@ -89,25 +79,42 @@ Button {
         animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
     }
 
+    property alias mouseArea: buttonMouseArea
     MouseArea {
         id: buttonMouseArea
         anchors.fill: parent
         cursorShape: Qt.PointingHandCursor
         acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
-        propagateComposedEvents: true
         onPressed: (event) => { 
-            if (event.button === Qt.LeftButton) {
-                event.accepted = false; // Let Button handle left click
-                return;
-            }
             if(event.button === Qt.RightButton) {
                 if (root.altAction) root.altAction();
+                return;
             }
             if(event.button === Qt.MiddleButton) {
                 if (root.middleClickAction) root.middleClickAction();
+                return;
             }
-            event.accepted = true;
+            root.down = true
+            if (root.downAction) root.downAction();
         }
+        onReleased: (event) => {
+            root.down = false
+            if (event.button != Qt.LeftButton) return;
+            if (root.releaseAction) root.releaseAction();
+        }
+        onClicked: (event) => {
+            if (event.button != Qt.LeftButton) return;
+            root.click()
+        }
+        onCanceled: (event) => {
+            root.down = false
+        }
+
+        onPressAndHold: () => {
+            altAction(); 
+            root.down = false; 
+            root.clicked = false;
+        };
     }
 
     property bool tabbedTo: root.focus && (focusReason === Qt.TabFocusReason || focusReason === Qt.BacktabFocusReason)
