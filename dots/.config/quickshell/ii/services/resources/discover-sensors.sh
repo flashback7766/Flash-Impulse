@@ -6,10 +6,13 @@
 # processes at all — important on a laptop, where a per-tick `grep -r`/`find`
 # over sysfs costs more power than the readings are worth.
 #
-# Keys: CPU_TEMP, CPU_FREQ, GPU_BUSY, GPU_TEMP, GPU_TYPE,
-#       BAT_POWER, BAT_CURRENT, BAT_VOLTAGE, BAT_STATUS, RAPL_ENERGY, RAPL_MAX
+# Path keys:  CPU_TEMP, CPU_FREQ, GPU_BUSY, GPU_TEMP, GPU_FREQ, GPU_POWER,
+#             VRAM_TOTAL, VRAM_USED, VRAM_MCLK, BAT_POWER, BAT_CURRENT,
+#             BAT_VOLTAGE, BAT_STATUS, RAPL_ENERGY, RAPL_MAX
+# Value keys: GPU_TYPE, GPU_POWER_LABEL, RAM_TYPE, VRAM_TYPE
 
 emit() { [ -r "$2" ] && printf '%s=%s\n' "$1" "$2"; }
+emit_val() { [ -n "$2" ] && printf '%s=%s\n' "$1" "$2"; }
 
 hwmon_dir_for() {
     # First hwmon whose name matches $1
@@ -38,15 +41,56 @@ emit CPU_TEMP "$cpu_temp"
 
 emit CPU_FREQ /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq
 
+# --- RAM type, straight from the SPD EEPROM's DRAM device type byte. The
+# spd5118 (DDR5) driver exposes it unprivileged; ee1004 (DDR4) usually does too.
+# Falls back to inferring from which SPD driver is bound at all.
+ram_type=""
+for eeprom in /sys/bus/i2c/drivers/spd5118/*/eeprom /sys/bus/i2c/drivers/ee1004/*/eeprom; do
+    [ -r "$eeprom" ] || continue
+    case "$(od -An -tx1 -j2 -N1 "$eeprom" 2> /dev/null | tr -d ' ')" in
+        08) ram_type="DDR2" ;;
+        0b) ram_type="DDR3" ;;
+        0c) ram_type="DDR4" ;;
+        0e) ram_type="LPDDR3" ;;
+        0f) ram_type="LPDDR4" ;;
+        10) ram_type="LPDDR4X" ;;
+        12) ram_type="DDR5" ;;
+        13) ram_type="LPDDR5" ;;
+    esac
+    [ -n "$ram_type" ] && break
+done
+if [ -z "$ram_type" ]; then
+    [ -d /sys/bus/i2c/drivers/spd5118 ] && ram_type="DDR5"
+    [ -d /sys/bus/i2c/drivers/ee1004 ] && ram_type="DDR4"
+fi
+emit_val RAM_TYPE "$ram_type"
+
 # --- GPU: AMD (and any driver exposing gpu_busy_percent) via sysfs
 for busy in /sys/class/drm/card*/device/gpu_busy_percent; do
     [ -r "$busy" ] || continue
+    dev="${busy%/gpu_busy_percent}"
     emit GPU_BUSY "$busy"
     printf 'GPU_TYPE=%s\n' "amd"
     # Matching hwmon node lives under the same device
-    for t in "${busy%/gpu_busy_percent}"/hwmon/hwmon*/temp1_input; do
-        [ -r "$t" ] && emit GPU_TEMP "$t" && break
+    for h in "$dev"/hwmon/hwmon*; do
+        [ -d "$h" ] || continue
+        emit GPU_TEMP "$h/temp1_input"
+        emit GPU_FREQ "$h/freq1_input"
+        emit GPU_POWER "$h/power1_input"
+        # On an APU this is "PPT" — the whole SoC package, CPU included — so
+        # pass the label through rather than mislabelling it as GPU-only.
+        [ -r "$h/power1_label" ] && emit_val GPU_POWER_LABEL "$(cat "$h/power1_label")"
+        break
     done
+    emit VRAM_TOTAL "$dev/mem_info_vram_total"
+    emit VRAM_USED "$dev/mem_info_vram_used"
+    emit VRAM_MCLK "$dev/pp_dpm_mclk"
+    # A discrete card names its memory vendor; an APU carves VRAM out of system RAM.
+    if [ -r "$dev/mem_info_vram_vendor" ]; then
+        emit_val VRAM_TYPE "$(cat "$dev/mem_info_vram_vendor")"
+    else
+        emit_val VRAM_TYPE "System"
+    fi
     break
 done
 

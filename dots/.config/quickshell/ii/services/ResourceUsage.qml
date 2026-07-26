@@ -27,6 +27,8 @@ Singleton {
     property real swapFree: 0
     property real swapUsed: swapTotal - swapFree
     property real swapUsedPercentage: swapTotal > 0 ? (swapUsed / swapTotal) : 0
+    property string memoryType: "" // DDR4 / DDR5 / ... from SPD
+    property string swapType: ""   // "zram" | "Partition" | "File"
 
     // --- CPU
     property real cpuUsage: 0            // 0..1, whole package
@@ -40,14 +42,23 @@ Singleton {
     // --- GPU
     property string gpuType: "none"      // "amd" | "nvidia" | "none"
     property bool gpuDetected: false     // latches true once a GPU is seen
-    property int gpuUsage: 0             // %, instantaneous
-    property real gpuUsageSmooth: 0      // %, averaged to calm the bar down
+    property int gpuUsage: 0             // %
     property int gpuTemp: 0              // °C
-    property var gpuUsageHistory: []
-    readonly property int gpuSmoothSamples: 3
+    property real gpuFreqMhz: 0          // MHz, shader clock
+    property real gpuPowerW: 0           // W, scope depends on gpuPowerLabel
+    property string gpuPowerLabel: ""    // sysfs label, e.g. "PPT" (whole SoC on an APU)
+
+    // --- VRAM
+    property real vramTotal: 0           // bytes
+    property real vramUsed: 0
+    property real vramFree: vramTotal - vramUsed
+    property real vramUsedPercentage: vramTotal > 0 ? (vramUsed / vramTotal) : 0
+    property string vramType: ""         // "System" for shared APU memory, else vendor
+    property real vramFreqMhz: 0         // MHz, memory clock
 
     // --- Power
     property real systemPowerW: 0        // W, whole system while on battery
+    property real cpuPowerW: 0           // W, from RAPL when the counter is readable
 
     property string maxAvailableMemoryString: kbToGbString(root.memoryTotal)
     property string maxAvailableSwapString: kbToGbString(root.swapTotal)
@@ -107,6 +118,9 @@ Singleton {
                     root.gpuType = found.GPU_TYPE;
                     root.gpuDetected = true;
                 }
+                root.memoryType = found.RAM_TYPE ?? "";
+                root.vramType = found.VRAM_TYPE ?? "";
+                root.gpuPowerLabel = found.GPU_POWER_LABEL ?? "";
                 root.sensorsReady = true;
             }
         }
@@ -128,19 +142,53 @@ Singleton {
         }
         if (fileGpuBusy.path.length > 0) {
             const busy = parseInt(fileGpuBusy.text());
-            if (!isNaN(busy)) {
-                root.gpuUsage = busy;
-                const hist = [...root.gpuUsageHistory, busy];
-                if (hist.length > root.gpuSmoothSamples) hist.shift();
-                root.gpuUsageHistory = hist;
-                root.gpuUsageSmooth = hist.reduce((a, b) => a + b, 0) / hist.length;
-            }
+            if (!isNaN(busy)) root.gpuUsage = busy;
         }
         if (fileGpuTemp.path.length > 0) {
             const raw = parseInt(fileGpuTemp.text());
             if (!isNaN(raw)) root.gpuTemp = Math.round(raw / 1000);
         }
+        if (fileGpuFreq.path.length > 0) {
+            const hz = parseInt(fileGpuFreq.text());
+            if (!isNaN(hz)) root.gpuFreqMhz = hz / 1000000;
+        }
+        if (fileGpuPower.path.length > 0) {
+            const uw = parseInt(fileGpuPower.text());
+            if (!isNaN(uw)) root.gpuPowerW = uw / 1000000;
+        }
+        if (fileVramTotal.path.length > 0) {
+            const total = parseInt(fileVramTotal.text());
+            if (!isNaN(total)) root.vramTotal = total;
+        }
+        if (fileVramUsed.path.length > 0) {
+            const used = parseInt(fileVramUsed.text());
+            if (!isNaN(used)) root.vramUsed = used;
+        }
+        if (fileVramMclk.path.length > 0) root.vramFreqMhz = root.parseDpmClock(fileVramMclk.text());
         root.systemPowerW = root.readPower();
+        root.cpuPowerW = root.readCpuPower();
+        root.updateSwapType();
+    }
+
+    /**
+     * pp_dpm_* lists every DPM state, marking the active one with an asterisk:
+     *   0: 1000Mhz
+     *   1: 2400Mhz *
+     */
+    function parseDpmClock(text) {
+        if (!text) return 0;
+        const match = text.match(/^\s*\d+:\s*(\d+)\s*Mhz\s*\*/mi);
+        return match ? Number(match[1]) : 0;
+    }
+
+    function updateSwapType() {
+        // /proc/swaps: Filename, Type, Size, Used, Priority
+        const lines = fileSwaps.text().trim().split("\n");
+        if (lines.length < 2) { root.swapType = ""; return; }
+        const fields = lines[1].trim().split(/\s+/);
+        if (fields.length < 2) return;
+        if (fields[0].includes("zram")) root.swapType = "zram";
+        else root.swapType = fields[1] === "file" ? "File" : "Partition";
     }
 
     function readPower() {
@@ -158,9 +206,18 @@ Singleton {
                     return (ua / 1000000) * (uv / 1000000);
             }
         }
-        // RAPL: package energy counter, works on AC. Needs a delta over real
-        // time — sampling it twice back-to-back (as a naive script would) always
-        // reads ~0 because the counter only ticks every few milliseconds.
+        return 0;
+    }
+
+    /**
+     * CPU package power from the RAPL energy counter. Needs a delta over real
+     * time — sampling it twice back-to-back (as a naive script would) always
+     * reads ~0, because the counter only ticks every few milliseconds.
+     *
+     * Note this is frequently root-only: the file was locked down after the
+     * PLATYPUS side-channel work, so on most systems this quietly stays at 0.
+     */
+    function readCpuPower() {
         if (fileRaplEnergy.path.length > 0) {
             const uj = parseInt(fileRaplEnergy.text());
             const now = Date.now();
@@ -171,13 +228,13 @@ Singleton {
                     let deltaUj = uj - prev.uj;
                     if (deltaUj < 0) { // counter wrapped
                         const max = parseInt(fileRaplMax.text());
-                        if (!isNaN(max)) deltaUj += max; else return root.systemPowerW;
+                        if (!isNaN(max)) deltaUj += max; else return root.cpuPowerW;
                     }
                     return deltaUj / (now - prev.t) / 1000;
                 }
             }
         }
-        return root.systemPowerW;
+        return root.cpuPowerW;
     }
 
     Timer {
@@ -259,6 +316,12 @@ Singleton {
         if (fileCpuFreq.path.length > 0) fileCpuFreq.reload();
         if (fileGpuBusy.path.length > 0) fileGpuBusy.reload();
         if (fileGpuTemp.path.length > 0) fileGpuTemp.reload();
+        if (fileGpuFreq.path.length > 0) fileGpuFreq.reload();
+        if (fileGpuPower.path.length > 0) fileGpuPower.reload();
+        if (fileVramTotal.path.length > 0) fileVramTotal.reload();
+        if (fileVramUsed.path.length > 0) fileVramUsed.reload();
+        if (fileVramMclk.path.length > 0) fileVramMclk.reload();
+        fileSwaps.reload();
         if (fileBatStatus.path.length > 0) fileBatStatus.reload();
         if (fileBatPower.path.length > 0) fileBatPower.reload();
         if (fileBatCurrent.path.length > 0) fileBatCurrent.reload();
@@ -268,12 +331,18 @@ Singleton {
 
     FileView { id: fileMeminfo; path: "/proc/meminfo" }
     FileView { id: fileStat; path: "/proc/stat" }
+    FileView { id: fileSwaps; path: "/proc/swaps" }
 
     // Discovered sensors. An empty path simply means this machine lacks it.
     FileView { id: fileCpuTemp;    path: root.sensorPaths.CPU_TEMP ?? "" }
     FileView { id: fileCpuFreq;    path: root.sensorPaths.CPU_FREQ ?? "" }
     FileView { id: fileGpuBusy;    path: root.sensorPaths.GPU_BUSY ?? "" }
     FileView { id: fileGpuTemp;    path: root.sensorPaths.GPU_TEMP ?? "" }
+    FileView { id: fileGpuFreq;    path: root.sensorPaths.GPU_FREQ ?? "" }
+    FileView { id: fileGpuPower;   path: root.sensorPaths.GPU_POWER ?? "" }
+    FileView { id: fileVramTotal;  path: root.sensorPaths.VRAM_TOTAL ?? "" }
+    FileView { id: fileVramUsed;   path: root.sensorPaths.VRAM_USED ?? "" }
+    FileView { id: fileVramMclk;   path: root.sensorPaths.VRAM_MCLK ?? "" }
     FileView { id: fileBatStatus;  path: root.sensorPaths.BAT_STATUS ?? "" }
     FileView { id: fileBatPower;   path: root.sensorPaths.BAT_POWER ?? "" }
     FileView { id: fileBatCurrent; path: root.sensorPaths.BAT_CURRENT ?? "" }
@@ -328,7 +397,6 @@ Singleton {
                 root.gpuType = "nvidia";
                 root.gpuDetected = true;
                 root.gpuUsage = usage;
-                root.gpuUsageSmooth = usage;
                 if (!isNaN(temp)) root.gpuTemp = temp;
             }
         }
