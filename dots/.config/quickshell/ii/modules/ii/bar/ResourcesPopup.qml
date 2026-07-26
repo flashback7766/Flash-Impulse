@@ -165,7 +165,11 @@ StyledPopup {
                 StyledPopupValueRow {
                     icon: "bolt"
                     label: Translation.tr("Load:")
-                    value: `${ResourceUsage.gpuUsage}%`
+                    // Clock-weighted, with the raw busy time alongside it — they
+                    // diverge a lot while the GPU sits at a low DPM state.
+                    value: ResourceUsage.gpuMaxFreqMhz > 0
+                        ? `${Math.round(ResourceUsage.gpuUsageEffective)}% (${ResourceUsage.gpuUsage}% busy)`
+                        : `${ResourceUsage.gpuUsage}%`
                 }
                 StyledPopupValueRow {
                     visible: ResourceUsage.gpuTemp > 0

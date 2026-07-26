@@ -103,6 +103,7 @@ for busy in /sys/class/drm/card*/device/gpu_busy_percent; do
         [ -r "$h/power1_label" ] && emit_val GPU_POWER_LABEL "$(cat "$h/power1_label")"
         break
     done
+    emit GPU_SCLK "$dev/pp_dpm_sclk"
     emit VRAM_TOTAL "$dev/mem_info_vram_total"
     emit VRAM_USED "$dev/mem_info_vram_used"
     emit VRAM_MCLK "$dev/pp_dpm_mclk"

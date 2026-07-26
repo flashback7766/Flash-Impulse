@@ -46,9 +46,21 @@ Singleton {
     // --- GPU
     property string gpuType: "none"      // "amd" | "nvidia" | "none"
     property bool gpuDetected: false     // latches true once a GPU is seen
-    property int gpuUsage: 0             // %
+    property int gpuUsage: 0             // %, raw busy time
     property int gpuTemp: 0              // °C
     property real gpuFreqMhz: 0          // MHz, shader clock
+    property real gpuMaxFreqMhz: 0       // MHz, top shader DPM state
+
+    /**
+     * Busy time alone overstates a downclocked GPU: the driver reports 100% while
+     * idling at 200 MHz just as it does when saturated at 2200 MHz, even though
+     * the actual work done differs ~11x. Weighting by the clock ratio gives a
+     * figure proportional to real throughput, so the bar stops screaming at
+     * light compositing work.
+     */
+    readonly property real gpuUsageEffective: (gpuMaxFreqMhz > 0 && gpuFreqMhz > 0)
+        ? gpuUsage * (gpuFreqMhz / gpuMaxFreqMhz)
+        : gpuUsage
     property real gpuPowerW: 0           // W, scope depends on gpuPowerLabel
     property real gpuVoltage: 0          // V, vddgfx rail
     property string gpuPowerLabel: ""    // sysfs label, e.g. "PPT" (whole SoC on an APU)
@@ -161,6 +173,10 @@ Singleton {
         if (fileGpuPower.path.length > 0) {
             const uw = parseInt(fileGpuPower.text());
             if (!isNaN(uw)) root.gpuPowerW = uw / 1000000;
+        }
+        if (fileGpuSclk.path.length > 0 && root.gpuMaxFreqMhz === 0) {
+            // Static for a given card, so parse it once.
+            root.gpuMaxFreqMhz = root.parseDpmMax(fileGpuSclk.text());
         }
         if (fileGpuVolt.path.length > 0) {
             const mv = parseInt(fileGpuVolt.text());
@@ -379,6 +395,7 @@ Singleton {
         if (fileGpuFreq.path.length > 0) fileGpuFreq.reload();
         if (fileGpuPower.path.length > 0) fileGpuPower.reload();
         if (fileGpuVolt.path.length > 0) fileGpuVolt.reload();
+        if (fileGpuSclk.path.length > 0 && root.gpuMaxFreqMhz === 0) fileGpuSclk.reload();
         if (fileCpuGovernor.path.length > 0) fileCpuGovernor.reload();
         if (fileZramStat.path.length > 0) fileZramStat.reload();
         if (fileVramTotal.path.length > 0) fileVramTotal.reload();
@@ -404,6 +421,7 @@ Singleton {
     FileView { id: fileGpuFreq;    path: root.sensorPaths.GPU_FREQ ?? "" }
     FileView { id: fileGpuPower;   path: root.sensorPaths.GPU_POWER ?? "" }
     FileView { id: fileGpuVolt;    path: root.sensorPaths.GPU_VOLT ?? "" }
+    FileView { id: fileGpuSclk;    path: root.sensorPaths.GPU_SCLK ?? "" }
     FileView { id: fileCpuGovernor; path: root.sensorPaths.CPU_GOVERNOR ?? "" }
     FileView { id: fileZramStat;   path: root.zramStatPath }
     FileView { id: fileVramTotal;  path: root.sensorPaths.VRAM_TOTAL ?? "" }

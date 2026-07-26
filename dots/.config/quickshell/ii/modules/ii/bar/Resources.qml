@@ -55,7 +55,7 @@ MouseArea {
 
         Resource {
             iconName: "developer_board"
-            percentage: ResourceUsage.gpuUsage / 100
+            percentage: ResourceUsage.gpuUsageEffective / 100
             shown: Config.options.bar.resources.showGpu && ResourceUsage.gpuDetected && (
                 Config.options.bar.resources.alwaysShowCpu ||
                 !(MprisController.activePlayer?.trackTitle?.length > 0) ||

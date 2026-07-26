@@ -224,6 +224,16 @@ ContentPage {
                 Config.options.appearance.transparency.enable = checked;
             }
         }
+
+        ConfigSwitch {
+            buttonIcon: "speed"
+            text: Translation.tr("Performance mode")
+            // Same layout and colours, cheaper effects — for GPUs that struggle
+            // with full-strength blur.
+            enabled: !PerformanceMode.busy
+            checked: PerformanceMode.enabled
+            onCheckedChanged: PerformanceMode.setEnabled(checked)
+        }
     }
 
     ContentSection {

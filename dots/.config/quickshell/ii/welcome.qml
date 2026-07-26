@@ -339,6 +339,24 @@ ApplicationWindow {
                 }
 
                 ContentSection {
+                    icon: "speed"
+                    title: Translation.tr("Performance")
+
+                    ConfigSwitch {
+                        buttonIcon: "speed"
+                        text: Translation.tr("Performance mode")
+                        enabled: !PerformanceMode.busy
+                        checked: PerformanceMode.enabled
+                        onCheckedChanged: PerformanceMode.setEnabled(checked)
+                    }
+
+                    NoticeBox {
+                        Layout.fillWidth: true
+                        text: Translation.tr("Keeps the same layout, shapes and colors, but uses cheaper blur, drops window shadows and shortens animations. Worth enabling on older integrated graphics.")
+                    }
+                }
+
+                ContentSection {
                     icon: "rule"
                     title: Translation.tr("Policies")
 
