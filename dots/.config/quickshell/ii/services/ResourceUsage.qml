@@ -27,8 +27,11 @@ Singleton {
     property real swapFree: 0
     property real swapUsed: swapTotal - swapFree
     property real swapUsedPercentage: swapTotal > 0 ? (swapUsed / swapTotal) : 0
-    property string memoryType: "" // DDR4 / DDR5 / ... from SPD
-    property string swapType: ""   // "zram" | "Partition" | "File"
+    property string memoryType: ""   // DDR4 / DDR5 / ... from SPD
+    property int memorySpeedMts: 0   // rated MT/s, DDR5 only
+    property string swapType: ""     // "zram" | "Partition" | "File"
+    property real swapCompressionRatio: 0 // zram only: uncompressed / compressed
+    property string zramStatPath: ""
 
     // --- CPU
     property real cpuUsage: 0            // 0..1, whole package
@@ -36,6 +39,7 @@ Singleton {
     property int cpuCoreCount: 1         // logical cores
     property int cpuTemp: 0              // °C
     property real cpuFreqGhz: 0          // GHz (cpu0)
+    property string cpuGovernor: ""      // scaling governor, e.g. "powersave"
     property var previousCpuStats
     property var previousCoreStats: []
 
@@ -46,6 +50,7 @@ Singleton {
     property int gpuTemp: 0              // °C
     property real gpuFreqMhz: 0          // MHz, shader clock
     property real gpuPowerW: 0           // W, scope depends on gpuPowerLabel
+    property real gpuVoltage: 0          // V, vddgfx rail
     property string gpuPowerLabel: ""    // sysfs label, e.g. "PPT" (whole SoC on an APU)
 
     // --- VRAM
@@ -119,6 +124,7 @@ Singleton {
                     root.gpuDetected = true;
                 }
                 root.memoryType = found.RAM_TYPE ?? "";
+                root.memorySpeedMts = Number(found.RAM_SPEED ?? 0);
                 root.vramType = found.VRAM_TYPE ?? "";
                 root.gpuPowerLabel = found.GPU_POWER_LABEL ?? "";
                 root.sensorsReady = true;
@@ -156,6 +162,11 @@ Singleton {
             const uw = parseInt(fileGpuPower.text());
             if (!isNaN(uw)) root.gpuPowerW = uw / 1000000;
         }
+        if (fileGpuVolt.path.length > 0) {
+            const mv = parseInt(fileGpuVolt.text());
+            if (!isNaN(mv)) root.gpuVoltage = mv / 1000;
+        }
+        if (fileCpuGovernor.path.length > 0) root.cpuGovernor = fileCpuGovernor.text().trim();
         if (fileVramTotal.path.length > 0) {
             const total = parseInt(fileVramTotal.text());
             if (!isNaN(total)) root.vramTotal = total;
@@ -168,6 +179,7 @@ Singleton {
         root.systemPowerW = root.readPower();
         root.cpuPowerW = root.readCpuPower();
         root.updateSwapType();
+        root.updateZramRatio();
     }
 
     /**
@@ -184,11 +196,36 @@ Singleton {
     function updateSwapType() {
         // /proc/swaps: Filename, Type, Size, Used, Priority
         const lines = fileSwaps.text().trim().split("\n");
-        if (lines.length < 2) { root.swapType = ""; return; }
+        if (lines.length < 2) {
+            root.swapType = "";
+            root.zramStatPath = "";
+            return;
+        }
         const fields = lines[1].trim().split(/\s+/);
         if (fields.length < 2) return;
-        if (fields[0].includes("zram")) root.swapType = "zram";
-        else root.swapType = fields[1] === "file" ? "File" : "Partition";
+        const zram = fields[0].match(/\/dev\/(zram\d+)/);
+        if (zram) {
+            root.swapType = "zram";
+            root.zramStatPath = `/sys/block/${zram[1]}/mm_stat`;
+        } else {
+            root.swapType = fields[1] === "file" ? "File" : "Partition";
+            root.zramStatPath = "";
+        }
+    }
+
+    /**
+     * zram's mm_stat: orig_data_size compr_data_size mem_used_total ...
+     * The ratio is what actually justifies zram over a swap partition.
+     */
+    function updateZramRatio() {
+        if (root.zramStatPath.length === 0) {
+            root.swapCompressionRatio = 0;
+            return;
+        }
+        const parts = fileZramStat.text().trim().split(/\s+/);
+        const orig = Number(parts[0]);
+        const compressed = Number(parts[1]);
+        root.swapCompressionRatio = (compressed > 0 && orig > 0) ? orig / compressed : 0;
     }
 
     function readPower() {
@@ -318,6 +355,9 @@ Singleton {
         if (fileGpuTemp.path.length > 0) fileGpuTemp.reload();
         if (fileGpuFreq.path.length > 0) fileGpuFreq.reload();
         if (fileGpuPower.path.length > 0) fileGpuPower.reload();
+        if (fileGpuVolt.path.length > 0) fileGpuVolt.reload();
+        if (fileCpuGovernor.path.length > 0) fileCpuGovernor.reload();
+        if (fileZramStat.path.length > 0) fileZramStat.reload();
         if (fileVramTotal.path.length > 0) fileVramTotal.reload();
         if (fileVramUsed.path.length > 0) fileVramUsed.reload();
         if (fileVramMclk.path.length > 0) fileVramMclk.reload();
@@ -340,6 +380,9 @@ Singleton {
     FileView { id: fileGpuTemp;    path: root.sensorPaths.GPU_TEMP ?? "" }
     FileView { id: fileGpuFreq;    path: root.sensorPaths.GPU_FREQ ?? "" }
     FileView { id: fileGpuPower;   path: root.sensorPaths.GPU_POWER ?? "" }
+    FileView { id: fileGpuVolt;    path: root.sensorPaths.GPU_VOLT ?? "" }
+    FileView { id: fileCpuGovernor; path: root.sensorPaths.CPU_GOVERNOR ?? "" }
+    FileView { id: fileZramStat;   path: root.zramStatPath }
     FileView { id: fileVramTotal;  path: root.sensorPaths.VRAM_TOTAL ?? "" }
     FileView { id: fileVramUsed;   path: root.sensorPaths.VRAM_USED ?? "" }
     FileView { id: fileVramMclk;   path: root.sensorPaths.VRAM_MCLK ?? "" }

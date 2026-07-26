@@ -51,6 +51,12 @@ StyledPopup {
                     label: Translation.tr("Type:")
                     value: ResourceUsage.memoryType
                 }
+                StyledPopupValueRow {
+                    visible: ResourceUsage.memorySpeedMts > 0
+                    icon: "speed"
+                    label: Translation.tr("Speed:")
+                    value: `${ResourceUsage.memorySpeedMts} MT/s`
+                }
             }
         }
 
@@ -85,6 +91,12 @@ StyledPopup {
                     icon: "label"
                     label: Translation.tr("Type:")
                     value: ResourceUsage.swapType
+                }
+                StyledPopupValueRow {
+                    visible: ResourceUsage.swapCompressionRatio > 0
+                    icon: "compress"
+                    label: Translation.tr("Ratio:")
+                    value: `${ResourceUsage.swapCompressionRatio.toFixed(1)}x`
                 }
             }
         }
@@ -129,6 +141,12 @@ StyledPopup {
                     label: Translation.tr("System:")
                     value: `${ResourceUsage.systemPowerW.toFixed(1)} W`
                 }
+                StyledPopupValueRow {
+                    visible: ResourceUsage.cpuGovernor.length > 0
+                    icon: "tune"
+                    label: Translation.tr("Mode:")
+                    value: ResourceUsage.cpuGovernor
+                }
             }
         }
 
@@ -169,6 +187,12 @@ StyledPopup {
                     label: ResourceUsage.gpuPowerLabel === "PPT"
                         ? Translation.tr("SoC:") : Translation.tr("Power:")
                     value: `${ResourceUsage.gpuPowerW.toFixed(1)} W`
+                }
+                StyledPopupValueRow {
+                    visible: ResourceUsage.gpuVoltage > 0
+                    icon: "e911_emergency"
+                    label: Translation.tr("Volt:")
+                    value: `${ResourceUsage.gpuVoltage.toFixed(2)} V`
                 }
             }
         }

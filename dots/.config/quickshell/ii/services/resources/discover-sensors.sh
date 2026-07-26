@@ -65,6 +65,26 @@ if [ -z "$ram_type" ]; then
 fi
 emit_val RAM_TYPE "$ram_type"
 
+# Rated transfer rate, decoded from the DDR5 SPD's tCKAVGmin (bytes 20-21,
+# little-endian picoseconds): MT/s = 2 / tCK. DDR4 encodes this differently, so
+# only DDR5-class modules are decoded rather than guessing.
+case "$ram_type" in
+    DDR5 | LPDDR5)
+        for eeprom in /sys/bus/i2c/drivers/spd5118/*/eeprom; do
+            [ -r "$eeprom" ] || continue
+            read -r lsb msb <<< "$(od -An -tu1 -j20 -N2 "$eeprom" 2> /dev/null)"
+            tck=$((msb * 256 + lsb))
+            if [ "$tck" -gt 0 ]; then
+                mts=$((2 * 1000000 / tck))
+                emit_val RAM_SPEED $(((mts + 50) / 100 * 100)) # snap to the nearest JEDEC step
+            fi
+            break
+        done
+        ;;
+esac
+
+emit CPU_GOVERNOR /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+
 # --- GPU: AMD (and any driver exposing gpu_busy_percent) via sysfs
 for busy in /sys/class/drm/card*/device/gpu_busy_percent; do
     [ -r "$busy" ] || continue
@@ -77,6 +97,7 @@ for busy in /sys/class/drm/card*/device/gpu_busy_percent; do
         emit GPU_TEMP "$h/temp1_input"
         emit GPU_FREQ "$h/freq1_input"
         emit GPU_POWER "$h/power1_input"
+        emit GPU_VOLT "$h/in0_input"
         # On an APU this is "PPT" — the whole SoC package, CPU included — so
         # pass the label through rather than mislabelling it as GPU-only.
         [ -r "$h/power1_label" ] && emit_val GPU_POWER_LABEL "$(cat "$h/power1_label")"
