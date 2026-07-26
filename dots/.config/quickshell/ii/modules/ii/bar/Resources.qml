@@ -20,7 +20,9 @@ MouseArea {
         anchors.rightMargin: 4
 
         Resource {
-            iconName: "memory"
+            // "memory" is the chip glyph, which reads as CPU — RAM takes the
+            // stacked-layers one instead.
+            iconName: "planner_review"
             percentage: ResourceUsage.memoryUsedPercentage
             warningThreshold: Config.options.bar.resources.memoryWarningThreshold
         }
@@ -36,13 +38,30 @@ MouseArea {
         }
 
         Resource {
-            iconName: "planner_review"
+            iconName: "memory"
             percentage: ResourceUsage.cpuUsage
-            shown: Config.options.bar.resources.alwaysShowCpu || 
+            // Optionally show the htop-style aggregate (sum over all threads,
+            // e.g. 312 when 8 threads sit at ~39%) instead of the 0-100 average.
+            displayText: Config.options.bar.resources.cpuPerCoreSum
+                ? `${Math.round(ResourceUsage.cpuUsageSum * 100)}` : ""
+            displayTextMax: Config.options.bar.resources.cpuPerCoreSum
+                ? `${ResourceUsage.cpuCoreCount * 100}` : ""
+            shown: Config.options.bar.resources.alwaysShowCpu ||
                 !(MprisController.activePlayer?.trackTitle?.length > 0) ||
                 root.alwaysShowAllResources
             Layout.leftMargin: shown ? 6 : 0
             warningThreshold: Config.options.bar.resources.cpuWarningThreshold
+        }
+
+        Resource {
+            iconName: "developer_board"
+            percentage: ResourceUsage.gpuUsageSmooth / 100
+            shown: Config.options.bar.resources.showGpu && ResourceUsage.gpuDetected && (
+                Config.options.bar.resources.alwaysShowCpu ||
+                !(MprisController.activePlayer?.trackTitle?.length > 0) ||
+                root.alwaysShowAllResources)
+            Layout.leftMargin: shown ? 6 : 0
+            warningThreshold: Config.options.bar.resources.gpuWarningThreshold
         }
 
     }

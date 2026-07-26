@@ -22,6 +22,9 @@ with [better-ii-ai](https://github.com/flashback7766/better-ii-ai), heading towa
   Explicit `/yolo on` mode for people who like living dangerously.
 - **Current model roster** (July 2026): Gemini 3.5 Flash-Lite (default, free tier),
   Gemini 3.6 Flash, Claude Sonnet 5 / Opus 4.8 / Fable 5, GPT-5.6 Luna/Terra/Sol.
+- **Real hardware readouts in the bar** — CPU (htop-style per-thread aggregate),
+  temperature, frequency, GPU load/temp and system power draw, all read straight from
+  sysfs with zero processes spawned on the polling path.
 - **Sane installer** — component selection, timestamped backups with one-command
   rollback, migration of your existing configs, API keys in the system keyring.
 - **RU layout out of the box** — `us,ru` with Alt+Shift toggle as the shipped default.

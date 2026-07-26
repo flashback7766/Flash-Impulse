@@ -9,6 +9,10 @@ Item {
     required property double percentage
     property int warningThreshold: 100
     property bool shown: true
+    // Optional label override. displayTextMax reserves width for the widest
+    // value the readout can reach, so the bar doesn't jitter as digits change.
+    property string displayText: ""
+    property string displayTextMax: ""
     clip: true
     visible: width > 0 && height > 0
     implicitWidth: resourceRowLayout.x < 0 ? 0 : resourceRowLayout.implicitWidth
@@ -56,7 +60,9 @@ Item {
 
             TextMetrics {
                 id: fullPercentageTextMetrics
-                text: "100"
+                text: root.displayTextMax !== "" ? root.displayTextMax
+                    : root.displayText !== "" ? root.displayText
+                    : "100"
                 font.pixelSize: Appearance.font.pixelSize.small
             }
 
@@ -65,7 +71,8 @@ Item {
                 anchors.centerIn: parent
                 color: Appearance.colors.colOnLayer1
                 font.pixelSize: Appearance.font.pixelSize.small
-                text: `${Math.round(percentage * 100).toString()}`
+                text: root.displayText !== "" ? root.displayText
+                    : `${Math.round(percentage * 100).toString()}`
             }
         }
 
