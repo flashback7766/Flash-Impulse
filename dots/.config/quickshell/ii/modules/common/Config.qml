@@ -245,7 +245,7 @@ Singleton {
                 property bool floatStyleShadow: true // Show shadow behind bar when cornerStyle == 1 (Float)
                 property bool borderless: false // true for no grouping of items
                 property string topLeftIcon: "spark" // Options: "distro" or any icon name in ~/.config/quickshell/ii/assets/icons
-                property bool showBackground: true
+                property bool showBackground: false // Transparent bar; each group carries its own capsule instead
                 property bool verbose: true
                 property bool vertical: false
                 property JsonObject resources: JsonObject {

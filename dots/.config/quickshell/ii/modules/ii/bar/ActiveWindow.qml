@@ -18,6 +18,19 @@ Item {
 
     implicitWidth: colLayout.implicitWidth
 
+    // Sized off the painted (already elided) text rather than the layout, which
+    // stretches to fill the whole left section — a capsule that wide would look
+    // like a second bar.
+    StandaloneBackdrop {
+        anchors {
+            left: colLayout.left
+            leftMargin: -10
+            verticalCenter: colLayout.verticalCenter
+        }
+        width: Math.max(appIdText.contentWidth, titleText.contentWidth) + 20
+        height: colLayout.implicitHeight + 8
+    }
+
     ColumnLayout {
         id: colLayout
 
@@ -27,6 +40,7 @@ Item {
         spacing: -4
 
         StyledText {
+            id: appIdText
             Layout.fillWidth: true
             font.pixelSize: Appearance.font.pixelSize.smaller
             color: Appearance.colors.colSubtext
@@ -38,6 +52,7 @@ Item {
         }
 
         StyledText {
+            id: titleText
             Layout.fillWidth: true
             font.pixelSize: Appearance.font.pixelSize.small
             color: Appearance.colors.colOnLayer0

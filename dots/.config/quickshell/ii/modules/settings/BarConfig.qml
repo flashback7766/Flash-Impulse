@@ -138,6 +138,31 @@ ContentPage {
                     ]
                 }
             }
+
+            ContentSubsection {
+                title: Translation.tr("Background")
+                Layout.fillWidth: false
+
+                ConfigSelectionArray {
+                    currentValue: Config.options.bar.showBackground
+                    onSelected: newValue => {
+                        Config.options.bar.showBackground = newValue; // Update local copy
+                    }
+                    options: [
+                        {
+                            // Groups grow their own outlined capsule to stay readable
+                            displayName: Translation.tr("Transparent"),
+                            icon: "blur_on",
+                            value: false
+                        },
+                        {
+                            displayName: Translation.tr("Solid"),
+                            icon: "toolbar",
+                            value: true
+                        }
+                    ]
+                }
+            }
         }
     }
 

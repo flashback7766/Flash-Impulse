@@ -43,7 +43,7 @@ Item { // Bar content region
         }
         color: Config.options.bar.showBackground ? Appearance.colors.colLayer0 : "transparent"
         radius: Config.options.bar.cornerStyle === 1 ? Appearance.rounding.windowRounding : 0
-        border.width: Config.options.bar.cornerStyle === 1 ? 1 : 0
+        border.width: (Config.options.bar.showBackground && Config.options.bar.cornerStyle === 1) ? 1 : 0
         border.color: Appearance.colors.colLayer0Border
     }
 
@@ -87,6 +87,11 @@ Item { // Bar content region
                 Layout.alignment: Qt.AlignVCenter
                 Layout.leftMargin: Appearance.rounding.screenRounding
                 colBackground: barLeftSideMouseArea.hovered ? Appearance.colors.colLayer1Hover : ColorUtils.transparentize(Appearance.colors.colLayer1Hover, 1)
+
+                StandaloneBackdrop {
+                    anchors.fill: parent
+                    anchors.margins: -3
+                }
             }
 
             ActiveWindow {
@@ -236,6 +241,10 @@ Item { // Bar content region
 
                 buttonRadius: Appearance.rounding.full
                 colBackground: barRightSideMouseArea.hovered ? Appearance.colors.colLayer1Hover : ColorUtils.transparentize(Appearance.colors.colLayer1Hover, 1)
+
+                StandaloneBackdrop {
+                    anchors.fill: parent
+                }
                 colBackgroundHover: Appearance.colors.colLayer1Hover
                 colRipple: Appearance.colors.colLayer1Active
                 colBackgroundToggled: Appearance.colors.colSecondaryContainer
@@ -322,6 +331,16 @@ Item { // Bar content region
                 Layout.fillWidth: false
                 Layout.fillHeight: true
                 invertSide: Config?.options.bar.bottom
+
+                StandaloneBackdrop {
+                    anchors {
+                        fill: parent
+                        topMargin: 4
+                        bottomMargin: 4
+                        leftMargin: -8
+                        rightMargin: -8
+                    }
+                }
             }
 
             Item {
