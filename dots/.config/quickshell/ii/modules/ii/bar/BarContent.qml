@@ -55,6 +55,7 @@ Item { // Bar content region
             bottom: parent.bottom
             left: parent.left
             right: middleSection.left
+            rightMargin: 8 // Clear space before the resources/media capsule
         }
         implicitWidth: leftSectionRowLayout.implicitWidth
         implicitHeight: Appearance.sizes.baseBarHeight
@@ -90,7 +91,6 @@ Item { // Bar content region
 
                 StandaloneBackdrop {
                     anchors.fill: parent
-                    anchors.margins: -3
                 }
             }
 
@@ -199,6 +199,7 @@ Item { // Bar content region
             top: parent.top
             bottom: parent.bottom
             left: middleSection.right
+            leftMargin: 8 // Clear space after the clock/util-buttons capsule
             right: parent.right
         }
         implicitWidth: rightSectionRowLayout.implicitWidth

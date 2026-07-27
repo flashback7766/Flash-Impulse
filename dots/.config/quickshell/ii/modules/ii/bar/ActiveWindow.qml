@@ -24,7 +24,7 @@ Item {
     StandaloneBackdrop {
         anchors {
             left: colLayout.left
-            leftMargin: -10
+            leftMargin: -4 // Leaves a clear gap to the sidebar button's own capsule
             verticalCenter: colLayout.verticalCenter
         }
         width: Math.max(appIdText.contentWidth, titleText.contentWidth) + 20
