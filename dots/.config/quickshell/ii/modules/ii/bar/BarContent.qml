@@ -327,19 +327,19 @@ Item { // Bar content region
             }
 
             SysTray {
+                id: sysTray
                 visible: root.useShortenedForm === 0
                 Layout.fillWidth: false
                 Layout.fillHeight: true
                 invertSide: Config?.options.bar.bottom
 
+                // Sized off the tray's own implicit content size, not the
+                // Layout.fillHeight-stretched item — anchoring to the full bar
+                // height puffed the capsule up into its neighbour.
                 StandaloneBackdrop {
-                    anchors {
-                        fill: parent
-                        topMargin: 4
-                        bottomMargin: 4
-                        leftMargin: -8
-                        rightMargin: -8
-                    }
+                    anchors.centerIn: parent
+                    width: sysTray.implicitWidth + 16
+                    height: sysTray.implicitHeight + 8
                 }
             }
 
