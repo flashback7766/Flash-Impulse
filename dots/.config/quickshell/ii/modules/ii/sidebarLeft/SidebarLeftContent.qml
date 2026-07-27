@@ -27,6 +27,14 @@ Item {
         swipeView.currentItem.forceActiveFocus()
     }
 
+    // The AI chat is always the first tab when it's enabled at all. Goes through
+    // the TabBar's own setter rather than assigning currentIndex, which would
+    // clobber the two-way binding it shares with the SwipeView.
+    function showAiTab() {
+        if (!root.aiChatEnabled) return;
+        tabBar.setCurrentIndex(0);
+    }
+
     Keys.onPressed: (event) => {
         if (event.modifiers === Qt.ControlModifier) {
             if (event.key === Qt.Key_PageDown) {

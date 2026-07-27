@@ -35,6 +35,16 @@ hl.bind("SUPER + A", hl.dsp.global("quickshell:sidebarLeftToggle"), { descriptio
 hl.bind("SUPER + ALT + A", hl.dsp.global("quickshell:sidebarLeftToggleDetach"))
 hl.bind("SUPER + B", hl.dsp.global("quickshell:sidebarLeftToggle"))
 hl.bind("SUPER + O", hl.dsp.global("quickshell:sidebarLeftToggle"))
+-- Copilot key. Microsoft's spec has the firmware emit Shift+Super+F23, and the
+-- OEM variants (plain F23, Ctrl+Shift+F23) differ only in modifiers — F23 is not
+-- on any real keyboard, so ignoring modifiers catches all of them at once.
+hl.bind("F23", hl.dsp.global("quickshell:sidebarLeftOpenAi"),
+    { ignore_mods = true, description = "Shell: Toggle AI sidebar (Copilot key)" })
+-- Assistant keys that report KEY_ASSISTANT instead. Its evdev code (583) is past
+-- the range the stock xkb keymap names, so the keysym may never resolve; the raw
+-- keycode (evdev + 8) is the fallback. Untested — no such hardware here.
+hl.bind("XF86Assistant", hl.dsp.global("quickshell:sidebarLeftOpenAi"), { ignore_mods = true })
+hl.bind("code:591", hl.dsp.global("quickshell:sidebarLeftOpenAi"), { ignore_mods = true })
 hl.bind("SUPER + N", hl.dsp.global("quickshell:sidebarRightToggle"), { description = "Shell: Toggle right sidebar" })
 hl.bind("SUPER + Slash", hl.dsp.global("quickshell:cheatsheetToggle"), { description = "Shell: Toggle cheatsheet" })
 hl.bind("SUPER + K", hl.dsp.global("quickshell:oskToggle"), { description = "Shell: Toggle on-screen keyboard" })

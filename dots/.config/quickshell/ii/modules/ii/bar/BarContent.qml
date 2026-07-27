@@ -334,6 +334,9 @@ Item { // Bar content region
                 visible: root.useShortenedForm === 0
                 Layout.fillWidth: false
                 Layout.fillHeight: true
+                // The tray and the indicators already sit in separate capsules;
+                // upstream's dot only made sense on a single flat surface.
+                showSeparator: false
                 // The capsule below bleeds 8px past the item on each side, so the
                 // layout has to reserve that space or the row's 5px spacing is not
                 // enough to keep it off the indicators capsule.
