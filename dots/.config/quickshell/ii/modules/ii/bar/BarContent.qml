@@ -95,7 +95,9 @@ Item { // Bar content region
             }
 
             ActiveWindow {
-                Layout.leftMargin: 10 + (leftSidebarButton.visible ? 0 : Appearance.rounding.screenRounding)
+                // 18 rather than 10: the title's capsule bleeds 10px left of the
+                // text, so this is what actually decides the gap to the button.
+                Layout.leftMargin: 18 + (leftSidebarButton.visible ? 0 : Appearance.rounding.screenRounding)
                 Layout.rightMargin: Appearance.rounding.screenRounding
                 Layout.fillWidth: true
                 Layout.fillHeight: true
@@ -332,6 +334,11 @@ Item { // Bar content region
                 visible: root.useShortenedForm === 0
                 Layout.fillWidth: false
                 Layout.fillHeight: true
+                // The capsule below bleeds 8px past the item on each side, so the
+                // layout has to reserve that space or the row's 5px spacing is not
+                // enough to keep it off the indicators capsule.
+                Layout.leftMargin: 8
+                Layout.rightMargin: 8
                 invertSide: Config?.options.bar.bottom
 
                 // Sized off the tray's own implicit content size, not the
