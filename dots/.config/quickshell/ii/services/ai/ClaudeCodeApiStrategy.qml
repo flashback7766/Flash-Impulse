@@ -24,6 +24,10 @@ ApiStrategy {
 
     // Session state — survives reset(), which runs before every request.
     property string sessionId: ""
+    // Claude Code stores sessions per working directory, so --resume only finds a
+    // conversation when it runs from the same place it started. A chat records the
+    // directory alongside the id and restores both.
+    property string sessionCwd: Quickshell.env("HOME")
     property string pendingPrompt: ""
     property string pendingModel: ""
     property bool sawResult: false
@@ -40,6 +44,7 @@ ApiStrategy {
 
     function clearSession() {
         sessionId = "";
+        sessionCwd = Quickshell.env("HOME");
     }
 
     function reset() {
@@ -108,7 +113,7 @@ ApiStrategy {
             + `export PATH="$HOME/.local/bin:$HOME/.npm-global/bin:$PATH"\n`
             // Claude Code sessions are stored per working directory — pin it so
             // --resume always finds the conversation regardless of who spawns us.
-            + `cd "$HOME"\n`
+            + `cd '${CF.StringUtils.shellSingleQuoteEscape(root.sessionCwd)}' || cd "$HOME"\n`
             + `mkdir -p '${root.logDir}'\n`
             + `exec 2>>'${root.logDir}/claude-code-bridge.log'\n`
             + `echo "[$(date -Iseconds)] model=${root.pendingModel} resume=${root.sessionId}" >&2\n`

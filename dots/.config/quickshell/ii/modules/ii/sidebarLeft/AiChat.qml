@@ -33,9 +33,17 @@ Item {
     Keys.onPressed: event => {
         // Escape closes any open popup
         if (event.key === Qt.Key_Escape) {
+            if (chatListPanel.shown) { chatListPanel.close(); event.accepted = true; return; }
             if (modelPickerPopup.isOpen) { modelPickerPopup.close(); event.accepted = true; return; }
             if (functionsPopup.isOpen) { functionsPopup.close(); event.accepted = true; return; }
         }
+        // Ctrl+K opens history straight into the search box
+        if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_K) {
+            chatListPanel.open(true);
+            event.accepted = true;
+            return;
+        }
+        if (chatListPanel.shown) return; // The panel owns the keyboard while it's up
         messageInputField.forceActiveFocus();
         if (event.modifiers === Qt.NoModifier) {
             if (event.key === Qt.Key_PageUp) {
@@ -156,18 +164,24 @@ Item {
             }
         },
         {
+            name: "chats",
+            description: Translation.tr("Open the chat history panel (Ctrl+K)"),
+            execute: () => {
+                chatListPanel.open(true);
+            }
+        },
+        {
             name: "new",
-            description: Translation.tr("Start new chat (saves current to history buffer)"),
+            description: Translation.tr("Start a new chat (the current one stays in history)"),
             execute: () => {
                 Ai.newChat();
             }
         },
         {
             name: "clear",
-            description: Translation.tr("Clear chat without saving to history"),
+            description: Translation.tr("Discard this chat (deletes it, unlike /new)"),
             execute: () => {
-                Ai.resetSessionState();
-                Ai.saveChat("lastSession");
+                Ai.discardCurrentChat();
             }
         },
         {
@@ -322,6 +336,13 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                 functionsPopup.close();
             }
         }
+    }
+
+    ChatListPanel {
+        id: chatListPanel
+        anchors.fill: parent
+        z: 900
+        onRequestClose: messageInputField.forceActiveFocus()
     }
 
     // Model picker popup — lives at root level to escape inputWrapper's clip:true
@@ -1359,41 +1380,41 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                                     };
                                 });
                             } else if (messageInputField.text.startsWith(`${root.commandPrefix}save`)) {
-                                root.suggestionQuery = messageInputField.text.split(" ")[1] ?? "";
-                                const promptFileResults = Fuzzy.go(root.suggestionQuery, Ai.savedChats.map(file => {
+                                root.suggestionQuery = messageInputField.text.split(" ").slice(1).join(" ");
+                                const promptFileResults = Fuzzy.go(root.suggestionQuery, Ai.savedChats.map(title => {
                                     return {
-                                        name: Fuzzy.prepare(file),
-                                        obj: file
+                                        name: Fuzzy.prepare(title),
+                                        obj: title
                                     };
                                 }), {
                                     all: true,
                                     key: "name"
                                 });
-                                root.suggestionList = promptFileResults.map(file => {
-                                    const chatName = FileUtils.trimFileExt(FileUtils.fileNameForPath(file.target)).trim();
+                                root.suggestionList = promptFileResults.map(entry => {
+                                    const chatName = entry.target;
                                     return {
                                         name: `${messageInputField.text.trim().split(" ").length == 1 ? (root.commandPrefix + "save ") : ""}${chatName}`,
                                         displayName: `${chatName}`,
-                                        description: Translation.tr("Save chat to %1").arg(chatName)
+                                        description: Translation.tr("Reuse the name %1").arg(chatName)
                                     };
                                 });
                             } else if (messageInputField.text.startsWith(`${root.commandPrefix}load`)) {
-                                root.suggestionQuery = messageInputField.text.split(" ")[1] ?? "";
-                                const promptFileResults = Fuzzy.go(root.suggestionQuery, Ai.savedChats.map(file => {
+                                root.suggestionQuery = messageInputField.text.split(" ").slice(1).join(" ");
+                                const promptFileResults = Fuzzy.go(root.suggestionQuery, Ai.savedChats.map(title => {
                                     return {
-                                        name: Fuzzy.prepare(file),
-                                        obj: file
+                                        name: Fuzzy.prepare(title),
+                                        obj: title
                                     };
                                 }), {
                                     all: true,
                                     key: "name"
                                 });
-                                root.suggestionList = promptFileResults.map(file => {
-                                    const chatName = FileUtils.trimFileExt(FileUtils.fileNameForPath(file.target)).trim();
+                                root.suggestionList = promptFileResults.map(entry => {
+                                    const chatName = entry.target;
                                     return {
                                         name: `${messageInputField.text.trim().split(" ").length == 1 ? (root.commandPrefix + "load ") : ""}${chatName}`,
                                         displayName: `${chatName}`,
-                                        description: Translation.tr(`Load chat from %1`).arg(file.target)
+                                        description: Translation.tr("Open this chat")
                                     };
                                 });
                             } else if (messageInputField.text.startsWith(`${root.commandPrefix}tool`)) {
@@ -1611,6 +1632,24 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                 anchors.rightMargin: 10
                 spacing: 10
 
+
+                // Chat history
+                RippleButton {
+                    id: historyButton
+                    implicitWidth: 36
+                    implicitHeight: 36
+                    buttonRadius: 18
+                    colBackground: Appearance.colors.colLayer2
+                    colBackgroundHover: Appearance.colors.colLayer2Hover
+                    onClicked: chatListPanel.open(false)
+                    StyledToolTip { text: Translation.tr("Chat history (Ctrl+K)") }
+                    contentItem: MaterialSymbol {
+                        anchors.centerIn: parent
+                        text: "history"
+                        iconSize: Appearance.font.pixelSize.large
+                        color: Appearance.m3colors.m3onSurface
+                    }
+                }
 
                 // Commands shortcut button
                 RippleButton {

@@ -143,7 +143,9 @@ Singleton {
     property list<var> defaultPrompts: []
     property list<var> userPrompts: []
     property list<var> promptFiles: [...defaultPrompts, ...userPrompts]
-    property list<var> savedChats: []
+    // Chat titles, for /save and /load completion. Backed by the store index,
+    // so it stays in step with the chat list without an ls on every save.
+    readonly property list<var> savedChats: chatStore.index.map(e => (e.title ?? "").length > 0 ? e.title : e.id)
 
     property var promptSubstitutions: {
         "{DISTRO}": SystemInfo.distroName,
@@ -610,10 +612,11 @@ Singleton {
         setModel(resolvedId, false, resolvedId !== storedId);
         root.addUserModels();
         
-        // Restore last session and summaries
+        // Startup opens a fresh empty chat by design — history lives in the chat
+        // list, one file per conversation, and is a click away instead of being
+        // whatever happened to be on screen when the shell last exited.
         Qt.callLater(() => {
-            root.loadRecentChatSummaries();
-            root.loadChat("lastSession");
+            chatStore.reloadIndex();
         });
     }
 
@@ -731,20 +734,6 @@ Singleton {
         }
     }
 
-    Process {
-        id: getSavedChats
-        running: true
-        command: ["ls", "-1", Directories.aiChats]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                if (text.length === 0) return;
-                root.savedChats = text.split("\n")
-                    .filter(fileName => fileName.endsWith(".json"))
-                    .map(fileName => `${Directories.aiChats}/${fileName}`)
-            }
-        }
-    }
-
     FileView {
         id: promptLoader
         watchChanges: false;
@@ -779,7 +768,7 @@ Singleton {
         // Ai.messageByID[id] before the entry exists, ending up stuck on null.
         root.messageByID[id] = aiMessage;
         root.messageIDs = [...root.messageIDs, id];
-        root.saveChat("lastSession");
+        root.persistCurrentChat();
     }
 
     function removeMessage(index) {
@@ -801,7 +790,7 @@ Singleton {
         
         // Reassign with a fresh array so QML's binding system observes the change.
         root.messageIDs = root.messageIDs.slice(0, startIndex).concat(root.messageIDs.slice(startIndex + count));
-        root.saveChat("lastSession");
+        root.persistCurrentChat();
     }
 
     function removeMessageById(id) {
@@ -930,45 +919,36 @@ Singleton {
         id: chatExportFile
     }
 
-    property int chatHistorySlots: 5
-    property int chatHistoryIndex: Persistent.states?.ai?.historyIndex ?? 0
-
     /**
-     * Start a new chat: save current to rotating buffer, then clear.
-     * Buffer: history_0..history_4 (oldest gets overwritten)
+     * Start a new chat. The current one is already on disk (autosave), so this is
+     * just "put it away and open a blank one" — nothing is overwritten and nothing
+     * rotates out, unlike the old five-slot ring buffer this replaces.
      */
     function newChat() {
-        // Save current chat to rotating slot (only if there's actual content)
-        if (root.messageIDs.length > 1) {
-            // Capture transcript BEFORE clearing — the summary timer may not have fired yet
-            let transcript = "";
-            for (let i = 0; i < root.messageIDs.length; i++) {
-                const msg = root.messageByID[root.messageIDs[i]];
-                if (!msg || msg.role === root.interfaceRole) continue;
-                const role = msg.role === "user" ? "User" : "Assistant";
-                transcript += `${role}: ${msg.rawContent}\n`;
-            }
-            const slotName = `history_${root.chatHistoryIndex % root.chatHistorySlots}`;
-            try {
-                root.saveChat(slotName);
-                root.chatHistoryIndex = (root.chatHistoryIndex + 1) % root.chatHistorySlots;
-                root.savePersistentState("historyIndex", root.chatHistoryIndex)
-            } catch (e) {
-                console.log("[AI] newChat: could not save to history:", e);
-            }
-            // Force a fresh summary for the slot we just archived to (background)
-            if (transcript.length > 50) {
-                root.generateMemorySummary(slotName, transcript);
-            }
+        root.persistCurrentChat();
+        // Capture the transcript before clearing; the idle summary timer may not
+        // have fired yet and the memory of this chat would be lost.
+        const summaryTarget = root.currentChatId;
+        let transcript = "";
+        for (let i = 0; i < root.messageIDs.length; i++) {
+            const msg = root.messageByID[root.messageIDs[i]];
+            if (!msg || msg.role === root.interfaceRole) continue;
+            const role = msg.role === "user" ? "User" : "Assistant";
+            transcript += `${role}: ${msg.rawContent}\n`;
         }
-        // Cancel pending idle-summary; the cleared chat has nothing to summarize
         memorySummaryTimer.stop();
-        // clearMessages() destroys all message QML objects internally
         root.clearMessages();
-        // Persist the cleared state so a restart doesn't reload the old chat
-        root.saveChat("lastSession");
-        // Reload summaries from all history slots
-        root.loadRecentChatSummaries();
+        root.currentChatId = "";
+        root.currentChatTitle = "";
+        root.currentChatCreatedAt = 0;
+        root.currentChatDraft = "";
+        root.titleGenerated = false;
+        if (summaryTarget.length > 0 && transcript.length > 50) {
+            root.generateMemorySummary(`chat_${summaryTarget}`, transcript);
+        } else {
+            root.loadRecentChatSummaries();
+        }
+        root.chatOpened("");
     }
 
     function resetSessionState() {
@@ -1092,52 +1072,34 @@ Singleton {
         }
     }
 
-    // Summarize a saved chat JSON into a one-liner
-    function summarizeSavedChat(chatJson) {
-        try {
-            const data = JSON.parse(chatJson);
-            if (!data || data.length < 2) return "";
-            const userMsgs = data.filter(m => m.role === "user");
-            const assistantMsgs = data.filter(m => m.role === "assistant");
-            const firstUser = userMsgs[0]?.rawContent?.substring(0, 150) ?? "";
-            const lastAssistant = assistantMsgs[assistantMsgs.length - 1]?.rawContent?.substring(0, 100) ?? "";
-            if (firstUser.length === 0) return "";
-            return `- User asked: ${firstUser.replace(/\n/g, " ")}${lastAssistant.length > 0 ? (" → Assistant: " + lastAssistant.replace(/\n/g, " ")) : ""}`;
-        } catch (e) {
-            return "";
-        }
-    }
+    // Pull the memory summaries of the few most recently touched chats, so a new
+    // conversation starts knowing roughly what the last ones were about.
+    property int recentSummaryCount: 5
 
-    // Load summaries from the rotating history buffer (history_0..history_4)
     function loadRecentChatSummaries() {
         try {
             let summaries = [];
-            for (let i = 0; i < root.chatHistorySlots; i++) {
+            const recent = chatStore.index.slice(0, root.recentSummaryCount);
+            for (let i = 0; i < recent.length; i++) {
+                if (recent[i].id === root.currentChatId) continue;
                 try {
-                    chatSummaryLoader.path = `${Directories.aiChats}/history_${i}.summary.txt`;
+                    chatSummaryLoader.path = `${Directories.aiChats}/chat_${recent[i].id}.summary.txt`;
                     chatSummaryLoader.reload();
-                    let content = chatSummaryLoader.text();
-                    
+                    const content = chatSummaryLoader.text();
                     if (content && content.length > 5) {
                         summaries.push(`- ${content.trim()}`);
-                    } else {
-                        // Fallback to naive JSON parsing
-                        chatSummaryLoader.path = `${Directories.aiChats}/history_${i}.json`;
-                        chatSummaryLoader.reload();
-                        content = chatSummaryLoader.text();
-                        if (!content || content.length < 10) continue;
-                        const summary = root.summarizeSavedChat(content);
-                        if (summary.length > 0) summaries.push(summary);
+                    } else if ((recent[i].preview ?? "").length > 0) {
+                        // No generated summary yet — the opening question is still a
+                        // better hint than nothing.
+                        summaries.push(`- ${recent[i].title || recent[i].preview}`);
                     }
                 } catch (e) {
                     continue;
                 }
             }
-            if (summaries.length > 0) {
-                root.previousChatSummary = summaries.join("\n").substring(0, 1500);
-            } else {
-                root.previousChatSummary = "";
-            }
+            root.previousChatSummary = summaries.length > 0
+                ? summaries.join("\n").substring(0, 1500)
+                : "";
         } catch (e) {
             console.log("[AI] Could not load recent chat summaries:", e);
         }
@@ -1196,6 +1158,84 @@ Singleton {
         backgroundMemoryProc.running = true;
     }
 
+    // ---- automatic chat titles ---------------------------------------------
+
+    property bool titleGenerated: false
+
+    /**
+     * Name the chat from its opening exchange, once, using the cheap model. Falls
+     * back to a trimmed version of the first question when there's no API key for
+     * the summarizer — an untitled chat in the list is worse than a crude title.
+     */
+    function maybeGenerateTitle() {
+        if (root.titleGenerated || root.currentChatId.length === 0) return;
+        if (root.messageIDs.length < 2) return;
+
+        let firstUser = "";
+        let firstAssistant = "";
+        for (let i = 0; i < root.messageIDs.length; i++) {
+            const msg = root.messageByID[root.messageIDs[i]];
+            if (!msg || msg.role === root.interfaceRole) continue;
+            if (!firstUser && msg.role === "user") firstUser = msg.rawContent;
+            else if (firstUser && !firstAssistant && msg.role === "assistant") firstAssistant = msg.rawContent;
+        }
+        if (firstUser.length === 0 || firstAssistant.length === 0) return;
+
+        root.titleGenerated = true; // One attempt per chat, success or not
+        root.currentChatTitle = root.fallbackTitle(firstUser);
+
+        const model = models[root.summarizerModelId];
+        const apiKey = model ? (root.apiKeys?.[model.key_id] ?? "") : "";
+        if (!model || !apiKey || titleProc.running) {
+            root.persistCurrentChat();
+            return;
+        }
+
+        const prompt = "Write a title for this conversation: at most 5 words, no quotes, no trailing period, "
+            + "in the same language the user is writing in. Output only the title.";
+        const transcript = `User: ${firstUser.substring(0, 800)}\nAssistant: ${firstAssistant.substring(0, 400)}`;
+        const requestData = geminiStrategy.buildRequestData(model, [{ role: "user", rawContent: transcript }], prompt, 0.3, [], "", false, 0);
+        const endpoint = geminiStrategy.buildEndpoint(model).replace(":streamGenerateContent", ":generateContent");
+        const curlCmd = `curl -s "${endpoint}" -H "Content-Type: application/json" --data '${CF.StringUtils.shellSingleQuoteEscape(JSON.stringify(requestData))}'`;
+        const escapedApiKey = CF.StringUtils.shellSingleQuoteEscape(apiKey);
+
+        titleProc.targetChatId = root.currentChatId;
+        titleProc.buffer = "";
+        titleProc.command = ["bash", "-c", `bash <<'EOP_TITLE'\nexport ${root.apiKeyEnvVarName}='${escapedApiKey}'\n${curlCmd}\nEOP_TITLE\n`];
+        titleProc.running = true;
+    }
+
+    function fallbackTitle(text) {
+        const clean = (text ?? "").replace(/\s+/g, " ").trim();
+        if (clean.length === 0) return "";
+        return clean.length > 40 ? clean.slice(0, 40).trim() + "…" : clean;
+    }
+
+    Process {
+        id: titleProc
+        property string targetChatId: ""
+        property string buffer: ""
+        stdout: SplitParser {
+            onRead: data => { titleProc.buffer += data; }
+        }
+        onExited: exitCode => {
+            const raw = titleProc.buffer;
+            titleProc.buffer = "";
+            if (exitCode !== 0) return;
+            let title = "";
+            try {
+                title = JSON.parse(raw).candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+            } catch (e) {
+                return;
+            }
+            title = title.replace(/^["'`\s]+|["'`\s.]+$/g, "").split("\n")[0];
+            if (title.length === 0 || title.length > 80) return;
+            // The user may have moved on to another chat while this was in flight.
+            root.renameChat(titleProc.targetChatId, title);
+            if (titleProc.targetChatId === root.currentChatId) root.currentChatTitle = title;
+        }
+    }
+
     Timer {
         id: memorySummaryTimer
         interval: 10000 // 10s idle
@@ -1208,8 +1248,8 @@ Singleton {
                 const role = msg.role === "user" ? "User" : "Assistant";
                 transcript += `${role}: ${msg.rawContent}\n`;
             }
-            if (transcript.length > 50) {
-                root.generateMemorySummary(`history_${root.chatHistoryIndex % root.chatHistorySlots}`, transcript);
+            if (transcript.length > 50 && root.currentChatId.length > 0) {
+                root.generateMemorySummary(`chat_${root.currentChatId}`, transcript);
             }
         }
     }
@@ -1265,7 +1305,7 @@ Singleton {
                 root.postResponseHook();
                 root.postResponseHook = null;
             }
-            root.saveChat("lastSession")
+            root.persistCurrentChat()
             memorySummaryTimer.restart()
             root.responseFinished()
         }
@@ -1828,108 +1868,200 @@ Singleton {
             })
     }
 
-    FileView {
-        id: chatSaveFile
-        property string chatName: ""
-        path: chatName.length > 0 ? `${Directories.aiChats}/${chatName}.json` : ""
-        blockLoading: true // Prevent race conditions
+    ChatStore {
+        id: chatStore
+        chatsDir: Directories.aiChats
+    }
+
+    // Identity of the conversation on screen. Empty id means "not written to disk
+    // yet" — an untouched new chat leaves no file behind.
+    property string currentChatId: ""
+    property string currentChatTitle: ""
+    property string currentChatDraft: ""
+    property alias chatIndex: chatStore.index
+
+    function currentChatDisplayTitle() {
+        if (root.currentChatTitle.length > 0) return root.currentChatTitle;
+        return Translation.tr("New chat");
     }
 
     /**
-     * Saves chat to a JSON list of message objects.
-     * @param chatName name of the chat
+     * Autosave. Called after every answer, every message edit, and on send —
+     * losing a conversation to a crash or a restart is not acceptable, and the
+     * write is a single small file.
+     */
+    function persistCurrentChat() {
+        if (root.messageIDs.length === 0) {
+            // Nothing to keep. If the chat had already been written, drop the file
+            // rather than leaving an empty husk in the list.
+            if (root.currentChatId.length > 0) {
+                chatStore.remove(root.currentChatId);
+                root.currentChatId = "";
+            }
+            return;
+        }
+        if (root.currentChatId.length === 0) {
+            root.currentChatId = chatStore.newId();
+        }
+        const claudeCode = root.apiStrategies["claude-code"];
+        chatStore.save({
+            "id": root.currentChatId,
+            "title": root.currentChatTitle,
+            "createdAt": root.currentChatCreatedAt > 0 ? root.currentChatCreatedAt : Date.now(),
+            "model": root.currentModelId,
+            "draft": root.currentChatDraft,
+            "sessionSummary": root.sessionSummary,
+            // Claude Code keeps the transcript on its side, keyed by session id and
+            // working directory; without both, reopening a chat starts a new one.
+            "claudeCodeSessionId": claudeCode?.sessionId ?? "",
+            "claudeCodeCwd": claudeCode?.sessionCwd ?? "",
+            "messages": root.chatToJson()
+        });
+        root.maybeGenerateTitle();
+    }
+
+    property double currentChatCreatedAt: 0
+
+    /**
+     * Loads a chat by store id, replacing whatever is on screen.
+     */
+    function loadChatById(id) {
+        const chat = chatStore.load(id);
+        if (!chat) {
+            root.addMessage(Translation.tr("Could not open that chat."), root.interfaceRole);
+            return false;
+        }
+        root.clearMessages();
+        root.currentChatId = chat.id ?? id;
+        root.currentChatTitle = chat.title ?? "";
+        root.currentChatCreatedAt = chat.createdAt ?? Date.now();
+        root.currentChatDraft = chat.draft ?? "";
+        root.sessionSummary = chat.sessionSummary ?? "";
+        const claudeCode = root.apiStrategies["claude-code"];
+        if (claudeCode) {
+            claudeCode.sessionId = chat.claudeCodeSessionId ?? "";
+            claudeCode.sessionCwd = chat.claudeCodeCwd ?? "";
+        }
+        root.restoreMessages(chat.messages ?? []);
+        root.chatOpened(root.currentChatId);
+        return true;
+    }
+
+    signal chatOpened(string id)
+
+    /**
+     * Rebuilds live message objects from their saved form.
+     */
+    function restoreMessages(saveData) {
+        if (!Array.isArray(saveData)) return;
+        const saveIds = saveData.map((_, i) => `loaded_${Date.now()}_${i}`);
+        // Populate the map first; assigning messageIDs triggers the UI rebuild,
+        // and delegates need messageByID[id] to be live by then.
+        for (let i = 0; i < saveData.length; i++) {
+            const message = saveData[i];
+            if (!message) continue;
+            // rawContent is what goes back to the model; the displayed content is
+            // it minus internal markers and any inlined <think> tags. Older saves
+            // predate the reasoning field, so recover it from the tags on load.
+            const rawContent = message.rawContent ?? "";
+            const marked = rawContent.replace(/\[\[\s*(Function|Output of).*?\s*\]\]\n?/g, "").trim();
+            const split = CF.StringUtils.extractThinkTags(marked);
+            const reasoning = (message.reasoning?.length > 0) ? message.reasoning : split.reasoning;
+            // Fake a start/end pair that reproduces the saved duration; a non-zero
+            // end is also what keeps reasoningActive false on restored messages.
+            const reasoningSeconds = message.reasoningSeconds ?? 0;
+            root.messageByID[saveIds[i]] = root.aiMessageComponent.createObject(root, {
+                "role": message.role,
+                "rawContent": rawContent,
+                "content": split.content.trim(),
+                "reasoning": reasoning,
+                "reasoningStartTime": reasoning.length > 0 ? 1 : 0,
+                "reasoningEndTime": reasoning.length > 0 ? 1 + reasoningSeconds * 1000 : 0,
+                "reasoningTokens": message.reasoningTokens ?? 0,
+                "fileMimeType": message.fileMimeType,
+                "fileUri": message.fileUri,
+                "fileTextContent": message.fileTextContent ?? "",
+                "localFilePath": message.localFilePath,
+                "model": message.model,
+                "done": message.done ?? true,
+                "annotations": message.annotations,
+                "annotationSources": message.annotationSources,
+                "functionName": message.functionName,
+                "functionCall": message.functionCall,
+                "functionResponse": message.functionResponse,
+                "visibleToUser": message.visibleToUser,
+            });
+            // Restore Gemini thought signature data (dynamic props, set after creation)
+            if (message.functionCallParts) root.messageByID[saveIds[i]].functionCallParts = message.functionCallParts;
+            if (message.thoughtSignature) root.messageByID[saveIds[i]].thoughtSignature = message.thoughtSignature;
+        }
+        root.messageIDs = saveIds;
+    }
+
+    /**
+     * /save NAME — names the conversation on screen. There is no separate "saved"
+     * state any more: everything is already on disk, so this is a rename.
      */
     function saveChat(chatName) {
-        chatName = chatName.trim();
-        chatSaveFile.chatName = chatName;
-        const saveContent = JSON.stringify(root.chatToJson())
-        chatSaveFile.setText(saveContent)
-        
-        // Also save context summary to a separate file for persistence
-        if (root.sessionSummary.length > 0) {
-            const summaryPath = `${Directories.aiChats}/${chatName}.context_summary.txt`;
-            Quickshell.execDetached(["bash", "-c", `echo '${root.sessionSummary.replace(/'/g, "'\\''")}' > '${summaryPath}'`]);
-        }
-        
-        getSavedChats.running = true;
+        const name = (chatName ?? "").trim();
+        if (name.length === 0) return;
+        root.currentChatTitle = name;
+        root.titleGenerated = true; // An explicit name is never overwritten by the auto-titler
+        root.persistCurrentChat();
+        root.addMessage(Translation.tr("Chat named **%1** ✓").arg(name), root.interfaceRole);
     }
 
     /**
-     * Loads chat from a JSON list of message objects.
-     * @param chatName name of the chat
+     * /load NAME — opens a chat by title (or id).
      */
     function loadChat(chatName) {
-        try {
-            chatName = chatName.trim();
-            chatSaveFile.chatName = chatName;
-            chatSaveFile.reload()
-            const saveContent = chatSaveFile.text()
-            if (!saveContent || saveContent.length < 2) return;
-            
-            const saveData = JSON.parse(saveContent)
-            if (!Array.isArray(saveData)) return;
-            root.clearMessages()
-            
-            // Load context summary if exists
-            const summaryPath = `${Directories.aiChats}/${chatName}.context_summary.txt`;
-            // Was root.chatSummaryLoader — an id isn't a property of root, so this was
-            // undefined and every loadChat() threw here before restoring a single message.
-            chatSummaryLoader.path = summaryPath;
-            chatSummaryLoader.reload();
-            const loadedSummary = chatSummaryLoader.text();
-            if (loadedSummary && loadedSummary.length > 0) {
-                root.sessionSummary = loadedSummary.trim();
-            }
-            const saveIds = saveData.map((_, i) => {
-                // Use timestamp+index to avoid collision with live message IDs
-                return `loaded_${Date.now()}_${i}`;
-            });
-            // Populate the map first; assigning messageIDs triggers the UI rebuild,
-            // and delegates need messageByID[id] to be live by then.
-            for (let i = 0; i < saveData.length; i++) {
-                const message = saveData[i];
-                if (!message) continue;
-                // rawContent is what goes back to the model; the displayed content is
-                // it minus internal markers and any inlined <think> tags. Older saves
-                // predate the reasoning field, so recover it from the tags on load.
-                const rawContent = message.rawContent ?? "";
-                const marked = rawContent.replace(/\[\[\s*(Function|Output of).*?\s*\]\]\n?/g, "").trim();
-                const split = CF.StringUtils.extractThinkTags(marked);
-                const reasoning = (message.reasoning?.length > 0) ? message.reasoning : split.reasoning;
-                // Fake a start/end pair that reproduces the saved duration; a non-zero
-                // end is also what keeps reasoningActive false on restored messages.
-                const reasoningSeconds = message.reasoningSeconds ?? 0;
-                root.messageByID[saveIds[i]] = root.aiMessageComponent.createObject(root, {
-                    "role": message.role,
-                    "rawContent": rawContent,
-                    "content": split.content.trim(),
-                    "reasoning": reasoning,
-                    "reasoningStartTime": reasoning.length > 0 ? 1 : 0,
-                    "reasoningEndTime": reasoning.length > 0 ? 1 + reasoningSeconds * 1000 : 0,
-                    "reasoningTokens": message.reasoningTokens ?? 0,
-                    "fileMimeType": message.fileMimeType,
-                    "fileUri": message.fileUri,
-                    "fileTextContent": message.fileTextContent ?? "",
-                    "localFilePath": message.localFilePath,
-                    "model": message.model,
-                    "done": message.done,
-                    "annotations": message.annotations,
-                    "annotationSources": message.annotationSources,
-                    "functionName": message.functionName,
-                    "functionCall": message.functionCall,
-                    "functionResponse": message.functionResponse,
-                    "visibleToUser": message.visibleToUser,
-                });
-                // Restore Gemini thought signature data (dynamic props, set after creation)
-                if (message.functionCallParts) root.messageByID[saveIds[i]].functionCallParts = message.functionCallParts;
-                if (message.thoughtSignature) root.messageByID[saveIds[i]].thoughtSignature = message.thoughtSignature;
-            }
-            root.messageIDs = saveIds;
-        } catch (e) {
-            console.log("[AI] Could not load chat: ", e);
-        } finally {
-            getSavedChats.running = true;
+        const name = (chatName ?? "").trim();
+        if (name.length === 0) return;
+        const id = chatStore.findByName(name);
+        if (!id) {
+            root.addMessage(Translation.tr("No chat matching '%1'.").arg(name), root.interfaceRole);
+            return;
         }
+        root.persistCurrentChat(); // Don't lose what's on screen
+        root.loadChatById(id);
+    }
+
+    /**
+     * /clear — throw this conversation away rather than filing it. Distinct from
+     * /new, which keeps it in the list.
+     */
+    function discardCurrentChat() {
+        if (root.currentChatId.length > 0) chatStore.remove(root.currentChatId);
+        memorySummaryTimer.stop();
+        root.clearMessages();
+        root.currentChatId = "";
+        root.currentChatTitle = "";
+        root.currentChatCreatedAt = 0;
+        root.currentChatDraft = "";
+        root.titleGenerated = false;
+        root.chatOpened("");
+    }
+
+    function deleteChat(id) {
+        chatStore.remove(id);
+        if (id === root.currentChatId) {
+            root.currentChatId = "";
+            root.currentChatTitle = "";
+            root.clearMessages();
+        }
+    }
+
+    function renameChat(id, title) {
+        if (id === root.currentChatId) {
+            root.currentChatTitle = title;
+            root.titleGenerated = true;
+            root.persistCurrentChat();
+            return;
+        }
+        const chat = chatStore.load(id);
+        if (!chat) return;
+        chat.title = title;
+        chatStore.save(chat);
     }
 
     function savePersistentState(key, value) {
