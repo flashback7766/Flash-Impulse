@@ -160,7 +160,7 @@ ColumnLayout {
             selectedTextColor: Appearance.m3colors.m3onSecondaryContainer
             selectionColor: Appearance.colors.colSecondaryContainer
             wrapMode: TextEdit.Wrap
-            color: root.messageData?.thinking ? Appearance.colors.colSubtext : Appearance.colors.colOnLayer1
+            color: Appearance.colors.colOnLayer1
             textFormat: renderMarkdown ? TextEdit.MarkdownText : TextEdit.PlainText
             text: modelData
 

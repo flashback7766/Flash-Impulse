@@ -158,8 +158,10 @@ ApiStrategy {
             const blocks = obj.message?.content ?? [];
             for (const block of blocks) {
                 if (block.type === "thinking" && block.thinking?.length > 0) {
-                    message.rawContent += `\n<think>\n${block.thinking}\n</think>\n`;
+                    // Each block is one self-contained thought, so it becomes its own step.
+                    root.appendReasoning(message, block.thinking, true);
                 } else if (block.type === "text" && block.text?.length > 0) {
+                    root.endReasoning(message);
                     message.rawContent += block.text;
                 } else if (block.type === "tool_use") {
                     if (block.name === "AskUserQuestion") {

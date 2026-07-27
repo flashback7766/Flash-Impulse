@@ -1239,11 +1239,18 @@ Singleton {
             // message_delta then message_stop), and we don't want to double-charge cost.
             if (requester.message?.done) return;
             requester.message.done = true;
+            // Close the reasoning clock for responses that end without ever emitting
+            // text after the thoughts (tool-only turns, aborted streams).
+            if (requester.message.reasoningStartTime > 0 && requester.message.reasoningEndTime === 0) {
+                requester.message.reasoningEndTime = Date.now();
+            }
             // Reset adaptive flush interval for next message
             streamFlushTimer.interval = 50;
-            // If content was truncated for large response, now show full content
+            // If content was truncated for large response, now show full content.
+            // Route it back through the flusher rather than assigning rawContent
+            // directly — that path also strips internal markers and <think> tags.
             if (requester.message.content !== requester.message.rawContent) {
-                requester.message.content = requester.message.rawContent;
+                streamFlushTimer.flushNow();
             }
             // Calculate generation speed
             if (root.generationStartTime > 0 && root.tokenCount.output > 0) {
@@ -1510,6 +1517,19 @@ Singleton {
 
             // Strip hidden internal markers from UI content
             let cleanContent = msg.rawContent.replace(/\[\[\s*(Function|Output of).*?\s*\]\]\n?/g, "").trim();
+
+            // Fallback for models that inline <think> tags in the text rather than
+            // exposing reasoning as its own stream field — local models via Ollama
+            // mostly. Providers handled at the strategy layer never reach this branch
+            // (no tags), and extractThinkTags bails on an indexOf miss, so it's free.
+            const split = CF.StringUtils.extractThinkTags(cleanContent);
+            if (split.reasoning.length > 0) {
+                if (msg.reasoningStartTime === 0) msg.reasoningStartTime = Date.now();
+                msg.reasoning = split.reasoning;
+                cleanContent = split.content.trim();
+                // The tag closed and real text follows: reasoning is over.
+                if (msg.reasoningEndTime === 0 && cleanContent.length > 0) msg.reasoningEndTime = Date.now();
+            }
 
             if (msg.contentBeforeCommand && msg.contentBeforeCommand.length > 0) {
                 // Check if the model has started sending text after the tool call sequence
@@ -1793,6 +1813,9 @@ Singleton {
                     "localFilePath": message.localFilePath,
                     "model": message.model,
                     "done": true,
+                    "reasoning": message.reasoning,
+                    "reasoningSeconds": message.reasoningSeconds,
+                    "reasoningTokens": message.reasoningTokens,
                     "annotations": message.annotations,
                     "annotationSources": message.annotationSources,
                     "functionName": message.functionName,
@@ -1849,10 +1872,11 @@ Singleton {
             
             // Load context summary if exists
             const summaryPath = `${Directories.aiChats}/${chatName}.context_summary.txt`;
-            const summaryLoader = root.chatSummaryLoader; // reuse existing loader
-            summaryLoader.path = summaryPath;
-            summaryLoader.reload();
-            const loadedSummary = summaryLoader.text();
+            // Was root.chatSummaryLoader — an id isn't a property of root, so this was
+            // undefined and every loadChat() threw here before restoring a single message.
+            chatSummaryLoader.path = summaryPath;
+            chatSummaryLoader.reload();
+            const loadedSummary = chatSummaryLoader.text();
             if (loadedSummary && loadedSummary.length > 0) {
                 root.sessionSummary = loadedSummary.trim();
             }
@@ -1865,16 +1889,29 @@ Singleton {
             for (let i = 0; i < saveData.length; i++) {
                 const message = saveData[i];
                 if (!message) continue;
+                // rawContent is what goes back to the model; the displayed content is
+                // it minus internal markers and any inlined <think> tags. Older saves
+                // predate the reasoning field, so recover it from the tags on load.
+                const rawContent = message.rawContent ?? "";
+                const marked = rawContent.replace(/\[\[\s*(Function|Output of).*?\s*\]\]\n?/g, "").trim();
+                const split = CF.StringUtils.extractThinkTags(marked);
+                const reasoning = (message.reasoning?.length > 0) ? message.reasoning : split.reasoning;
+                // Fake a start/end pair that reproduces the saved duration; a non-zero
+                // end is also what keeps reasoningActive false on restored messages.
+                const reasoningSeconds = message.reasoningSeconds ?? 0;
                 root.messageByID[saveIds[i]] = root.aiMessageComponent.createObject(root, {
                     "role": message.role,
-                    "rawContent": message.rawContent,
-                    "content": message.rawContent,
+                    "rawContent": rawContent,
+                    "content": split.content.trim(),
+                    "reasoning": reasoning,
+                    "reasoningStartTime": reasoning.length > 0 ? 1 : 0,
+                    "reasoningEndTime": reasoning.length > 0 ? 1 + reasoningSeconds * 1000 : 0,
+                    "reasoningTokens": message.reasoningTokens ?? 0,
                     "fileMimeType": message.fileMimeType,
                     "fileUri": message.fileUri,
                     "fileTextContent": message.fileTextContent ?? "",
                     "localFilePath": message.localFilePath,
                     "model": message.model,
-                    "thinking": message.thinking,
                     "done": message.done,
                     "annotations": message.annotations,
                     "annotationSources": message.annotationSources,

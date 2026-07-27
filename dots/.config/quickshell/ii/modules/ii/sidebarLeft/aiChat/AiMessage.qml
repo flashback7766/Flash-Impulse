@@ -141,7 +141,7 @@ Rectangle {
                             CustomIcon {
                                 id: modelIcon
                                 anchors.centerIn: parent
-                                visible: messageData?.role == 'assistant' && Ai.models[messageData?.model]?.icon
+                                visible: messageData?.role == 'assistant' && (Ai.models[messageData?.model]?.icon ?? "").length > 0
                                 width: Appearance.font.pixelSize.large
                                 height: Appearance.font.pixelSize.large
                                 source: messageData?.role == 'assistant' ? (Ai.models[messageData?.model]?.icon ?? '') :
@@ -295,6 +295,17 @@ Rectangle {
             sourceComponent: AttachedFileIndicator {
                 filePath: root.messageData?.localFilePath
                 canRemove: false
+            }
+        }
+
+        Loader { // Reasoning / thinking
+            Layout.fillWidth: true
+            Layout.bottomMargin: active ? 2 : 0
+            active: root.messageData?.hasReasoning ?? false
+            visible: active
+            sourceComponent: ReasoningBlock {
+                messageData: root.messageData
+                enableMouseSelection: root.enableMouseSelection
             }
         }
 

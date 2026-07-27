@@ -286,7 +286,7 @@ ColumnLayout {
                             font.pixelSize: Appearance.font.pixelSize.small + 2
                             selectedTextColor: Appearance.m3colors.m3onSecondaryContainer
                             selectionColor: Appearance.colors.colSecondaryContainer
-                            color: messageData.thinking ? Appearance.colors.colSubtext : Appearance.colors.colOnLayer1
+                            color: Appearance.colors.colOnLayer1
                             text: segmentContent
                             onTextChanged: { segmentContent = text }
 

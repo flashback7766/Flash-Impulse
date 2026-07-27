@@ -1,6 +1,8 @@
 import QtQuick
 
 ApiStrategy {
+    id: root
+
     property bool isReasoning: false
     
     function buildEndpoint(model: AiModel): string {
@@ -86,23 +88,18 @@ ApiStrategy {
                 return { functionCall: { name: functionName, args: functionArgs, id: functionId } };
             }
 
-            // Thinking?
+            // Reasoning arrives as its own delta field and goes to its own property,
+            // never into the answer text.
             if (responseContent && responseContent.length > 0) {
                 if (isReasoning) {
                     isReasoning = false;
-                    const endBlock = "\n\n</think>\n\n";
-                    message.content += endBlock;
-                    message.rawContent += endBlock;
+                    root.endReasoning(message);
                 }
                 newContent = responseContent;
             } else if (responseReasoning && responseReasoning.length > 0) {
-                if (!isReasoning) {
-                    isReasoning = true;
-                    const startBlock = "\n\n<think>\n\n";
-                    message.rawContent += startBlock;
-                    message.content += startBlock;
-                }
-                newContent = responseReasoning;
+                isReasoning = true;
+                root.appendReasoning(message, responseReasoning, false);
+                return {}; // Nothing to add to the visible content
             }
 
             // Text
@@ -120,7 +117,10 @@ ApiStrategy {
                 };
             }
 
-            if (`dataJson`.done) {
+            // Was `dataJson`.done — a template literal, so this tested the string
+            // "dataJson" and never fired. Ollama signals completion this way rather
+            // than with [DONE], so its streams never terminated cleanly.
+            if (dataJson.done) {
                 return { finished: true };
             }
             

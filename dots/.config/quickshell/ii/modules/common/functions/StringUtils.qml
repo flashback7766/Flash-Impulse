@@ -50,6 +50,52 @@ Singleton {
      * @param { string } markdown
      * @returns {Array<{type: "text" | "code", content: string, lang?: string, completed?: boolean}>}
      */
+    /**
+     * Pull <think> sections out of a model's text.
+     *
+     * Providers that expose reasoning properly get their own field and never come
+     * through here; this is for models that inline the tags in the text, which is
+     * what local models served through Ollama do. Returns
+     * { content, reasoning } with the tags and their contents removed from content.
+     *
+     * Fenced code is masked out first, so a message *about* <think> tags — asking
+     * how to parse them, say — doesn't get eaten by its own example.
+     */
+    function extractThinkTags(text) {
+        if (!text || text.indexOf("<think") === -1) return { content: text ?? "", reasoning: "" };
+
+        const fences = [];
+        // NUL delimits the placeholder: a model can write "FENCE0" but not a NUL byte,
+        // so nothing in the text can be mistaken for one of ours.
+        const masked = text.replace(/```[\s\S]*?(?:```|$)/g, match => {
+            fences.push(match);
+            return `\x00FENCE${fences.length - 1}\x00`;
+        });
+
+        const reasoning = [];
+        // Unterminated final tag is normal mid-stream, hence the `$` alternative.
+        const stripped = masked.replace(/<think(?:ing)?>([\s\S]*?)(?:<\/think(?:ing)?>|$)/g, (match, inner) => {
+            if (inner.trim().length > 0) reasoning.push(inner.trim());
+            return "";
+        });
+
+        const restore = s => s.replace(/\x00FENCE(\d+)\x00/g, (m, i) => fences[Number(i)]);
+        return {
+            content: restore(stripped),
+            reasoning: reasoning.join("\n\n")
+        };
+    }
+
+    /**
+     * Split reasoning into display steps. Models paragraph their thoughts, and
+     * providers that emit discrete blocks are joined with a blank line upstream,
+     * so a blank-line split covers both without needing per-provider knowledge.
+     */
+    function splitReasoningSteps(reasoning) {
+        if (!reasoning) return [];
+        return reasoning.split(/\n\s*\n/).map(s => s.trim()).filter(s => s.length > 0);
+    }
+
     function splitMarkdownBlocks(markdown) {
         // Two alternatives: with-language-then-newline, or one-liner with no language.
         const regex = /```(\w+)\n([\s\S]*?)```|```([\s\S]*?)```/g;

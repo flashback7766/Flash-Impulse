@@ -2,6 +2,8 @@ import QtQuick
 import qs.modules.common.functions as CF
 
 ApiStrategy {
+    id: root
+
     readonly property string apiKeyEnvVarName: "API_KEY"
     readonly property string fileUriVarName: "file_uri"
     readonly property string fileMimeTypeVarName: "MIME_TYPE"
@@ -256,6 +258,10 @@ ApiStrategy {
             // Usage metadata can arrive in a chunk on its own (no candidates) — extract first
             // so the final cost/speed numbers aren't dropped.
             const usageMetadata = dataJson.usageMetadata;
+            // Thinking budget spent on this turn — shown in the reasoning header.
+            if (usageMetadata?.thoughtsTokenCount > 0) {
+                message.reasoningTokens = usageMetadata.thoughtsTokenCount;
+            }
 
             // No candidates?
             if (!dataJson.candidates) {
@@ -285,17 +291,18 @@ ApiStrategy {
                 const part = parts[i];
                 if (!part) continue;
 
-                // Handle text parts
+                // A reasoning part is the same shape as a text part, flagged with
+                // `thought: true` — so the flag has to be checked before the text is
+                // taken as answer content, or thoughts land in the reply.
                 const text = part.text || "";
-                if (text && text.length > 0) {
+                if (part.thought === true) {
+                    root.appendReasoning(message, text, true);
+                } else if (typeof part.thought === "string" && part.thought.length > 0) {
+                    // Older shape: the thought itself carried the text.
+                    root.appendReasoning(message, part.thought, true);
+                } else if (text && text.length > 0) {
+                    root.endReasoning(message);
                     message.rawContent += text;
-                }
-                
-                // Handle thinking/reasoning parts (Gemini 3.1 Pro might use 'thought')
-                // We keep it invisible as requested, but we could log it for debug
-                const thought = part.thought || "";
-                if (thought && thought.length > 0) {
-                    console.log("[AI] Gemini Thought: " + thought);
                 }
             }
 

@@ -10,8 +10,10 @@ ApiStrategy {
     property string _toolCallArgs: ""
     property string _toolCallId: ""
     property bool _isToolCall: false
+    property bool _newThinkingBlock: false
 
     function reset() {
+        _newThinkingBlock = false;
         inputTokens = 0;
         cacheReadTokens = 0;
         cacheWriteTokens = 0;
@@ -233,6 +235,26 @@ ApiStrategy {
             root.cacheWriteTokens = json.message.usage.cache_creation_input_tokens ?? 0;
         }
 
+        // Extended thinking. Each content block is one self-contained thought, so the
+        // first delta of a block starts a new step and the rest append to it.
+        if (json.type === "content_block_start" && json.content_block?.type === "thinking") {
+            root._newThinkingBlock = true;
+            root.appendReasoning(message, json.content_block.thinking ?? "", true);
+            if ((json.content_block.thinking ?? "").length > 0) root._newThinkingBlock = false;
+            return {};
+        }
+
+        if (json.type === "content_block_delta" && json.delta?.type === "thinking_delta") {
+            root.appendReasoning(message, json.delta.thinking ?? "", root._newThinkingBlock);
+            root._newThinkingBlock = false;
+            return {};
+        }
+
+        // signature_delta carries the block's cryptographic signature, not text.
+        if (json.type === "content_block_delta" && json.delta?.type === "signature_delta") {
+            return {};
+        }
+
         if (json.type === "content_block_start" && json.content_block?.type === "tool_use") {
             root._isToolCall = true;
             root._toolCallName = json.content_block.name;
@@ -266,6 +288,7 @@ ApiStrategy {
         }
 
         if (json.type === "content_block_delta" && json.delta?.type === "text_delta") {
+            root.endReasoning(message);
             message.rawContent += json.delta.text ?? "";
             return {};
         }

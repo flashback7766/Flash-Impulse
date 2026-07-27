@@ -1,6 +1,8 @@
 import QtQuick
 
 ApiStrategy {
+    id: root
+
     property bool isReasoning: false
     
     function buildEndpoint(model: AiModel): string {
@@ -213,7 +215,19 @@ ApiStrategy {
 
             let newContent = "";
             const responseContent = delta?.content || dataJson.message?.content;
+            // Reasoning-capable endpoints stream thoughts in their own delta field;
+            // the field name differs between OpenAI-compatible servers.
+            const responseReasoning = delta?.reasoning || delta?.reasoning_content;
+            if (responseReasoning && responseReasoning.length > 0) {
+                root.isReasoning = true;
+                root.appendReasoning(message, responseReasoning, false);
+                return {};
+            }
             if (responseContent && responseContent.length > 0) {
+                if (root.isReasoning) {
+                    root.isReasoning = false;
+                    root.endReasoning(message);
+                }
                 newContent = responseContent;
             }
 
@@ -226,6 +240,8 @@ ApiStrategy {
             }
 
             if (dataJson.usage) {
+                const reasoningTokens = dataJson.usage.completion_tokens_details?.reasoning_tokens ?? 0;
+                if (reasoningTokens > 0) message.reasoningTokens = reasoningTokens;
                 return {
                     tokenUsage: {
                         input: dataJson.usage.prompt_tokens ?? -1,
