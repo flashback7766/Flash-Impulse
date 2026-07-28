@@ -89,7 +89,37 @@ Scope { // Scope
             visible: GlobalStates.sidebarLeftOpen
             
             property bool extend: false
-            property real sidebarWidth: panelWindow.extend ? Appearance.sizes.sidebarWidthExtended : Appearance.sizes.sidebarWidth
+
+            // Draggable width, remembered per mode. Zero in the store means the
+            // theme default, so a fresh install and a reset both land there
+            // without a second "has the user chosen" flag.
+            readonly property real minSidebarWidth: 360
+            readonly property real maxSidebarWidth: Math.min((panelWindow.screen?.width ?? 1920) * 0.9, 1400)
+            readonly property real defaultSidebarWidth: panelWindow.extend
+                ? Appearance.sizes.sidebarWidthExtended : Appearance.sizes.sidebarWidth
+            property real sidebarWidth: {
+                const stored = panelWindow.extend
+                    ? (Persistent.states?.sidebar?.left?.widthExtended ?? 0)
+                    : (Persistent.states?.sidebar?.left?.width ?? 0);
+                const wanted = stored > 0 ? stored : panelWindow.defaultSidebarWidth;
+                return Math.max(panelWindow.minSidebarWidth,
+                    Math.min(wanted, panelWindow.maxSidebarWidth));
+            }
+
+            function setSidebarWidth(value) {
+                const clamped = Math.max(panelWindow.minSidebarWidth,
+                    Math.min(value, panelWindow.maxSidebarWidth));
+                if (!Persistent.states?.sidebar?.left) return;
+                if (panelWindow.extend) Persistent.states.sidebar.left.widthExtended = clamped;
+                else Persistent.states.sidebar.left.width = clamped;
+            }
+
+            function resetSidebarWidth() {
+                if (!Persistent.states?.sidebar?.left) return;
+                if (panelWindow.extend) Persistent.states.sidebar.left.widthExtended = 0;
+                else Persistent.states.sidebar.left.width = 0;
+            }
+
             property var contentParent: sidebarLeftBackground
 
             function hide() {
@@ -98,7 +128,9 @@ Scope { // Scope
 
             exclusionMode: ExclusionMode.Normal
             exclusiveZone: root.pin ? sidebarWidth : 0
-            implicitWidth: Appearance.sizes.sidebarWidthExtended + Appearance.sizes.elevationMargin
+            // Sized for the widest the sidebar may ever be dragged to; the visible
+            // panel inside is what actually changes width.
+            implicitWidth: panelWindow.maxSidebarWidth + Appearance.sizes.elevationMargin
             WlrLayershell.namespace: "quickshell:sidebarLeft"
             // Hyprland 0.49: OnDemand is Exclusive, Exclusive just breaks click-outside-to-close
             WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
@@ -110,8 +142,12 @@ Scope { // Scope
                 bottom: true
             }
 
+            // The panel plus its resize handle: input outside this falls through
+            // to whatever is behind, which is what makes click-outside-to-close
+            // work at all.
             mask: Region {
                 item: sidebarLeftBackground
+                Region { item: resizeHandle }
             }
 
             onVisibleChanged: {
@@ -147,8 +183,12 @@ Scope { // Scope
                 radius: Appearance.rounding.screenRounding - Appearance.sizes.hyprlandGapsOut + 1
 
                 Behavior on width {
+                    // Off while dragging: an eased width lags the pointer, and a
+                    // handle that doesn't sit under your finger feels broken.
+                    enabled: !resizeHandle.pressed
                     animation: Appearance.animation.elementMove.numberAnimation.createObject(this)
                 }
+
 
                 Keys.onPressed: (event) => {
                     if (event.key === Qt.Key_Escape) {
@@ -166,6 +206,63 @@ Scope { // Scope
                     }
                 }
             }
+
+            MouseArea { // Drag the right edge to resize
+                id: resizeHandle
+                // A sibling of the panel, not a child: the sidebar's content is
+                // installed with `contentParent.children = [...]`, which replaces
+                // the whole array and takes anything else in there with it.
+                anchors.right: sidebarLeftBackground.right
+                anchors.top: sidebarLeftBackground.top
+                anchors.bottom: sidebarLeftBackground.bottom
+                anchors.topMargin: 16
+                anchors.bottomMargin: 16
+                width: 14
+                z: 9999
+                visible: GlobalStates.sidebarLeftOpen
+                hoverEnabled: true
+                cursorShape: Qt.SizeHorCursor
+                acceptedButtons: Qt.LeftButton
+
+                property real pressAnchorX: 0
+                property real startWidth: 0
+
+                onPressed: mouse => {
+                    // Measured against the panel's own left edge, which is anchored
+                    // and therefore still. The handle rides the right edge, so its
+                    // own coordinates would chase the drag; and the window isn't an
+                    // Item, so it can't be mapped to at all.
+                    resizeHandle.pressAnchorX = resizeHandle.mapToItem(sidebarLeftBackground, mouse.x, 0).x;
+                    resizeHandle.startWidth = panelWindow.sidebarWidth;
+                }
+                onPositionChanged: mouse => {
+                    if (!resizeHandle.pressed) return;
+                    const nowX = resizeHandle.mapToItem(sidebarLeftBackground, mouse.x, 0).x;
+                    panelWindow.setSidebarWidth(resizeHandle.startWidth + (nowX - resizeHandle.pressAnchorX));
+                }
+                onDoubleClicked: panelWindow.resetSidebarWidth()
+
+                // A grip that shows up when you're near it, so the edge is
+                // discoverable without drawing a permanent seam.
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: 3
+                    height: 36
+                    radius: Appearance.rounding.full
+                    color: Appearance.colors.colOnLayer0
+                    opacity: resizeHandle.pressed ? 0.55 : (resizeHandle.containsMouse ? 0.35 : 0)
+                    Behavior on opacity {
+                        animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+                    }
+                }
+
+                StyledToolTip {
+                    extraVisibleCondition: false
+                    alternativeVisibleCondition: resizeHandle.containsMouse && !resizeHandle.pressed
+                    text: Translation.tr("Drag to resize · double-click to reset")
+                }
+            }
+
         }
     }
 

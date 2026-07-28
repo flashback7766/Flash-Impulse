@@ -85,6 +85,14 @@ Singleton {
                     property bool collapsed: false
                     property int tab: 0
                 }
+                // Dragged widths for the left sidebar, remembered separately for
+                // its normal and expanded modes — they're used for different
+                // things, so one number for both is the wrong number twice.
+                // Zero means "whatever the theme says".
+                property JsonObject left: JsonObject {
+                    property real width: 0
+                    property real widthExtended: 0
+                }
             }
 
             property JsonObject booru: JsonObject {
