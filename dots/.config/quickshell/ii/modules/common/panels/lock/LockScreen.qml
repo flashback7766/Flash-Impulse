@@ -109,6 +109,12 @@ Scope {
         function focus(): void {
             lockContext.shouldReFocus();
         }
+        // Restarting the shell while this owns the session lock leaves Hyprland in
+        // its crashed-lockscreen fallback, which can only be cleared from a TTY.
+        // Anything scripted around `qs kill` should check here first.
+        function status(): string {
+            return GlobalStates.screenLocked ? "locked" : "unlocked";
+        }
     }
 
     GlobalShortcut {
