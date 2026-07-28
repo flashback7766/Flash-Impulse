@@ -44,7 +44,10 @@ Item {
     Connections {
         target: Ai
         function onSettingsRequested() {
-            root.open();
+            // Toggle: the same call that opened it should put it away again,
+            // otherwise the only way out is the keyboard.
+            if (root.shown) root.close();
+            else root.open();
         }
     }
 

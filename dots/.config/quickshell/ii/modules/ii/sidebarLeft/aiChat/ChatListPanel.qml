@@ -50,7 +50,9 @@ Item {
     Connections {
         target: Ai
         function onChatListRequested() {
-            root.open(true);
+            // Toggles, like the settings sheet — the call that opened it closes it.
+            if (root.shown) root.close();
+            else root.open(true);
         }
     }
 
