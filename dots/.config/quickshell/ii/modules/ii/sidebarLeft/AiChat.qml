@@ -26,6 +26,21 @@ Item {
     // sitting at the bottom of an empty box.
     readonly property bool chatIsEmpty: Ai.messageIDs.length === 0
 
+    /**
+     * How much room sits below the composer while the chat is empty: the cards,
+     * plus half of what's left over, which is what centres the composer.
+     *
+     * Derived from the container's own height rather than from its children —
+     * asking the layout how much slack it has, in order to decide how much slack
+     * to take, is a loop that resolves to nothing.
+     */
+    readonly property real emptyBottomHeight: {
+        if (!root.chatIsEmpty) return 0;
+        const cards = suggestionCards.implicitHeight + 14;
+        const slack = columnLayout.height - inputWrapper.implicitHeight - cards - root.padding * 2;
+        return cards + Math.max(0, slack / 2);
+    }
+
     property var suggestionQuery: ""
     property var suggestionList: []
 
@@ -1975,32 +1990,37 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
             }
         }
 
-        Item { // Things worth asking, under the composer
-            id: emptySuggestions
+        Item { // Everything below the composer on an empty chat
+            id: emptyBottom
             Layout.fillWidth: true
-            Layout.topMargin: 14
-            visible: root.chatIsEmpty
-            implicitHeight: suggestionCards.implicitHeight
+            clip: true
+
+            // One animated height instead of two toggled stretches. It carries
+            // both the cards and the slack that puts the composer in the middle,
+            // so collapsing it is what walks the composer down to the bottom —
+            // the message area above has fillHeight and takes back what this
+            // gives up. Layout.fillHeight can't be animated, which is why the
+            // number is worked out here rather than left to the layout.
+            Layout.preferredHeight: root.emptyBottomHeight
+            Behavior on Layout.preferredHeight {
+                animation: Appearance.animation.elementMove.numberAnimation.createObject(this)
+            }
 
             SuggestionCards {
                 id: suggestionCards
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.top: parent.top
+                anchors.topMargin: 14
+                opacity: root.chatIsEmpty ? 1 : 0
+                Behavior on opacity {
+                    animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+                }
                 onPicked: prompt => {
                     Ai.queueUserMessage(prompt);
                     messageInputField.forceActiveFocus();
                 }
             }
-        }
-
-        Item {
-            // The message area above and this below both take a share of the slack,
-            // which is what actually lands the composer in the middle — giving the
-            // cards the stretch instead just pinned the whole group to the top.
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            visible: root.chatIsEmpty
         }
     }
 }
