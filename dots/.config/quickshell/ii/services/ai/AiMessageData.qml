@@ -47,6 +47,9 @@ QtObject {
     // labelled hairline in place of the usual author/body/controls.
     property string dividerText
     property string dividerIcon
+    // Groups dividers that supersede one another, so cycling a setting
+    // replaces its line instead of adding one per step.
+    property string dividerKey
 
     // Shell-command lifecycle, for the command block.
     //

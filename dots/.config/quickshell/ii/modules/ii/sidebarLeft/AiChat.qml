@@ -229,7 +229,7 @@ Item {
                     return;
                 }
                 Ai.addDivider(Ai.compactMessages ? Translation.tr("Compact spacing")
-                    : Translation.tr("Spacious spacing"), "density_medium");
+                    : Translation.tr("Spacious spacing"), "density_medium", false, "density");
             }
         },
         {
@@ -1041,14 +1041,6 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
             // Messages
             Layout.fillWidth: true
             Layout.fillHeight: true
-            layer.enabled: true
-            layer.effect: OpacityMask {
-                maskSource: Rectangle {
-                    width: swipeView.width
-                    height: swipeView.height
-                    radius: Appearance.rounding.small
-                }
-            }
 
             StyledRectangularShadow {
                 z: 1
@@ -1153,6 +1145,30 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                 spacing: 0
                 popin: false
                 topMargin: statusBg.implicitHeight + statusBg.anchors.topMargin * 2
+
+                // The status capsule floats over the list, and it's narrower than
+                // the list is — so a scrolled line came out from behind it with its
+                // middle covered and both ends showing. Fading the top makes the
+                // content disappear before it reaches the capsule instead.
+                //
+                // The mask rounds the corners too, which is what the parent Item's
+                // layer used to be for; doing both here keeps it at one FBO.
+                readonly property real topFadeEnd:
+                    Math.min(0.5, (statusBg.implicitHeight + statusBg.anchors.topMargin * 2)
+                        / Math.max(1, messageListView.height))
+                layer.enabled: true
+                layer.effect: OpacityMask {
+                    maskSource: Rectangle {
+                        width: messageListView.width
+                        height: messageListView.height
+                        radius: Appearance.rounding.small
+                        gradient: Gradient {
+                            GradientStop { position: 0.0; color: "#00000000" }
+                            GradientStop { position: messageListView.topFadeEnd; color: "#FF000000" }
+                            GradientStop { position: 1.0; color: "#FF000000" }
+                        }
+                    }
+                }
 
                 // Pre-render off-screen items for smoother scrolling
                 cacheBuffer: 600

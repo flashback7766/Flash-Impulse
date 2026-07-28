@@ -50,11 +50,27 @@ Singleton {
     function queueUserMessage(text) {
         const message = (text ?? "").trim();
         if (message.length === 0) return false;
-        if (!root.isGenerating && root.queuedMessages.length === 0) {
+        if (root.conversationIdle && root.queuedMessages.length === 0) {
             root.sendUserMessage(message);
             return false;
         }
         root.queuedMessages = [...root.queuedMessages, message];
+        return true;
+    }
+
+    /**
+     * Nothing is in flight and nothing is waiting on the user.
+     *
+     * Both queueing and draining have to agree on this. They didn't: sending
+     * only checked isGenerating, so a message typed while a command sat waiting
+     * for approval went straight out and interleaved with the turn that command
+     * belonged to.
+     */
+    readonly property bool conversationIdle: {
+        if (root.isGenerating || requester.dispatchAfterExit || requester.retryPending) return false;
+        for (let i = 0; i < root.messageIDs.length; i++) {
+            if (root.messageByID[root.messageIDs[i]]?.functionPending) return false;
+        }
         return true;
     }
 
@@ -67,10 +83,7 @@ Singleton {
         // Only once the whole exchange has settled. A tool call ends one turn and
         // immediately starts another, and a command can be sitting there waiting
         // for approval — jumping in at either point interleaves two conversations.
-        if (root.isGenerating || requester.dispatchAfterExit || requester.retryPending) return;
-        for (let i = 0; i < root.messageIDs.length; i++) {
-            if (root.messageByID[root.messageIDs[i]]?.functionPending) return;
-        }
+        if (!root.conversationIdle) return;
         const next = root.queuedMessages[0];
         root.queuedMessages = root.queuedMessages.slice(1);
         root.sendUserMessage(next);
@@ -201,7 +214,8 @@ Singleton {
         const profile = root.promptProfiles.find(p => p.id === id);
         if (!profile || id === root.promptProfile) return;
         root.savePersistentState("promptProfile", id);
-        root.addDivider(Translation.tr("%1 — %2").arg(profile.name).arg(profile.summary), profile.icon);
+        root.addDivider(Translation.tr("%1 — %2").arg(profile.name).arg(profile.summary),
+            profile.icon, false, "prompt-profile");
     }
 
     property string systemPrompt: {
@@ -337,12 +351,32 @@ The shell (Quickshell config "ii"):
         ?? root.permissionModes[2]
     readonly property bool planMode: root.permissionMode === "plan"
 
+    // The mode in force before the current run of divider-replacing changes, so
+    // cycling all the way back around leaves no divider at all.
+    property string _modeDividerBaseline: ""
+
     function setPermissionMode(mode) {
         if (!root.permissionModes.some(m => m.id === mode)) return;
         if (mode === root.permissionMode) return;
+        const previous = root.permissionMode;
         root.savePersistentState("permissionMode", mode);
+
+        // Shift+Tab cycles, so reaching the mode you want means passing through
+        // the ones you don't. addDivider replaces the previous line for us; the
+        // baseline is what makes a full lap around the cycle leave no line at all.
+        const lastId = root.messageIDs[root.messageIDs.length - 1];
+        if (root.messageByID[lastId]?.dividerKey !== "permission-mode") {
+            root._modeDividerBaseline = previous;
+        }
+        if (mode === root._modeDividerBaseline) {
+            if (root.messageByID[lastId]?.dividerKey === "permission-mode") {
+                root.removeMessagesRange(root.messageIDs.length - 1, 1);
+            }
+            return;
+        }
         const info = root.permissionModes.find(m => m.id === mode);
-        root.addDivider(Translation.tr("%1 mode — %2").arg(info.name).arg(info.hint), info.icon);
+        root.addDivider(Translation.tr("%1 mode — %2").arg(info.name).arg(info.hint),
+            info.icon, false, "permission-mode");
     }
 
     function cyclePermissionMode(backwards = false) {
@@ -1049,14 +1083,30 @@ The shell (Quickshell config "ii"):
      * @param atStart put it above everything — for compaction, where the event
      *        applies to the messages that were just removed from the top.
      */
-    function addDivider(text, icon, atStart = false) {
+    /**
+     * A labelled hairline marking an event rather than something anyone said.
+     *
+     * `key` groups dividers that supersede one another. Toggling a setting a few
+     * times to see what it does should leave the one line saying where you ended
+     * up, not one line per step, so a keyed divider replaces the previous one
+     * when it is still the last thing in the conversation. Events that are
+     * genuinely history — a context compaction — take no key and always stack.
+     */
+    function addDivider(text, icon, atStart = false, key = "") {
         if (!text || text.length === 0) return;
+        if (key.length > 0 && !atStart) {
+            const lastId = root.messageIDs[root.messageIDs.length - 1];
+            if (lastId && root.messageByID[lastId]?.dividerKey === key) {
+                root.removeMessagesRange(root.messageIDs.length - 1, 1);
+            }
+        }
         const aiMessage = aiMessageComponent.createObject(root, {
             "role": root.interfaceRole,
             "content": "",
             "rawContent": "",
             "dividerText": text,
             "dividerIcon": icon ?? "",
+            "dividerKey": key ?? "",
             "done": true,
         });
         const id = idForMessage(aiMessage);
@@ -1115,7 +1165,8 @@ The shell (Quickshell config "ii"):
 
             // A divider rather than a message: it's an event in the conversation,
             // not something anyone said, and it belongs exactly where it happened.
-            if (feedback) root.addDivider(Translation.tr("Switched to %1").arg(models[modelId].name), "swap_horiz");
+            if (feedback) root.addDivider(Translation.tr("Switched to %1").arg(models[modelId].name),
+                "swap_horiz", false, "model");
             const model = models[modelId]
             // See if policy prevents online models
             if (Config.options.policies.ai === 2 && !model.endpoint.includes("localhost")) {
@@ -2367,11 +2418,11 @@ The shell (Quickshell config "ii"):
                     "functionName": message.functionName,
                     "functionCall": message.functionCall,
                     "functionCallParts": message.functionCallParts,
-                    "thoughtSignature": message.thoughtSignature,
                     "functionResponse": message.functionResponse,
                     "visibleToUser": message.visibleToUser,
                     "dividerText": message.dividerText,
                     "dividerIcon": message.dividerIcon,
+                    "dividerKey": message.dividerKey,
                     // What ran, so a reopened chat still shows the commands rather
                     // than a run of empty assistant turns. Output is capped: the
                     // model already has the full text in its function response.
@@ -2514,6 +2565,7 @@ The shell (Quickshell config "ii"):
                 "visibleToUser": message.visibleToUser,
                 "dividerText": message.dividerText ?? "",
                 "dividerIcon": message.dividerIcon ?? "",
+                "dividerKey": message.dividerKey ?? "",
                 // A command that was still awaiting approval when the chat was
                 // saved is not resurrected as pending — the turn it belonged to is
                 // long over, so it reads as history.
@@ -2526,7 +2578,6 @@ The shell (Quickshell config "ii"):
             });
             // Restore Gemini thought signature data (dynamic props, set after creation)
             if (message.functionCallParts) root.messageByID[saveIds[i]].functionCallParts = message.functionCallParts;
-            if (message.thoughtSignature) root.messageByID[saveIds[i]].thoughtSignature = message.thoughtSignature;
         }
         root.messageIDs = saveIds;
     }

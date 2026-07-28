@@ -69,6 +69,9 @@ Singleton {
                 property string permissionMode: "auto"
                 // code | plain | terse | ctf | custom — see Ai.promptProfiles
                 property string promptProfile: "code"
+                // The toggle wrote here without the key existing, so it worked for
+                // the session and was gone on the next start.
+                property bool promptCaching: true
             }
 
             property JsonObject cheatsheet: JsonObject {

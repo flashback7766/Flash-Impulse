@@ -102,7 +102,11 @@ Singleton {
         const restore = s => s.replace(/\x00FENCE(\d+)\x00/g, (m, i) => fences[Number(i)]);
         return {
             content: restore(stripped),
-            reasoning: reasoning.join("\n\n")
+            // Restored here too: a fence inside the thinking was masked along with
+            // the rest, and reasoning that reached the UI unrestored showed the
+            // placeholder instead of the code. Reasoning models write code in
+            // their thoughts constantly, so this is the common case, not an edge.
+            reasoning: restore(reasoning.join("\n\n"))
         };
     }
 
@@ -113,7 +117,27 @@ Singleton {
      */
     function splitReasoningSteps(reasoning) {
         if (!reasoning) return [];
-        return reasoning.split(/\n\s*\n/).map(s => s.trim()).filter(s => s.length > 0);
+        // Blank lines separate steps — except inside a fence, where they're part
+        // of the code and splitting on them tears one snippet across two steps.
+        const lines = reasoning.split("\n");
+        const steps = [];
+        let buffer = [];
+        let inFence = false;
+        const flush = () => {
+            const step = buffer.join("\n").trim();
+            if (step.length > 0) steps.push(step);
+            buffer = [];
+        };
+        for (let i = 0; i < lines.length; i++) {
+            if (/^\s*```/.test(lines[i])) inFence = !inFence;
+            if (!inFence && lines[i].trim().length === 0) {
+                flush();
+                continue;
+            }
+            buffer.push(lines[i]);
+        }
+        flush();
+        return steps;
     }
 
     /**
@@ -316,7 +340,10 @@ Singleton {
                 }
             }
             const info = parseCodeInfo(match[1] || "");
-            const content = match[2] !== undefined ? match[2] : (match[3] || "");
+            // The newline before the closing fence belongs to the fence, not to the
+            // code. Kept, it showed as a phantom last line in the gutter and rode
+            // along into every copy and save.
+            const content = (match[2] !== undefined ? match[2] : (match[3] || "")).replace(/\n$/, "");
             if (content.trim()) {
                 result.push({
                     type: "code",

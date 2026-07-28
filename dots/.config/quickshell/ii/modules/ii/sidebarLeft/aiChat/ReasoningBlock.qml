@@ -40,7 +40,13 @@ Rectangle {
     }
 
     readonly property string summary: {
-        const words = root.reasoning.replace(/[#*`>_\[\]]/g, "").split(/\s+/).filter(w => w.length > 0);
+        // Fenced code first: a peek at the thinking that opens with "py" or a
+        // half-line of a snippet says nothing about what the model was working
+        // out. Prose is what makes the collapsed header worth reading.
+        const prose = root.reasoning
+            .replace(/```[\s\S]*?(?:```|$)/g, " ")
+            .replace(/[#*`>_\[\]]/g, "");
+        const words = prose.split(/\s+/).filter(w => w.length > 0);
         if (words.length === 0) return "";
         return words.slice(0, 6).join(" ") + (words.length > 6 ? "…" : "");
     }

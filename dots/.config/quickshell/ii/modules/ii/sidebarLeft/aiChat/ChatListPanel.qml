@@ -358,9 +358,13 @@ print(json.dumps(hits))
                                         font.pixelSize: Appearance.font.pixelSize.small
                                         font.weight: chatRow.isCurrent ? Font.DemiBold : Font.Normal
                                         color: chatRow.isCurrent ? Appearance.colors.colPrimary : Appearance.colors.colOnLayer1
-                                        text: (chatRow.entry.title ?? "").length > 0
-                                            ? chatRow.entry.title
-                                            : (chatRow.entry.preview ?? Translation.tr("Untitled chat"))
+                                        // ?? only catches null, and both fields are
+                                        // empty strings on a chat with no user turn
+                                        // in it — which drew a row with a blank gap
+                                        // where the name should be.
+                                        text: (chatRow.entry.title ?? "").length > 0 ? chatRow.entry.title
+                                            : (chatRow.entry.preview ?? "").length > 0 ? chatRow.entry.preview
+                                            : Translation.tr("Untitled chat")
                                     }
 
                                     StyledText {
@@ -370,7 +374,11 @@ print(json.dumps(hits))
                                         maximumLineCount: 1
                                         font.pixelSize: Appearance.font.pixelSize.smaller
                                         color: Appearance.colors.colOnLayer1Inactive
-                                        text: chatRow.entry.preview ?? ""
+                                        // Already shown as the name when there's no
+                                        // title; repeating it as the subtitle too
+                                        // printed the same line twice.
+                                        text: (chatRow.entry.title ?? "").length > 0
+                                            ? (chatRow.entry.preview ?? "") : ""
                                     }
 
                                     StyledText {
@@ -442,7 +450,9 @@ print(json.dumps(hits))
         const parts = [];
         const stamp = entry.updatedAt ?? 0;
         if (stamp > 0) parts.push(root.relativeTime(stamp));
-        if ((entry.messageCount ?? 0) > 0) parts.push(Translation.tr("%1 messages").arg(entry.messageCount));
+        const count = entry.messageCount ?? 0;
+        if (count > 0) parts.push(count === 1 ? Translation.tr("1 message")
+            : Translation.tr("%1 messages").arg(count));
         if ((entry.model ?? "").length > 0) parts.push(Ai.models[entry.model]?.name ?? entry.model);
         return parts.join(" · ");
     }
