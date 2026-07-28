@@ -98,12 +98,20 @@ Item {
      */
     function load(id) {
         try {
-            chatFile.path = root.chatPath(id);
-            chatFile.reload();
-            const text = chatFile.text();
+            chatReadFile.path = root.chatPath(id);
+            chatReadFile.reload();
+            const text = chatReadFile.text();
             if (!text || text.length < 2) return null;
             const chat = JSON.parse(text);
-            return Array.isArray(chat?.messages) ? chat : null;
+            if (!Array.isArray(chat?.messages)) return null;
+            // Reading back a different chat than the one asked for means the view
+            // handed us stale text; opening it would silently switch the user to
+            // the wrong conversation, so fail instead.
+            if (chat.id && chat.id !== id) {
+                console.log("[ChatStore] Stale read for", id, "got", chat.id);
+                return null;
+            }
+            return chat;
         } catch (e) {
             console.log("[ChatStore] Could not read chat:", id, e);
             return null;
@@ -146,9 +154,9 @@ Item {
 
     function reloadIndex() {
         try {
-            indexFile.path = root.indexPath;
-            indexFile.reload();
-            const text = indexFile.text();
+            indexReadFile.path = root.indexPath;
+            indexReadFile.reload();
+            const text = indexReadFile.text();
             if (text && text.length > 1) {
                 const parsed = JSON.parse(text);
                 if (Array.isArray(parsed)) {
@@ -172,13 +180,27 @@ Item {
         indexRebuilder.running = true;
     }
 
+    // Reads and writes get their own views on purpose. Sharing one meant that
+    // opening a chat right after autosaving another — which is exactly what the
+    // chat list does — could read back the text just written and load the wrong
+    // conversation.
     FileView {
         id: chatFile
         blockLoading: true
     }
 
     FileView {
+        id: chatReadFile
+        blockLoading: true
+    }
+
+    FileView {
         id: indexFile
+        blockLoading: true
+    }
+
+    FileView {
+        id: indexReadFile
         blockLoading: true
     }
 
