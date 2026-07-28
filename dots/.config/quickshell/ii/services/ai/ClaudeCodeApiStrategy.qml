@@ -179,7 +179,11 @@ ApiStrategy {
                         let summary = root.summarizeToolUse(block.name, block.input)
                             .replace(/`/g, "'").replace(/\n/g, " ");
                         if (summary.length > 90) summary = summary.slice(0, 90) + "…";
-                        message.rawContent += `\n\`🔧 ${summary}\`\n`;
+                        // Blank lines, not single ones: a lone newline doesn't end
+                        // a Markdown paragraph, so every tool line was being drawn
+                        // into the sentence before it, one long run of prose and
+                        // commands with no break anywhere.
+                        message.rawContent += `\n\n\`🔧 ${summary}\`\n\n`;
                     }
                 }
             }

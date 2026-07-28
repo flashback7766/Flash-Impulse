@@ -41,14 +41,43 @@ ColumnLayout {
         }
     }
 
+    /**
+     * True if a `$…$` span is plausibly maths rather than shell.
+     *
+     * A dollar in a terminal line is a prompt, not a delimiter, and taking
+     * `$ which pacman … $ checkupdates` for an equation replaced both commands
+     * with a broken image. TeX inline maths never opens or closes against
+     * whitespace and never spans a blank line, which is enough to tell them
+     * apart without trying to parse either.
+     */
+    function looksLikeMath(inner, after) {
+        if (!inner || inner.length === 0) return false;
+        if (/^\s|\s$/.test(inner)) return false;
+        if (inner.indexOf("\n") !== -1) return false;
+        // "$5 and $10" is money on both ends, not a span.
+        if (/^\d/.test(after ?? "")) return false;
+        return true;
+    }
+
     function renderLatex() {
+        // Fenced and inline code first: a shell snippet is exactly where stray
+        // dollars live, and it is never maths.
+        const masked = segmentContent
+            .replace(/```[\s\S]*?(?:```|$)/g, m => " ".repeat(m.length))
+            .replace(/`[^`\n]*`/g, m => " ".repeat(m.length));
+
         // Regex for $$...$$, $...$, \[...\], \(...\). We pass the full delimited
         // match to the renderer so the later content.replace(expression, image)
         // can find and substitute the original delimited substring back.
         let regex = /(\$\$([\s\S]+?)\$\$)|(\$([^\$]+?)\$)|(\\\[((?:.|\n)+?)\\\])|(\\\(([\s\S]+?)\\\))/g;
         let match;
-        while ((match = regex.exec(segmentContent)) !== null) {
+        while ((match = regex.exec(masked)) !== null) {
             let expression = match[1] || match[3] || match[5] || match[7];
+            // Only the single-dollar form is ambiguous; the rest are unmistakable.
+            if (match[3] !== undefined
+                && !root.looksLikeMath(match[4], masked.slice(regex.lastIndex, regex.lastIndex + 1))) {
+                continue;
+            }
             if (expression) {
                 Qt.callLater(() => {
                     const [renderHash, isNew] = LatexRenderer.requestRender(expression.trim());
