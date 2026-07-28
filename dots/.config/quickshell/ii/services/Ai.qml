@@ -2594,6 +2594,7 @@ The shell (Quickshell config "ii"):
                     "commandVerdict": message.commandVerdict,
                     "commandOutput": (message.commandOutput ?? "").slice(-2000),
                     "variants": message.variants,
+                    "toolCalls": message.toolCalls,
                     "variantIndex": message.variantIndex,
                 })
             })
@@ -2754,6 +2755,7 @@ The shell (Quickshell config "ii"):
                 "commandVerdict": message.commandVerdict ?? "",
                 "commandOutput": message.commandOutput ?? "",
                 "variants": message.variants ?? [],
+                "toolCalls": message.toolCalls ?? [],
                 "variantIndex": message.variantIndex ?? 0,
             });
             // Restore Gemini thought signature data (dynamic props, set after creation)

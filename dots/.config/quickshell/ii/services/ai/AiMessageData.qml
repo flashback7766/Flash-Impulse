@@ -73,4 +73,11 @@ QtObject {
     property int commandExitCode: 0
     property string commandVerdict   // why the safety pipeline allowed it or asked for review
     property bool commandAutoApproved: false
+
+    // Claude Code runs many tools in one turn under its own permission system,
+    // so the single command above can't describe it. Each entry is
+    // { id, tool, text, output, state } and renders as the same block a command
+    // from any other model does — the point being that a Claude Code turn should
+    // not look like a different program.
+    property var toolCalls: []
 }

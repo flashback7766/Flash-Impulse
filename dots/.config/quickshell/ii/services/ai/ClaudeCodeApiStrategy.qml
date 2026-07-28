@@ -136,14 +136,49 @@ ApiStrategy {
         return out;
     }
 
+    /**
+     * What a tool call did, in one line. Not prefixed with a shell prompt: the
+     * block draws its own, and only Bash is a shell command in the first place.
+     */
     function summarizeToolUse(name, input): string {
-        if (name === "Bash") return `$ ${input?.command ?? ""}`;
-        if (name === "Read") return `read ${input?.file_path ?? ""}`;
-        if (name === "Edit" || name === "Write") return `${name.toLowerCase()} ${input?.file_path ?? ""}`;
-        if (name === "WebSearch") return `search: ${input?.query ?? ""}`;
-        if (name === "WebFetch") return `fetch: ${input?.url ?? ""}`;
+        if (name === "Bash") return input?.command ?? "";
+        if (name === "Read") return input?.file_path ?? "";
+        if (name === "Edit" || name === "Write") return input?.file_path ?? "";
+        if (name === "Glob" || name === "Grep") return input?.pattern ?? "";
+        if (name === "WebSearch") return input?.query ?? "";
+        if (name === "WebFetch") return input?.url ?? "";
+        if (name === "TodoWrite") return `${(input?.todos ?? []).length} items`;
         const argStr = JSON.stringify(input ?? {});
-        return `${name} ${argStr.length > 120 ? argStr.slice(0, 120) + "…" : argStr}`;
+        return argStr.length > 160 ? argStr.slice(0, 160) + "…" : argStr;
+    }
+
+    function addToolCall(message: AiMessageData, id, name, input) {
+        message.toolCalls = [...message.toolCalls, {
+            "id": id ?? "",
+            "tool": name,
+            "text": root.summarizeToolUse(name, input),
+            "output": "",
+            "state": "running"
+        }];
+    }
+
+    /**
+     * Attach a result to the call it answers. Matched by id rather than by
+     * position: Claude Code runs tools concurrently and the results come back in
+     * whatever order they finish.
+     */
+    function completeToolCall(message: AiMessageData, id, output, failed) {
+        const calls = [...message.toolCalls];
+        for (let i = calls.length - 1; i >= 0; i--) {
+            if (calls[i].id !== id) continue;
+            const text = (output ?? "").trim();
+            calls[i] = Object.assign({}, calls[i], {
+                "output": text.length > 2000 ? text.slice(-2000) : text,
+                "state": failed ? "failed" : "done"
+            });
+            message.toolCalls = calls;
+            return;
+        }
     }
 
     function parseResponseLine(line: string, message: AiMessageData) {
@@ -172,20 +207,30 @@ ApiStrategy {
                     if (block.name === "AskUserQuestion") {
                         message.rawContent += root.formatAskUserQuestion(block.input);
                     } else {
-                        // One thin inline-code line per tool call. A fenced ```command```
-                        // block here would render as a tall collapsible "Running command"
-                        // row — Claude Code fires dozens of tools per turn and that
-                        // becomes a wall (it's designed for single run_shell_command use).
-                        let summary = root.summarizeToolUse(block.name, block.input)
-                            .replace(/`/g, "'").replace(/\n/g, " ");
-                        if (summary.length > 90) summary = summary.slice(0, 90) + "…";
-                        // Blank lines, not single ones: a lone newline doesn't end
-                        // a Markdown paragraph, so every tool line was being drawn
-                        // into the sentence before it, one long run of prose and
-                        // commands with no break anywhere.
-                        message.rawContent += `\n\n\`🔧 ${summary}\`\n\n`;
+                        root.addToolCall(message, block.id, block.name, block.input);
                     }
                 }
+            }
+            return {};
+        }
+
+        // Tool results come back as `user` messages addressed to the call they
+        // answer. These were dropped entirely, so a Claude Code turn showed what
+        // it had decided to run and never what came of it.
+        if (obj.type === "user") {
+            const blocks = obj.message?.content ?? [];
+            for (const block of blocks) {
+                if (block.type !== "tool_result") continue;
+                let text = "";
+                if (typeof block.content === "string") {
+                    text = block.content;
+                } else if (Array.isArray(block.content)) {
+                    text = block.content
+                        .filter(part => part?.type === "text")
+                        .map(part => part.text ?? "")
+                        .join("\n");
+                }
+                root.completeToolCall(message, block.tool_use_id, text, block.is_error === true);
             }
             return {};
         }

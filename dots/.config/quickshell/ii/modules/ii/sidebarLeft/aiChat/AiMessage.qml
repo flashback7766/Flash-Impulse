@@ -405,6 +405,29 @@ Item {
             }
         }
 
+        // Claude Code's tools, drawn as the same block. It runs several in one
+        // turn under its own permission system, so these report rather than ask.
+        Repeater {
+            model: ScriptModel {
+                values: root.messageData?.toolCalls ?? []
+            }
+
+            delegate: MessageCommandBlock {
+                required property var modelData
+                Layout.fillWidth: true
+                Layout.maximumWidth: root.textColumnWidth
+                Layout.topMargin: 4
+                messageData: root.messageData
+                approvable: false
+                title: modelData.tool
+                showPrompt: modelData.tool === "Bash" 
+                commandState: modelData.state
+                commandText: modelData.text
+                output: modelData.output
+                verdict: ""
+            }
+        }
+
         Flow { // Annotations
             visible: root.messageData?.annotationSources?.length > 0
             spacing: 5

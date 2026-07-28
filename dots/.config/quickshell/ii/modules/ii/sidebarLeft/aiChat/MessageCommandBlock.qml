@@ -26,14 +26,28 @@ Item {
 
     property var messageData: null
 
+    // Fed either from the message's own command fields or from one entry of a
+    // Claude Code turn's tool list, so both render as the same thing. Before
+    // this, a Claude Code turn was a run of inline-code lines that looked
+    // nothing like the command block every other model produces.
     // Not `state`: that's Item's own, and binding it would swap the item's states.
-    readonly property string commandState: messageData?.commandState ?? ""
+    property string commandState: messageData?.commandState ?? ""
+    property string commandText: messageData?.commandText ?? ""
+    property string output: messageData?.commandOutput ?? ""
+    property string verdict: messageData?.commandVerdict ?? ""
+    property int exitCode: messageData?.commandExitCode ?? 0
+    // Claude Code runs its own permission system, so its blocks report rather
+    // than ask; only the shell's own tool puts a decision in front of you.
+    property bool approvable: true
+    property string title: ""
+    // A prompt in front of a file path claims it's a shell command. Only the
+    // tools that really are one get to wear it.
+    property bool showPrompt: true
+
     readonly property bool pending: root.commandState === "pending"
     readonly property bool running: root.commandState === "running"
     readonly property bool failed: root.commandState === "failed"
     readonly property bool rejected: root.commandState === "rejected"
-    readonly property string output: messageData?.commandOutput ?? ""
-    readonly property string verdict: messageData?.commandVerdict ?? ""
 
     // Output opens while there's something to watch and stays open when it went
     // wrong; a command that succeeded is noise you can ask for.
@@ -104,16 +118,17 @@ Item {
                     font.weight: Font.DemiBold
                     color: root.accent
                     elide: Text.ElideRight
-                    text: root.pending ? Translation.tr("Wants to run a command")
+                    text: root.title.length > 0 ? root.title
+                        : root.pending ? Translation.tr("Wants to run a command")
                         : root.running ? Translation.tr("Running…")
                         : root.rejected ? Translation.tr("Rejected")
-                        : root.failed ? Translation.tr("Failed · exit %1").arg(root.messageData?.commandExitCode ?? 1)
+                        : root.failed ? Translation.tr("Failed · exit %1").arg(root.exitCode)
                         : Translation.tr("Done")
                 }
 
                 AiMessageControlButton {
                     buttonIcon: "content_copy"
-                    onClicked: Quickshell.clipboardText = root.messageData?.commandText ?? ""
+                    onClicked: Quickshell.clipboardText = root.commandText
                     StyledToolTip { text: Translation.tr("Copy command") }
                 }
 
@@ -146,6 +161,7 @@ Item {
 
                     StyledText {
                         Layout.alignment: Qt.AlignTop
+                        visible: root.showPrompt
                         font.family: Appearance.font.family.monospace
                         font.pixelSize: Appearance.font.pixelSize.smaller
                         color: root.accent
@@ -163,7 +179,7 @@ Item {
                         // long commands wrap; only a finished one gets shortened.
                         elide: root.pending ? Text.ElideNone : Text.ElideRight
                         maximumLineCount: root.pending ? 12 : 2
-                        text: root.messageData?.commandText ?? ""
+                        text: root.commandText
                     }
                 }
             }
@@ -174,7 +190,7 @@ Item {
                 Layout.rightMargin: 8
                 Layout.bottomMargin: 8
                 spacing: 6
-                visible: root.verdict.length > 0 && (root.pending || root.messageData?.commandAutoApproved)
+                visible: root.verdict.length > 0 && (root.pending || (root.messageData?.commandAutoApproved ?? false))
 
                 MaterialSymbol {
                     Layout.alignment: Qt.AlignTop
@@ -197,7 +213,7 @@ Item {
                 Layout.margins: 8
                 Layout.topMargin: 0
                 spacing: 6
-                visible: root.messageData?.functionPending ?? false
+                visible: root.approvable && (root.messageData?.functionPending ?? false)
 
                 Item { Layout.fillWidth: true }
 
