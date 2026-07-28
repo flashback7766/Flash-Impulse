@@ -397,12 +397,17 @@ The shell (Quickshell config "ii"):
     Binding {
         target: root.apiStrategies["claude-code"]
         property: "permissionMode"
+        // Claude Code's own vocabulary, checked against `claude --help` on 2.1.220:
+        // acceptEdits, auto, bypassPermissions, manual, dontAsk, plan. It has an
+        // auto mode of its own, which is a far better match for the Auto chip
+        // than acceptEdits — that one waves through file edits and still stops
+        // every command, which is the half nobody wanted.
         value: ({
             "plan": "plan",
-            "default": "default",
-            "auto": "acceptEdits",
+            "default": "manual",
+            "auto": "auto",
             "yolo": "bypassPermissions"
-        })[root.permissionMode] ?? "default"
+        })[root.permissionMode] ?? "manual"
     }
 
     Binding {
