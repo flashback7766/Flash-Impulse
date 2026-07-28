@@ -386,6 +386,13 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
         if (messageListView.isNearBottom) messageListView.positionViewAtEnd();
     }
 
+    Connections {
+        target: Ai
+        function onCommandRequested(text) {
+            root.handleInput(text);
+        }
+    }
+
     // Click-away overlay to close popups when clicking outside
     Rectangle {
         id: popupDismissOverlay

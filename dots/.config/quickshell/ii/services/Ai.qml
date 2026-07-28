@@ -977,6 +977,23 @@ The shell (Quickshell config "ii"):
             "api_format": "openai",
         });
         root.modelList = Object.keys(root.models);
+
+        // Write it to the config as well. addModel only touches the in-memory map,
+        // which is read back from extraModels at every start — so /addlocal used
+        // to report success and then lose the model on the next restart.
+        const existing = (Config?.options.ai?.extraModels ?? []).filter(m =>
+            root.safeModelName(m["model"]) !== safeId);
+        Config.options.ai.extraModels = [...existing, {
+            "api_format": "openai",
+            "name": root.guessModelName(modelName),
+            "icon": root.guessModelLogo(modelName),
+            "description": Translation.tr("Local model | %1\nEndpoint: %2").arg(actualModel).arg(actualEndpoint),
+            "homepage": actualEndpoint,
+            "endpoint": actualEndpoint,
+            "model": actualModel,
+            "requires_key": false,
+        }];
+
         root.addMessage(Translation.tr("Added local model: **%1**\nEndpoint: `%2`\nModel: `%3`").arg(root.guessModelName(modelName)).arg(actualEndpoint).arg(actualModel), root.interfaceRole);
     }
 
@@ -2674,7 +2691,14 @@ The shell (Quickshell config "ii"):
 
         function send(message: string): string {
             if (!message || message.trim().length === 0) return "nothing to send";
-            root.sendUserMessage(message);
+            // Route slash commands through the same handler the input box uses.
+            // Without this, `ipc call ai send "/new"` posted the literal text to
+            // the model — the one thing the caller definitely didn't mean.
+            if (message.trim().startsWith("/")) {
+                root.commandRequested(message.trim());
+                return "ran";
+            }
+            root.queueUserMessage(message);
             return "sent";
         }
 
@@ -2706,6 +2730,9 @@ The shell (Quickshell config "ii"):
 
     // Raised by `ipc call ai chats`; the sidebar's history sheet listens for it.
     signal chatListRequested
+    // Raised for slash commands arriving over IPC; the chat page owns the table
+    // of commands, so it is the one that can run them.
+    signal commandRequested(string text)
 
     function savePersistentState(key, value) {
         if (!Persistent.states || !Persistent.states.ai) return;
