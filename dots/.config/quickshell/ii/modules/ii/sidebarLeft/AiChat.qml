@@ -21,6 +21,11 @@ Item {
     property var inputField: messageInputField
     property string commandPrefix: "/"
 
+    // A brand-new chat gets a different shape: the composer rises to the middle
+    // with a greeting over it and a few things worth asking under it, instead of
+    // sitting at the bottom of an empty box.
+    readonly property bool chatIsEmpty: Ai.messageIDs.length === 0
+
     property var suggestionQuery: ""
     property var suggestionList: []
 
@@ -1061,6 +1066,19 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
             Rectangle {
                 id: statusBg
                 z: 2
+                // Only once there is something to report. Key and temperature moved
+                // to the composer's control row, where the rest of "what will happen
+                // when I press send" already lives — on an empty chat this capsule
+                // was a lone key icon and a 0.5 floating in the middle of nothing.
+                readonly property bool hasSomethingToShow: Ai.tokenCount.total > 0
+                    || Ai.generationSpeed > 0
+                    || Ai.sessionCost > 0.0001
+                    || Ai.sessionSummary.length > 0
+                visible: opacity > 0
+                opacity: statusBg.hasSomethingToShow ? 1 : 0
+                Behavior on opacity {
+                    animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+                }
                 anchors {
                     horizontalCenter: parent.horizontalCenter
                     top: parent.top
@@ -1083,20 +1101,6 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                         Layout.alignment: Qt.AlignHCenter
                         spacing: 10
 
-                        StatusItem {
-                            icon: Ai.currentModelHasApiKey ? "key" : "key_off"
-                            statusText: ""
-                            description: Ai.currentModelHasApiKey ? Translation.tr("API key is set\nChange with /key YOUR_API_KEY") : Translation.tr("No API key\nSet it with /key YOUR_API_KEY")
-                        }
-                        StatusSeparator {}
-                        StatusItem {
-                            icon: "device_thermostat"
-                            statusText: Ai.temperature.toFixed(1)
-                            description: Translation.tr("Temperature\nChange with /temp VALUE")
-                        }
-                        StatusSeparator {
-                            visible: Ai.tokenCount.total > 0
-                        }
                         StatusItem {
                             visible: Ai.tokenCount.total > 0
                             icon: "token"
@@ -1159,9 +1163,12 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                 // Ending the list above the capsule needs no layer at all.
                 anchors.left: parent.left
                 anchors.right: parent.right
-                anchors.top: statusBg.bottom
-                anchors.topMargin: 6
+                anchors.top: parent.top
+                anchors.topMargin: statusBg.visible ? statusBg.height + statusBg.anchors.topMargin + 6 : 0
                 anchors.bottom: parent.bottom
+                Behavior on anchors.topMargin {
+                    animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+                }
                 clip: true
                 spacing: 0
                 popin: false
@@ -1219,6 +1226,19 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                     messageData: Ai.messageByID[modelData] ?? null
 
                     property var prevMessageData: index > 0 ? Ai.messageByID[messageListView.model.values[index - 1]] : null
+
+                    // Name the model on the first answer and whenever it changes;
+                    // the rest of the time the icon is enough and the label is just
+                    // the same six words down the left of every exchange.
+                    namesModel: {
+                        if (messageData?.role !== "assistant") return false;
+                        const vals = messageListView.model.values;
+                        for (let i = index - 1; i >= 0; i--) {
+                            const earlier = Ai.messageByID[vals[i]];
+                            if (earlier?.role === "assistant") return earlier.model !== messageData.model;
+                        }
+                        return true;
+                    }
                     isContinuation: prevMessageData != null
                         && messageData != null
                         && messageData.role === prevMessageData?.role
@@ -1229,13 +1249,36 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                 }
             }
 
-            PagePlaceholder {
+            ColumnLayout { // Greeting, sitting just above the centred composer
+                id: emptyGreeting
                 z: 2
-                shown: Ai.messageIDs.length === 0
-                icon: "chat_bubble"
-                title: Translation.tr("AI Assistant")
-                description: Translation.tr("Type /key to get started with online models\nCtrl+O to expand sidebar\nCtrl+P to pin sidebar\nCtrl+D to detach sidebar\nCtrl+Shift+O to start a new chat")
-                shape: MaterialShape.Shape.PixelCircle
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: 18
+                spacing: 2
+                visible: opacity > 0
+                opacity: root.chatIsEmpty ? 1 : 0
+                Behavior on opacity {
+                    animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+                }
+
+                StyledText {
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    font.pixelSize: Appearance.font.pixelSize.huge
+                    font.weight: Font.DemiBold
+                    color: Appearance.colors.colOnLayer1
+                    text: Translation.tr("How can I help?")
+                }
+
+                StyledText {
+                    Layout.fillWidth: true
+                    horizontalAlignment: Text.AlignHCenter
+                    font.pixelSize: Appearance.font.pixelSize.smaller
+                    color: Appearance.colors.colSubtext
+                    text: Translation.tr("Ctrl+K for history · / for commands")
+                }
             }
 
             ScrollToBottomButton {
@@ -1733,29 +1776,67 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
                 anchors.bottomMargin: 12
-                anchors.leftMargin: 14
+                anchors.leftMargin: 12
                 anchors.rightMargin: 10
-                spacing: 10
+                // Tight: six fixed controls plus the model name have to fit a
+                // sidebar that can be as narrow as 360px.
+                spacing: 6
 
                 // First in the row: what the assistant is allowed to do without
                 // asking is the thing to read before pressing send.
                 PermissionModeChip {}
 
+                // Key and temperature, moved down from the status capsule. The key
+                // only speaks up when it's missing — "configured correctly" is the
+                // normal state and doesn't need a permanent badge.
+                RippleButton {
+                    id: apiKeyWarning
+                    visible: !Ai.currentModelHasApiKey
+                    implicitHeight: 30
+                    implicitWidth: 30
+                    buttonRadius: Appearance.rounding.full
+                    colBackground: Appearance.colors.colErrorContainer
+                    colBackgroundHover: Appearance.colors.colErrorContainerHover
+                    onClicked: chatSettingsPanel.open()
+                    contentItem: MaterialSymbol {
+                        horizontalAlignment: Text.AlignHCenter
+                        text: "key_off"
+                        iconSize: Appearance.font.pixelSize.large
+                        color: Appearance.colors.colOnErrorContainer
+                    }
+                    StyledToolTip { text: Translation.tr("No API key for this model — click to add one") }
+                }
+
                 // Settings
                 RippleButton {
                     id: settingsButton
-                    implicitWidth: 36
+                    // Carries the temperature as its label rather than giving it a
+                    // chip of its own: this button is where temperature is changed,
+                    // and a narrow sidebar has no room for a control per number.
+                    implicitWidth: settingsRow.implicitWidth + 18
                     implicitHeight: 36
                     buttonRadius: 18
                     colBackground: Appearance.colors.colLayer2
                     colBackgroundHover: Appearance.colors.colLayer2Hover
                     onClicked: chatSettingsPanel.open()
-                    StyledToolTip { text: Translation.tr("Assistant settings") }
-                    contentItem: MaterialSymbol {
-                        anchors.centerIn: parent
-                        text: "tune"
-                        iconSize: Appearance.font.pixelSize.large
-                        color: Appearance.colors.colOnLayer2
+                    StyledToolTip {
+                        text: Translation.tr("Settings · temperature %1").arg(Ai.temperature.toFixed(1))
+                    }
+                    contentItem: RowLayout {
+                        id: settingsRow
+                        spacing: 3
+                        MaterialSymbol {
+                            Layout.alignment: Qt.AlignVCenter
+                            text: "tune"
+                            iconSize: Appearance.font.pixelSize.large
+                            color: Appearance.colors.colOnLayer2
+                        }
+                        StyledText {
+                            Layout.alignment: Qt.AlignVCenter
+                            font.pixelSize: Appearance.font.pixelSize.smaller
+                            color: Appearance.colors.colSubtext
+                            text: Ai.temperature.toFixed(1)
+                        }
                     }
                 }
 
@@ -1778,41 +1859,12 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                 }
 
                 // Commands shortcut button
-                RippleButton {
-                    id: commandsShortcutButton
-                    implicitWidth: commandsShortcutRow.implicitWidth + 22
-                    implicitHeight: 36
-                    buttonRadius: 18
-                    colBackground: Appearance.colors.colLayer2
-                    colBackgroundHover: Appearance.colors.colLayer2Hover
-                    onClicked: {
-                        messageInputField.text = root.commandPrefix;
-                        messageInputField.cursorPosition = messageInputField.text.length;
-                        messageInputField.forceActiveFocus();
-                    }
-                    StyledToolTip { text: Translation.tr("Open commands") }
-                    contentItem: RowLayout {
-                        id: commandsShortcutRow
-                        anchors.centerIn: parent
-                        spacing: 4
-                        MaterialSymbol {
-                            text: "terminal"
-                            iconSize: Appearance.font.pixelSize.small
-                            color: Appearance.m3colors.m3onSurface
-                        }
-                        StyledText {
-                            font.pixelSize: Appearance.font.pixelSize.smaller + 2
-                            font.weight: Font.Medium
-                            color: Appearance.m3colors.m3onSurface
-                            text: "/"
-                        }
-                    }
-                }
 
                 RippleButton {
                     // Model picker button
                     id: modelPickerButton
                     implicitWidth: modelPickerRow.implicitWidth + 26
+                    // Sized by the Layout above once the row runs out of room.
                     implicitHeight: 36
                     buttonRadius: 18
                     colBackground: Qt.alpha(Appearance.m3colors.m3primary, 0.10)
@@ -1823,6 +1875,13 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                     }
 
                     onClicked: modelPickerPopup.toggle()
+
+                    // The one item in the row allowed to give up width. Everything
+                    // else is a fixed-size control, so without this the row simply
+                    // overflowed the sidebar and pushed Functions off the edge.
+                    Layout.fillWidth: true
+                    Layout.maximumWidth: modelPickerRow.implicitWidth + 26
+                    Layout.minimumWidth: 120
 
                     contentItem: RowLayout {
                         id: modelPickerRow
@@ -1837,6 +1896,7 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                             color: Appearance.m3colors.m3primary
                         }
                         StyledText {
+                            Layout.fillWidth: true
                             font.pixelSize: Appearance.font.pixelSize.smaller + 2
                             font.weight: Font.Medium
                             color: Appearance.m3colors.m3primary
@@ -1877,6 +1937,10 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                             color: Appearance.m3colors.m3onSurface
                         }
                         StyledText {
+                            // Named only when it isn't the default. A sidebar this
+                            // narrow can't spend 70px on a label that reads
+                            // "Functions" every time; the model's name is worth more.
+                            visible: Ai.currentTool !== "functions"
                             font.pixelSize: Appearance.font.pixelSize.smaller + 2
                             color: Appearance.m3colors.m3onSurface
                             text: Ai.currentTool.charAt(0).toUpperCase() + Ai.currentTool.slice(1)
@@ -1888,6 +1952,9 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                             color: Appearance.colors.colSubtext
                         }
                     }
+                    StyledToolTip {
+                        text: Translation.tr("Tools — %1").arg(Ai.currentTool)
+                    }
                 }
 
                 Item {
@@ -1896,6 +1963,34 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
 
 
             }
+        }
+
+        Item { // Things worth asking, under the composer
+            id: emptySuggestions
+            Layout.fillWidth: true
+            Layout.topMargin: 14
+            visible: root.chatIsEmpty
+            implicitHeight: suggestionCards.implicitHeight
+
+            SuggestionCards {
+                id: suggestionCards
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                onPicked: prompt => {
+                    Ai.queueUserMessage(prompt);
+                    messageInputField.forceActiveFocus();
+                }
+            }
+        }
+
+        Item {
+            // The message area above and this below both take a share of the slack,
+            // which is what actually lands the composer in the middle — giving the
+            // cards the stretch instead just pinned the whole group to the top.
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            visible: root.chatIsEmpty
         }
     }
 }

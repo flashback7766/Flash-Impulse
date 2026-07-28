@@ -36,6 +36,9 @@ Item {
     property bool renderMarkdown: true
     property bool editing: false
     property bool isContinuation: false
+    // Whether this answer states which model produced it. Set by the list, which
+    // is the only thing that can see what came before.
+    property bool namesModel: true
 
     readonly property bool isUser: messageData?.role === "user"
     readonly property bool isAssistant: messageData?.role === "assistant"
@@ -147,6 +150,10 @@ Item {
         RowLayout { // Authorship
             id: headerRow
             visible: !root.isContinuation && !root.isDivider
+            // Height is reserved whether or not anything in it is showing: the
+            // author line fades in on hover, and letting the row collapse made
+            // every message jump down as the pointer crossed it.
+            Layout.preferredHeight: 16
             Layout.fillWidth: true
             Layout.leftMargin: 2
             Layout.rightMargin: 2
@@ -160,6 +167,12 @@ Item {
             Item {
                 implicitWidth: 16
                 implicitHeight: 16
+                // The person icon goes with the name; an answer keeps its provider
+                // mark always, because that one identifies something that varies.
+                opacity: (!root.isUser || root.hovered) ? 1 : 0
+                Behavior on opacity {
+                    animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+                }
 
                 CustomIcon {
                     id: modelIcon
@@ -182,8 +195,15 @@ Item {
             }
 
             StyledText {
-                // Named on every answer: with model switching mid-chat, "which one
-                // said this" is a question you ask constantly otherwise.
+                // The name earns its place when it changes — or when you ask for it
+                // by hovering. Otherwise the provider icon already says enough.
+                // Your own name above your own question, every single time, is the
+                // one label that can never tell you anything — the bubble is
+                // already on your side of the conversation. Same rule as the model.
+                opacity: (root.isInterface || root.namesModel || root.hovered) ? 1 : 0
+                Behavior on opacity {
+                    animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+                }
                 font.pixelSize: Appearance.font.pixelSize.smaller
                 font.weight: Font.DemiBold
                 color: root.isUser ? Appearance.colors.colSubtext : Appearance.colors.colPrimary
@@ -216,8 +236,7 @@ Item {
             }
 
             StyledText { // Timestamp, on hover only
-                visible: opacity > 0 && text.length > 0
-                opacity: root.hovered ? 1 : 0
+                opacity: (root.hovered && text.length > 0) ? 1 : 0
                 font.pixelSize: Appearance.font.pixelSize.smallest
                 color: Appearance.colors.colSubtext
                 text: root.messageData?.timestamp > 0
