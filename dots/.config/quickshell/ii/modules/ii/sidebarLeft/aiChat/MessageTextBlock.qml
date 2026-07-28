@@ -151,6 +151,11 @@ ColumnLayout {
             }
 
             Layout.fillWidth: true
+            // TextArea brings ~6px of padding of its own from the control style.
+            // The user bubble is sized from a separate unwrapped measurement of
+            // the same string, which can't see that padding — so a short question
+            // got a bubble ~12px too narrow and "Спасибо!" wrapped mid-word.
+            padding: 0
             readOnly: !editing
             selectByMouse: enableMouseSelection || editing
             renderType: Text.NativeRendering

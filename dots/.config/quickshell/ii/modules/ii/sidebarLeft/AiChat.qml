@@ -1148,34 +1148,23 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
             StyledListView { // Message list
                 id: messageListView
                 z: 0
-                anchors.fill: parent
+                // Starts below the status capsule rather than under it. The capsule
+                // is narrower than the list, so content scrolling behind it came out
+                // the other side with its middle covered and both ends showing.
+                //
+                // The first attempt at this faded the top with an OpacityMask, which
+                // put the list in a layer — and a layer over a ListView that reuses
+                // its delegates keeps painting rows that have since been hidden, so
+                // an empty tool-call turn left its author line ghosted on screen.
+                // Ending the list above the capsule needs no layer at all.
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: statusBg.bottom
+                anchors.topMargin: 6
+                anchors.bottom: parent.bottom
+                clip: true
                 spacing: 0
                 popin: false
-                topMargin: statusBg.implicitHeight + statusBg.anchors.topMargin * 2
-
-                // The status capsule floats over the list, and it's narrower than
-                // the list is — so a scrolled line came out from behind it with its
-                // middle covered and both ends showing. Fading the top makes the
-                // content disappear before it reaches the capsule instead.
-                //
-                // The mask rounds the corners too, which is what the parent Item's
-                // layer used to be for; doing both here keeps it at one FBO.
-                readonly property real topFadeEnd:
-                    Math.min(0.5, (statusBg.implicitHeight + statusBg.anchors.topMargin * 2)
-                        / Math.max(1, messageListView.height))
-                layer.enabled: true
-                layer.effect: OpacityMask {
-                    maskSource: Rectangle {
-                        width: messageListView.width
-                        height: messageListView.height
-                        radius: Appearance.rounding.small
-                        gradient: Gradient {
-                            GradientStop { position: 0.0; color: "#00000000" }
-                            GradientStop { position: messageListView.topFadeEnd; color: "#FF000000" }
-                            GradientStop { position: 1.0; color: "#FF000000" }
-                        }
-                    }
-                }
 
                 // Pre-render off-screen items for smoother scrolling
                 cacheBuffer: 600

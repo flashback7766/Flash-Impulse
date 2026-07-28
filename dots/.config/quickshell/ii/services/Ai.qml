@@ -1417,6 +1417,29 @@ The shell (Quickshell config "ii"):
      * messages (function calls and their output) are left out — the point is a
      * readable transcript, not a replayable log.
      */
+    /**
+     * Hide a finished turn that has nothing in it.
+     *
+     * A tool-call turn's whole content is internal markers, so once they're
+     * stripped there is no text, no reasoning and no command left to draw — just
+     * an author line and a hover toolbar attached to nothing.
+     *
+     * Decided here, once, rather than in the delegate: a delegate that hides
+     * itself is still an item in the list, and a zero-height item still takes
+     * part in the scroll arithmetic, which parked the view above the first real
+     * message. Filtering on message content in the list's model instead would
+     * re-run over every message on every streamed token.
+     */
+    function hideIfEmpty(message: AiMessageData) {
+        if (!message || !message.visibleToUser) return;
+        if ((message.content ?? "").length > 0) return;
+        if ((message.reasoning ?? "").length > 0) return;
+        if ((message.dividerText ?? "").length > 0) return;
+        if ((message.commandState ?? "").length > 0) return;
+        if ((message.localFilePath ?? "").length > 0) return;
+        message.visibleToUser = false;
+    }
+
     function exportChat() {
         const lines = [];
         const title = root.currentChatDisplayTitle();
@@ -1859,6 +1882,7 @@ The shell (Quickshell config "ii"):
             if (requester.message.content !== requester.message.rawContent) {
                 streamFlushTimer.flushNow();
             }
+            root.hideIfEmpty(requester.message);
             // Calculate generation speed
             if (root.generationStartTime > 0 && root.tokenCount.output > 0) {
                 const elapsed = (Date.now() - root.generationStartTime) / 1000;
@@ -2595,6 +2619,9 @@ The shell (Quickshell config "ii"):
             });
             // Restore Gemini thought signature data (dynamic props, set after creation)
             if (message.functionCallParts) root.messageByID[saveIds[i]].functionCallParts = message.functionCallParts;
+            // Chats saved before hideIfEmpty existed still carry tool-call turns
+            // marked visible with nothing in them.
+            root.hideIfEmpty(root.messageByID[saveIds[i]]);
         }
         root.messageIDs = saveIds;
     }

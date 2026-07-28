@@ -105,17 +105,10 @@ Item {
         root.enableMouseSelection = false;
     }
 
-    // A finished turn with nothing in it — no text, no reasoning, no command, no
-    // attachment — is a tool call whose content was entirely internal markers.
-    // Showing it gives an author line and a hover toolbar attached to nothing.
-    readonly property bool isEmpty: (root.messageData?.done ?? false)
-        && (root.messageData?.content ?? "").length === 0
-        && !(root.messageData?.hasReasoning ?? false)
-        && !root.isDivider
-        && (root.messageData?.commandState ?? "").length === 0
-        && (root.messageData?.localFilePath ?? "").length === 0
-
-    visible: (messageData?.visibleToUser ?? true) && !root.isEmpty
+    // Empty tool-call turns are dropped by Ai.hideIfEmpty when they finish, so
+    // there is nothing to filter here — a delegate that hides itself is still an
+    // item in the list, and a zero-height item still moves the scroll position.
+    visible: messageData?.visibleToUser ?? true
     height: visible ? implicitHeight : 0
     opacity: visible ? 1 : 0
 
@@ -285,7 +278,11 @@ Item {
                 anchors.right: root.isUser ? parent.right : undefined
                 anchors.left: root.isUser ? undefined : parent.left
                 width: root.isUser
-                    ? Math.max(48, Math.min(userWidthProbe.contentWidth + root.messagePadding * 2 + 2, parent.width * 0.85))
+                    // Ceil plus a few px of slack: contentWidth is fractional and
+                    // the rendered block adds a little of its own, and being one
+                    // pixel short wraps the last character onto its own line.
+                    ? Math.max(48, Math.min(Math.ceil(userWidthProbe.contentWidth) + root.messagePadding * 2 + 6,
+                        parent.width * 0.85))
                     : Math.min(parent.width, root.textColumnWidth)
                 implicitHeight: messageContentColumnLayout.implicitHeight + (root.isUser ? root.messagePadding * 2 : 0)
 
