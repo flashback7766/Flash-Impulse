@@ -1967,7 +1967,8 @@ The shell (Quickshell config "ii"):
             }
 
             const toolsForFormat = root.tools[model.api_format] ?? root.tools["openai"];
-            const data = root.currentApiStrategy.buildRequestData(model, filteredMessageArray, root.systemPrompt, root.temperature, toolsForFormat[root.currentTool] ?? [], root.pendingFilePath);
+            const toolSet = root.withMcpTools(toolsForFormat[root.currentTool] ?? [], model.api_format);
+            const data = root.currentApiStrategy.buildRequestData(model, filteredMessageArray, root.systemPrompt, root.temperature, toolSet, root.pendingFilePath);
             // console.log("[Ai] Request data: ", JSON.stringify(data, null, 2));
 
             let requestHeaders = {
@@ -2344,6 +2345,15 @@ The shell (Quickshell config "ii"):
     // Command safety pipeline (whitelist / blacklist / Gemini judge / YOLO + audit log)
     property CommandSafety commandSafety: CommandSafety {}
 
+    // MCP servers and the tools they contribute (see McpManager).
+    property McpManager mcp: McpManager {
+        onCallFinished: (toolName, ok, text) => {
+            root.addFunctionOutputMessage(toolName, ok ? text : `Error: ${text}`);
+            if (root.aborted) { root.aborted = false; return; }
+            requester.makeRequest();
+        }
+    }
+
     function isDangerousCommand(cmd) {
         return commandSafety.isBlacklisted(cmd);
     }
@@ -2430,7 +2440,41 @@ The shell (Quickshell config "ii"):
         }
     }
 
+    /**
+     * Fold the MCP servers' tools into the built-in set, in whichever shape the
+     * provider wants. Only for the function-calling tool set — Google's search
+     * grounding is mutually exclusive with function declarations, so adding to
+     * it would break search rather than extend it.
+     */
+    function withMcpTools(builtin, apiFormat) {
+        const declarations = root.mcp?.toolDeclarations ?? [];
+        if (declarations.length === 0) return builtin;
+        if (root.currentTool !== "functions") return builtin;
+
+        if (apiFormat === "gemini") {
+            const base = builtin?.[0]?.functionDeclarations ?? [];
+            return [{ "functionDeclarations": [...base, ...declarations] }];
+        }
+        return [...builtin, ...declarations.map(tool => ({
+            "type": "function",
+            "function": {
+                "name": tool.name,
+                "description": tool.description,
+                "parameters": tool.parameters
+            }
+        }))];
+    }
+
     function handleFunctionCall(name, args: var, message: AiMessageData) {
+        // An MCP tool is anything a connected server claims by name. Checked
+        // first: a server is free to offer something called run_shell_command,
+        // and the prefix is what disambiguates it.
+        if (root.mcp?.isMcpTool(name)) {
+            message.functionName = name;
+            root.mcp.callTool(name, args ?? {});
+            return;
+        }
+
         if (name === "switch_to_search_mode") {
             root.currentTool = "search";
             root.postResponseHook = () => {
@@ -2855,6 +2899,32 @@ The shell (Quickshell config "ii"):
     // Raised for slash commands arriving over IPC; the chat page owns the table
     // of commands, so it is the one that can run them.
     signal commandRequested(string text)
+
+    // ---- MCP server list ---------------------------------------------------
+
+    /**
+     * Add a server from one typed command line. Splitting on whitespace is the
+     * shape people paste from a README (`npx -y @modelcontextprotocol/...`), and
+     * anything needing real quoting can be edited in the config file.
+     */
+    function addMcpServer(name, commandLine) {
+        const cleanName = (name ?? "").trim();
+        const parts = (commandLine ?? "").trim().split(/\s+/).filter(p => p.length > 0);
+        if (cleanName.length === 0 || parts.length === 0) return;
+        const existing = (Config.options.ai.mcpServers ?? []).filter(server => server.name !== cleanName);
+        Config.options.ai.mcpServers = [...existing, {
+            "name": cleanName,
+            "command": parts[0],
+            "args": parts.slice(1),
+            "env": {},
+            "enabled": true
+        }];
+    }
+
+    function removeMcpServer(name) {
+        const remaining = (Config.options.ai.mcpServers ?? []).filter(server => server.name !== name);
+        Config.options.ai.mcpServers = remaining;
+    }
 
     // ---- favourites --------------------------------------------------------
 

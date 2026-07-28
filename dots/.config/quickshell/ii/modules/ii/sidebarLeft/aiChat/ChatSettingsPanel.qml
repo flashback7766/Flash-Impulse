@@ -490,6 +490,189 @@ Item {
                         }
                     }
 
+                    // ---- MCP ---------------------------------------------------
+
+                    SectionLabel { text: Translation.tr("MCP servers") }
+
+                    StyledText {
+                        Layout.fillWidth: true
+                        Layout.leftMargin: 10
+                        Layout.rightMargin: 10
+                        wrapMode: Text.Wrap
+                        font.pixelSize: Appearance.font.pixelSize.smaller
+                        color: Appearance.colors.colSubtext
+                        text: (Ai.mcp?.toolCount ?? 0) > 0
+                            ? Translation.tr("%1 tools from %2 connected servers, offered to the model alongside the built-in ones.")
+                                .arg(Ai.mcp.toolCount).arg(Ai.mcp.readyCount)
+                            : Translation.tr("Programs that give the assistant extra tools. Started here, spoken to over stdio.")
+                    }
+
+                    Repeater {
+                        model: Ai.mcp?.servers ?? []
+
+                        delegate: Rectangle {
+                            id: serverRow
+                            required property var modelData
+
+                            readonly property string state_: serverRow.modelData.status
+                            readonly property color accent: serverRow.state_ === "ready" ? Appearance.colors.colPrimary
+                                : serverRow.state_ === "failed" ? Appearance.colors.colError
+                                : Appearance.colors.colSubtext
+
+                            Layout.fillWidth: true
+                            Layout.leftMargin: 10
+                            Layout.rightMargin: 10
+                            Layout.topMargin: 4
+                            implicitHeight: serverColumn.implicitHeight + 16
+                            radius: Appearance.rounding.small
+                            color: Appearance.colors.colLayer2
+
+                            ColumnLayout {
+                                id: serverColumn
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.top: parent.top
+                                anchors.margins: 8
+                                spacing: 2
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 6
+
+                                    MaterialSymbol {
+                                        Layout.alignment: Qt.AlignVCenter
+                                        iconSize: Appearance.font.pixelSize.normal
+                                        color: serverRow.accent
+                                        text: serverRow.state_ === "ready" ? "check_circle"
+                                            : serverRow.state_ === "failed" ? "error"
+                                            : serverRow.state_ === "starting" ? "hourglass_top"
+                                            : "radio_button_unchecked"
+                                        SequentialAnimation on opacity {
+                                            running: serverRow.state_ === "starting"
+                                            loops: Animation.Infinite
+                                            alwaysRunToEnd: true
+                                            NumberAnimation { from: 1; to: 0.4; duration: 600 }
+                                            NumberAnimation { from: 0.4; to: 1; duration: 600 }
+                                        }
+                                    }
+
+                                    StyledText {
+                                        Layout.fillWidth: true
+                                        elide: Text.ElideRight
+                                        font.pixelSize: Appearance.font.pixelSize.small
+                                        font.weight: Font.DemiBold
+                                        color: Appearance.colors.colOnLayer2
+                                        text: serverRow.modelData.name
+                                    }
+
+                                    StyledText {
+                                        font.pixelSize: Appearance.font.pixelSize.smaller
+                                        color: Appearance.colors.colSubtext
+                                        text: serverRow.state_ === "ready"
+                                            ? Translation.tr("%1 tools").arg(serverRow.modelData.tools.length) : ""
+                                    }
+
+                                    RippleButton {
+                                        implicitWidth: 28
+                                        implicitHeight: 28
+                                        buttonRadius: Appearance.rounding.full
+                                        onClicked: serverRow.modelData.start()
+                                        contentItem: MaterialSymbol {
+                                            horizontalAlignment: Text.AlignHCenter
+                                            text: "refresh"
+                                            iconSize: Appearance.font.pixelSize.normal
+                                            color: Appearance.colors.colSubtext
+                                        }
+                                        StyledToolTip { text: Translation.tr("Reconnect") }
+                                    }
+
+                                    RippleButton {
+                                        implicitWidth: 28
+                                        implicitHeight: 28
+                                        buttonRadius: Appearance.rounding.full
+                                        onClicked: Ai.removeMcpServer(serverRow.modelData.name)
+                                        contentItem: MaterialSymbol {
+                                            horizontalAlignment: Text.AlignHCenter
+                                            text: "delete"
+                                            iconSize: Appearance.font.pixelSize.normal
+                                            color: Appearance.colors.colSubtext
+                                        }
+                                        StyledToolTip { text: Translation.tr("Remove this server") }
+                                    }
+                                }
+
+                                StyledText {
+                                    Layout.fillWidth: true
+                                    elide: Text.ElideRight
+                                    maximumLineCount: 1
+                                    font.family: Appearance.font.family.monospace
+                                    font.pixelSize: Appearance.font.pixelSize.smaller
+                                    color: Appearance.colors.colSubtext
+                                    text: [serverRow.modelData.command, ...(serverRow.modelData.args ?? [])].join(" ")
+                                }
+
+                                StyledText {
+                                    Layout.fillWidth: true
+                                    visible: text.length > 0
+                                    wrapMode: Text.Wrap
+                                    maximumLineCount: 3
+                                    font.pixelSize: Appearance.font.pixelSize.smaller
+                                    color: Appearance.colors.colError
+                                    text: serverRow.state_ === "failed" ? (serverRow.modelData.detail ?? "") : ""
+                                }
+                            }
+                        }
+                    }
+
+                    RowLayout { // Add a server
+                        Layout.fillWidth: true
+                        Layout.leftMargin: 10
+                        Layout.rightMargin: 10
+                        Layout.topMargin: 6
+                        spacing: 6
+
+                        MaterialTextField {
+                            id: mcpNameField
+                            Layout.preferredWidth: 100
+                            placeholderText: Translation.tr("Name")
+                            wrapMode: TextEdit.NoWrap
+                        }
+
+                        MaterialTextField {
+                            id: mcpCommandField
+                            Layout.fillWidth: true
+                            placeholderText: Translation.tr("Command, e.g. npx -y @foo/mcp")
+                            wrapMode: TextEdit.NoWrap
+                            Keys.onPressed: event => {
+                                if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                                    addMcpButton.clicked();
+                                    event.accepted = true;
+                                }
+                            }
+                        }
+
+                        RippleButton {
+                            id: addMcpButton
+                            implicitWidth: 34
+                            implicitHeight: 34
+                            buttonRadius: Appearance.rounding.full
+                            enabled: mcpNameField.text.trim().length > 0 && mcpCommandField.text.trim().length > 0
+                            onClicked: {
+                                if (!enabled) return;
+                                Ai.addMcpServer(mcpNameField.text.trim(), mcpCommandField.text.trim());
+                                mcpNameField.text = "";
+                                mcpCommandField.text = "";
+                            }
+                            contentItem: MaterialSymbol {
+                                horizontalAlignment: Text.AlignHCenter
+                                text: "add"
+                                iconSize: Appearance.font.pixelSize.large
+                                color: Appearance.colors.colOnLayer1
+                            }
+                            StyledToolTip { text: Translation.tr("Add server") }
+                        }
+                    }
+
                     // ---- Chat --------------------------------------------------
 
                     SectionLabel { text: Translation.tr("This chat") }
