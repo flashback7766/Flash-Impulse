@@ -61,23 +61,43 @@ Singleton {
      * Fenced code is masked out first, so a message *about* <think> tags — asking
      * how to parse them, say — doesn't get eaten by its own example.
      */
+    // Every wrapper a local model has been seen to put its reasoning in. The
+    // opener is what the cheap bail-out below looks for, so each entry needs one
+    // that can't plausibly appear in ordinary prose.
+    readonly property var reasoningTagPatterns: [
+        // <think>…</think>, <thinking>, <thought>, <reason>, <reasoning>
+        { probe: "<th", regex: /<think(?:ing)?>([\s\S]*?)(?:<\/think(?:ing)?>|$)/g },
+        { probe: "<thought", regex: /<thought>([\s\S]*?)(?:<\/thought>|$)/g },
+        { probe: "<reason", regex: /<reason(?:ing)?>([\s\S]*?)(?:<\/reason(?:ing)?>|$)/g },
+        // Skywork/OpenThoughts-style special tokens that leak into the text
+        { probe: "<|begin_of_thought|>", regex: /<\|begin_of_thought\|>([\s\S]*?)(?:<\|end_of_thought\|>|$)/g },
+        // Kimi's unicode-bracketed form
+        { probe: "◁think▷", regex: /◁think▷([\s\S]*?)(?:◁\/think▷|$)/g }
+    ]
+
     function extractThinkTags(text) {
-        if (!text || text.indexOf("<think") === -1) return { content: text ?? "", reasoning: "" };
+        if (!text) return { content: "", reasoning: "" };
+
+        const patterns = root.reasoningTagPatterns.filter(p => text.indexOf(p.probe) !== -1);
+        if (patterns.length === 0) return { content: text, reasoning: "" };
 
         const fences = [];
         // NUL delimits the placeholder: a model can write "FENCE0" but not a NUL byte,
         // so nothing in the text can be mistaken for one of ours.
-        const masked = text.replace(/```[\s\S]*?(?:```|$)/g, match => {
+        let stripped = text.replace(/```[\s\S]*?(?:```|$)/g, match => {
             fences.push(match);
             return `\x00FENCE${fences.length - 1}\x00`;
         });
 
         const reasoning = [];
-        // Unterminated final tag is normal mid-stream, hence the `$` alternative.
-        const stripped = masked.replace(/<think(?:ing)?>([\s\S]*?)(?:<\/think(?:ing)?>|$)/g, (match, inner) => {
-            if (inner.trim().length > 0) reasoning.push(inner.trim());
-            return "";
-        });
+        for (let i = 0; i < patterns.length; i++) {
+            // Unterminated final tag is normal mid-stream, hence the `$` alternative
+            // in every pattern.
+            stripped = stripped.replace(patterns[i].regex, (match, inner) => {
+                if (inner.trim().length > 0) reasoning.push(inner.trim());
+                return "";
+            });
+        }
 
         const restore = s => s.replace(/\x00FENCE(\d+)\x00/g, (m, i) => fences[Number(i)]);
         return {
