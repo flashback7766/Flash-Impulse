@@ -2900,6 +2900,46 @@ The shell (Quickshell config "ii"):
     // of commands, so it is the one that can run them.
     signal commandRequested(string text)
 
+    /**
+     * The message whose command is waiting on the user, if any. There is at most
+     * one: a turn ends at its tool call, so nothing else can be asked until this
+     * one is answered.
+     */
+    function pendingCommandMessage() {
+        for (let i = root.messageIDs.length - 1; i >= 0; i--) {
+            const message = root.messageByID[root.messageIDs[i]];
+            if (message?.functionPending) return message;
+        }
+        return null;
+    }
+
+    function approvePendingCommand() {
+        const message = root.pendingCommandMessage();
+        if (!message) return false;
+        root.approveCommand(message);
+        return true;
+    }
+
+    function rejectPendingCommand() {
+        const message = root.pendingCommandMessage();
+        if (!message) return false;
+        root.rejectCommand(message);
+        return true;
+    }
+
+    /**
+     * The last thing you asked, for putting back in the box to reword. Interface
+     * lines and tool output aren't yours and are skipped.
+     */
+    function lastUserMessage() {
+        for (let i = root.messageIDs.length - 1; i >= 0; i--) {
+            const message = root.messageByID[root.messageIDs[i]];
+            if (message?.role === "user" && (message.visibleToUser ?? true)
+                && (message.rawContent ?? "").length > 0) return message;
+        }
+        return null;
+    }
+
     // ---- MCP server list ---------------------------------------------------
 
     /**

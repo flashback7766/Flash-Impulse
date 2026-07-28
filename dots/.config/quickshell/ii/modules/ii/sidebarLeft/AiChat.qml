@@ -36,8 +36,19 @@ Item {
     }
 
     Keys.onPressed: event => {
+        // Escape turns down a command waiting on you, before it means "close a
+        // popup" — a request for permission is the thing most worth being able
+        // to refuse without reaching for the mouse.
+        if (event.key === Qt.Key_Escape && messageInputField.text.length === 0
+            && !chatListPanel.shown && !chatSettingsPanel.shown && !shortcutSheet.shown
+            && !modelPickerPopup.isOpen && !functionsPopup.isOpen
+            && Ai.rejectPendingCommand()) {
+            event.accepted = true;
+            return;
+        }
         // Escape closes any open popup
         if (event.key === Qt.Key_Escape) {
+            if (shortcutSheet.shown) { shortcutSheet.shown = false; event.accepted = true; return; }
             if (chatSettingsPanel.shown) { chatSettingsPanel.close(); event.accepted = true; return; }
             if (chatListPanel.shown) { chatListPanel.close(); event.accepted = true; return; }
             if (modelPickerPopup.isOpen) { modelPickerPopup.close(); event.accepted = true; return; }
@@ -46,6 +57,33 @@ Item {
         // Ctrl+K opens history straight into the search box
         if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_K) {
             chatListPanel.open(true);
+            event.accepted = true;
+            return;
+        }
+        if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_M) {
+            modelPickerPopup.toggle();
+            event.accepted = true;
+            return;
+        }
+        // F1 as well as Ctrl+/: on a Cyrillic layout the slash key doesn't report
+        // as Key_Slash, so the shortcut for finding out what the keyboard does
+        // would itself have been unreachable for anyone not typing in English.
+        if (event.key === Qt.Key_F1
+            || ((event.modifiers & Qt.ControlModifier)
+                && (event.key === Qt.Key_Slash || event.key === Qt.Key_Question))) {
+            shortcutSheet.shown = !shortcutSheet.shown;
+            event.accepted = true;
+            return;
+        }
+        if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_E) {
+            // Put the last question back in the box to reword. The original stays
+            // in the transcript — this is a starting point, not an edit in place.
+            const last = Ai.lastUserMessage();
+            if (last) {
+                messageInputField.text = last.rawContent;
+                messageInputField.cursorPosition = messageInputField.text.length;
+                messageInputField.forceActiveFocus();
+            }
             event.accepted = true;
             return;
         }
@@ -413,6 +451,13 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                 functionsPopup.close();
             }
         }
+    }
+
+    ShortcutSheet {
+        id: shortcutSheet
+        anchors.fill: parent
+        z: 901
+        onShownChanged: if (!shown) messageInputField.forceActiveFocus()
     }
 
     ChatListPanel {
@@ -1160,6 +1205,19 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                     NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 220; easing.type: Easing.OutCubic }
                 }
 
+                // A deleted message fades rather than vanishing, and the ones
+                // below close the gap instead of snapping up into it.
+                remove: Transition {
+                    NumberAnimation { property: "opacity"; to: 0; duration: 160; easing.type: Easing.InQuad }
+                }
+                displaced: Transition {
+                    NumberAnimation {
+                        properties: "y"
+                        duration: Appearance.animation.elementMoveFast.duration
+                        easing.type: Easing.OutCubic
+                    }
+                }
+
                 model: ScriptModel {
                     values: Ai.messageIDs.filter(id => {
                         const message = Ai.messageByID[id];
@@ -1585,6 +1643,11 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                                 if (event.modifiers & Qt.ShiftModifier) {
                                     // Insert newline
                                     messageInputField.insert(messageInputField.cursorPosition, "\n");
+                                    event.accepted = true;
+                                } else if (messageInputField.text.length === 0 && Ai.pendingCommandMessage()) {
+                                    // Your hands are already here. Only on an empty
+                                    // box, so Enter never means two things at once.
+                                    Ai.approvePendingCommand();
                                     event.accepted = true;
                                 } else if (Ai.isGenerating && messageInputField.text.length === 0) {
                                     // Enter on an empty box while generating still stops

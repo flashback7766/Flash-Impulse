@@ -86,7 +86,15 @@ Scope { // Scope
         
         sourceComponent: PanelWindow { // Window
             id: panelWindow
-            visible: GlobalStates.sidebarLeftOpen
+
+            // The window can't animate its own appearance, so it stays mapped
+            // while the panel inside slides and fades, and unmaps once that has
+            // finished. Before this the sidebar simply blinked into existence.
+            property real reveal: GlobalStates.sidebarLeftOpen ? 1 : 0
+            Behavior on reveal {
+                animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+            }
+            visible: panelWindow.reveal > 0.001
             
             property bool extend: false
 
@@ -182,6 +190,11 @@ Scope { // Scope
                 border.color: Appearance.colors.colLayer0Border
                 radius: Appearance.rounding.screenRounding - Appearance.sizes.hyprlandGapsOut + 1
 
+                // A short slide from the edge it lives on, not a full-width one:
+                // travelling the whole width reads as slow however fast it is.
+                opacity: panelWindow.reveal
+                transform: Translate { x: (panelWindow.reveal - 1) * 36 }
+
                 Behavior on width {
                     // Off while dragging: an eased width lags the pointer, and a
                     // handle that doesn't sit under your finger feels broken.
@@ -242,15 +255,18 @@ Scope { // Scope
                 }
                 onDoubleClicked: panelWindow.resetSidebarWidth()
 
-                // A grip that shows up when you're near it, so the edge is
-                // discoverable without drawing a permanent seam.
+                // Always drawn, faintly. A handle you can only find by guessing
+                // where to put the pointer is one most people never find.
                 Rectangle {
                     anchors.centerIn: parent
                     width: 3
-                    height: 36
+                    height: resizeHandle.containsMouse || resizeHandle.pressed ? 36 : 22
                     radius: Appearance.rounding.full
                     color: Appearance.colors.colOnLayer0
-                    opacity: resizeHandle.pressed ? 0.55 : (resizeHandle.containsMouse ? 0.35 : 0)
+                    opacity: resizeHandle.pressed ? 0.55 : (resizeHandle.containsMouse ? 0.4 : 0.16)
+                    Behavior on height {
+                        animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+                    }
                     Behavior on opacity {
                         animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
                     }

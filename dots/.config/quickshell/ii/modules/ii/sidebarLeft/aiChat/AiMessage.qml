@@ -46,7 +46,11 @@ Item {
     // An event marker rather than something someone said: no author, no body,
     // no controls — just the hairline saying what changed and where.
     readonly property bool isDivider: (messageData?.dividerText ?? "").length > 0
-    readonly property bool hovered: !root.isDivider && (hoverArea.containsMouse || actionRowHover.containsMouse)
+    // A HoverHandler rather than a MouseArea underneath: the controls are Qt
+    // Quick Controls, they accept hover themselves, and a MouseArea stacked below
+    // them stops seeing the pointer the moment it reaches a button. Which meant
+    // the row vanished exactly as you went to click something in it.
+    readonly property bool hovered: !root.isDivider && hoverHandler.hovered
 
     // A wide sidebar shouldn't stretch prose to the full window; long lines are
     // hard to track. Code and tables are exempt — they own their own width.
@@ -125,11 +129,10 @@ Item {
         }
     }
 
-    MouseArea {
-        id: hoverArea
-        anchors.fill: columnLayout
-        acceptedButtons: Qt.NoButton
-        hoverEnabled: true
+    HoverHandler {
+        id: hoverHandler
+        // Covers the whole message including the revealed row, and keeps
+        // reporting while the pointer is over a control inside it.
     }
 
     ColumnLayout {
@@ -441,25 +444,22 @@ Item {
 
         Item { // Actions, revealed on hover
             Layout.fillWidth: true
-            implicitHeight: root.hovered || root.editing ? actionRow.implicitHeight : 0
+            // The strip is always there, only its contents fade. Collapsing it
+            // meant there was nothing to aim at: the buttons appeared under the
+            // pointer only while the pointer was on the message above them, so
+            // moving down to click one was a race against the row disappearing.
+            // Reserving it also stops the list shifting as the pointer crosses it.
+            implicitHeight: actionRow.implicitHeight
             clip: true
-
-            Behavior on implicitHeight {
-                animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
-            }
-
-            MouseArea {
-                id: actionRowHover
-                anchors.fill: parent
-                acceptedButtons: Qt.NoButton
-                hoverEnabled: true
-            }
 
             RowLayout {
                 id: actionRow
                 anchors.right: root.isUser ? parent.right : undefined
                 anchors.left: root.isUser ? undefined : parent.left
                 opacity: root.hovered || root.editing ? 1 : 0
+                // A transparent button is still a button as far as the mouse is
+                // concerned; without this you could click one you couldn't see.
+                enabled: root.hovered || root.editing
                 spacing: 2
 
                 Behavior on opacity {

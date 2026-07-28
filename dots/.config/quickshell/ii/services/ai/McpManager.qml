@@ -21,6 +21,7 @@ Item {
     signal callFinished(string requestKey, bool ok, string text)
 
     readonly property int readyCount: root.servers.filter(s => s.ready).length
+    readonly property int failedCount: root.servers.filter(s => s.status === "failed").length
     readonly property int toolCount: root.servers.reduce((n, s) => n + (s.tools?.length ?? 0), 0)
 
     // Tool name as the model sees it: server__tool. Two underscores because a
