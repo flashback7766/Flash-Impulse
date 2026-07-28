@@ -1,10 +1,13 @@
 pragma ComponentBehavior: Bound
 
+import qs
 import qs.services
 import qs.modules.common
 import qs.modules.common.widgets
 import QtQuick
 import QtQuick.Layouts
+import Quickshell
+import "suggestionPool.js" as SuggestionPool
 
 /**
  * What to ask, on an empty chat.
@@ -21,28 +24,48 @@ ColumnLayout {
 
     spacing: 6
 
-    readonly property var suggestions: [
-        {
-            icon: "monitor",
-            label: Translation.tr("Set up my second monitor"),
-            prompt: Translation.tr("Look at my monitor setup and help me configure the second display properly.")
-        },
-        {
-            icon: "battery_alert",
-            label: Translation.tr("What's draining my battery?"),
-            prompt: Translation.tr("Check what's using the most power on this laptop right now and tell me what to do about it.")
-        },
-        {
-            icon: "storage",
-            label: Translation.tr("What's eating my disk space?"),
-            prompt: Translation.tr("Find what's taking up the most disk space on this machine and summarise it.")
-        },
-        {
-            icon: "volume_off",
-            label: Translation.tr("My audio stopped working"),
-            prompt: Translation.tr("My sound stopped working. Check the audio stack and help me fix it.")
+    // What the machine is currently in a position to complain about. Read from
+    // state the shell already keeps, so opening an empty chat costs nothing.
+    function currentContext() {
+        const hour = new Date().getHours();
+        const windows = HyprlandData.windowList?.length ?? 0;
+        return {
+            batteryLow: (Battery.available ?? false) && (Battery.isLow ?? false) && !(Battery.isCharging ?? false),
+            batteryCharging: (Battery.available ?? false) && (Battery.isCharging ?? false),
+            memoryHigh: (ResourceUsage.memoryUsedPercentage ?? 0) > 0.85,
+            swapUsed: (ResourceUsage.swapUsedPercentage ?? 0) > 0.15,
+            updatesPending: (Updates.available ?? false) && (Updates.count ?? 0) > 0,
+            multiMonitor: (Quickshell.screens?.length ?? 1) > 1,
+            audioMuted: Audio.sink?.audio?.muted ?? false,
+            networkDown: !(Network.wifi || Network.ethernet),
+            manyWindows: windows > 12,
+            morning: hour >= 5 && hour < 11,
+            night: hour >= 22 || hour < 5
+        };
+    }
+
+    // Re-rolled whenever the empty chat comes back into view, not on every
+    // binding change — a set that reshuffled under the pointer would be worse
+    // than one that never changes.
+    property var suggestions: []
+    function reroll() {
+        root.suggestions = SuggestionPool.pick(root.currentContext(), 4);
+    }
+    Component.onCompleted: root.reroll()
+
+    // Re-rolled when the sidebar comes back, and when a new chat clears the
+    // board. Not on every binding change: a set that reshuffled under the
+    // pointer would be worse than one that never changes.
+    Connections {
+        target: GlobalStates
+        function onSidebarLeftOpenChanged() {
+            if (GlobalStates.sidebarLeftOpen) root.reroll();
         }
-    ]
+    }
+    Connections {
+        target: Ai
+        function onChatOpened() { root.reroll(); }
+    }
 
     Repeater {
         model: root.suggestions
