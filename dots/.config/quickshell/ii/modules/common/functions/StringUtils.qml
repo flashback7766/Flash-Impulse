@@ -113,9 +113,107 @@ Singleton {
                 continue;
             }
             const parts = splitQuoteRuns(blocks[i].content);
-            for (let j = 0; j < parts.length; j++) result.push(parts[j]);
+            for (let j = 0; j < parts.length; j++) {
+                if (parts[j].type !== "text") {
+                    result.push(parts[j]);
+                    continue;
+                }
+                const tables = splitTableRuns(parts[j].content);
+                for (let k = 0; k < tables.length; k++) result.push(tables[k]);
+            }
         }
         return result;
+    }
+
+    /**
+     * Pull GFM tables out into their own blocks, parsed into header/rows.
+     *
+     * Qt renders a markdown table, but as an unstyled grid with no way to give
+     * the header weight, alternate row shading, or scroll a wide one — in a
+     * sidebar that's the difference between a comparison you can read and a
+     * squashed column of fragments.
+     */
+    function splitTableRuns(text) {
+        if (!text || text.indexOf("|") === -1) return [{ type: "text", content: text }];
+        const lines = text.split("\n");
+        const out = [];
+        let buffer = [];
+
+        const flushText = () => {
+            if (buffer.length === 0) return;
+            const content = buffer.join("\n");
+            if (content.trim().length > 0) out.push({ type: "text", content: content });
+            buffer = [];
+        };
+
+        for (let i = 0; i < lines.length; i++) {
+            // A table is a header row immediately followed by a delimiter row.
+            // Requiring both keeps ordinary prose containing a pipe out of here.
+            if (isTableRow(lines[i]) && i + 1 < lines.length && isTableDelimiter(lines[i + 1])) {
+                flushText();
+                const header = splitTableRow(lines[i]);
+                const aligns = splitTableRow(lines[i + 1]).map(cellAlignment);
+                const rows = [];
+                let j = i + 2;
+                while (j < lines.length && isTableRow(lines[j])) {
+                    rows.push(splitTableRow(lines[j]));
+                    j++;
+                }
+                out.push({
+                    type: "table",
+                    content: lines.slice(i, j).join("\n"),
+                    header: header,
+                    aligns: aligns,
+                    rows: rows
+                });
+                i = j - 1;
+                continue;
+            }
+            buffer.push(lines[i]);
+        }
+        flushText();
+        return out.length > 0 ? out : [{ type: "text", content: text }];
+    }
+
+    function isTableRow(line) {
+        return line.indexOf("|") !== -1 && line.trim().length > 0;
+    }
+
+    function isTableDelimiter(line) {
+        return /^\s*\|?(\s*:?-+:?\s*\|)*\s*:?-+:?\s*\|?\s*$/.test(line) && line.indexOf("-") !== -1;
+    }
+
+    function splitTableRow(line) {
+        let t = line.trim();
+        if (t.charAt(0) === "|") t = t.slice(1);
+        if (t.charAt(t.length - 1) === "|") t = t.slice(0, -1);
+        const cells = [];
+        let cur = "";
+        // Hand-scanned rather than split(): a cell may contain an escaped \| and
+        // the engine can't be relied on for lookbehind.
+        for (let i = 0; i < t.length; i++) {
+            const ch = t.charAt(i);
+            if (ch === "\\" && t.charAt(i + 1) === "|") {
+                cur += "|";
+                i++;
+            } else if (ch === "|") {
+                cells.push(cur.trim());
+                cur = "";
+            } else {
+                cur += ch;
+            }
+        }
+        cells.push(cur.trim());
+        return cells;
+    }
+
+    function cellAlignment(spec) {
+        const s = (spec ?? "").trim();
+        const left = s.charAt(0) === ":";
+        const right = s.charAt(s.length - 1) === ":";
+        if (left && right) return "center";
+        if (right) return "right";
+        return "left";
     }
 
     function splitQuoteRuns(text) {
@@ -146,9 +244,41 @@ Singleton {
         return out.length > 0 ? out : [{ type: "text", content: text }];
     }
 
+    /**
+     * Split a fence's info string into a language and, where the writer supplied
+     * one, a file name. Models label snippets every which way — ```qml:path/File.qml,
+     * ```js app.js, ```python title="setup.py" — and a named file is worth showing
+     * in the header and reusing when saving, so all three forms are accepted.
+     * @returns {{lang: string, filename: string}}
+     */
+    function parseCodeInfo(info) {
+        const trimmed = (info ?? "").trim();
+        if (trimmed.length === 0) return { lang: "", filename: "" };
+
+        const titled = trimmed.match(/title\s*=\s*"([^"]+)"|title\s*=\s*'([^']+)'/);
+        if (titled) {
+            return { lang: trimmed.split(/[\s:]/)[0] ?? "", filename: titled[1] ?? titled[2] ?? "" };
+        }
+
+        const colon = trimmed.indexOf(":");
+        if (colon > 0) {
+            return { lang: trimmed.slice(0, colon), filename: trimmed.slice(colon + 1).trim() };
+        }
+
+        const parts = trimmed.split(/\s+/);
+        // A bare second word is only a file name if it looks like one; "js copy"
+        // and "bash {highlight}" are not paths.
+        if (parts.length > 1 && /[./]/.test(parts[1])) {
+            return { lang: parts[0], filename: parts[1] };
+        }
+        return { lang: parts[0], filename: "" };
+    }
+
     function splitMarkdownBlocks(markdown) {
-        // Two alternatives: with-language-then-newline, or one-liner with no language.
-        const regex = /```(\w+)\n([\s\S]*?)```|```([\s\S]*?)```/g;
+        // Two alternatives: with-info-string-then-newline, or one-liner with none.
+        // The info string is anything up to the newline so that a labelled file
+        // name survives to parseCodeInfo, not just a bare language word.
+        const regex = /```([^\n`]*)\n([\s\S]*?)```|```([\s\S]*?)```/g;
         /**
          * @type {{type: "text" | "code"; content: string; lang: string | undefined; completed: boolean | undefined}[]}
          */
@@ -165,12 +295,13 @@ Singleton {
                     });
                 }
             }
-            const lang = match[1] || "";
+            const info = parseCodeInfo(match[1] || "");
             const content = match[2] !== undefined ? match[2] : (match[3] || "");
             if (content.trim()) {
                 result.push({
                     type: "code",
-                    lang,
+                    lang: info.lang,
+                    filename: info.filename,
                     content,
                     completed: true
                 });
@@ -188,12 +319,12 @@ Singleton {
                         content: beforeCode
                     });
                 }
-                // Try to detect language after ```
-                const codeLangMatch = text.slice(codeStart + 3).match(/^(\w+)?\n/);
-                let lang = "";
+                // Try to detect the info string after ```
+                const codeLangMatch = text.slice(codeStart + 3).match(/^([^\n`]*)\n/);
+                let info = { lang: "", filename: "" };
                 let codeContentStart = codeStart + 3;
                 if (codeLangMatch) {
-                    lang = codeLangMatch[1] || "";
+                    info = parseCodeInfo(codeLangMatch[1] || "");
                     codeContentStart += codeLangMatch[0].length;
                 } else if (text[codeStart + 3] === '\n') {
                     codeContentStart += 1;
@@ -202,7 +333,8 @@ Singleton {
                 if (codeContent.trim()) {
                     result.push({
                         type: "code",
-                        lang,
+                        lang: info.lang,
+                        filename: info.filename,
                         content: codeContent,
                         completed: false
                     });

@@ -57,6 +57,12 @@ Singleton {
         if (requester.running) {
             requester.running = false;
         }
+        // A command still awaiting approval belongs to the turn just stopped;
+        // leaving its buttons live would run it long after the user said no.
+        if (requester.message?.functionPending) {
+            requester.message.functionPending = false;
+            requester.message.commandState = "rejected";
+        }
         // Mark current message as done
         if (requester.message && !requester.message.done) {
             if (requester.message.content.length === 0) {
@@ -75,8 +81,35 @@ Singleton {
             // QML/JS doesn't support replaceAll, so use split/join
             prompt = prompt.split(key).join(root.promptSubstitutions[key]);
         }
-        return prompt;
+        // Appended by the shell rather than living in the editable prompt: these
+        // are facts about *this* machine, and they have to survive the user
+        // rewriting their prompt — getting them wrong costs a round of commands
+        // that edit the wrong file or change something already set.
+        return prompt + "\n\n" + root.desktopRules;
     }
+
+    readonly property string desktopRules: `
+## How this desktop is configured (authoritative — don't guess, don't probe for it)
+
+Hyprland here is configured in **Lua**, not hyprlang. There is no \`hyprland.conf\`.
+- \`~/.config/hypr/hyprland.lua\` only sources other files. Never edit it.
+- \`~/.config/hypr/hyprland/*.lua\` are shipped defaults, replaced on every update. Never edit them.
+- \`~/.config/hypr/custom/*.lua\` (\`env\`, \`execs\`, \`general\`, \`keybinds\`, \`rules\`, \`variables\`) and \`~/.config/hypr/monitors.lua\` are the user's. **Edit these.** They load after the defaults, so adding a line here overrides the shipped value — you never need to touch the shipped file to change something.
+- Syntax is \`hl.keyword{...}\`, e.g. \`hl.monitor({ output = "DP-1", mode = "1920x1080@144", position = "1920x0", scale = 1 })\`. Match the style already in the file; do not write hyprlang lines into a Lua file.
+- \`hyprctl keyword ...\` and \`hyprctl eval '<lua>'\` both change the **running session only** and are lost on reload. Use them to try something, then persist it by **editing the Lua file** — say which file you changed. Nothing in hyprctl writes config to disk.
+- Apply config edits with \`hyprctl reload\`. Never log out or restart the compositor for something that reloads.
+
+The shell (Quickshell config "ii"):
+- Read its settings with \`get_shell_config\` and change them with \`set_shell_config\`. Do not hand-edit \`~/.config/illogical-impulse/config.json\` — the shell owns that file and will overwrite you.
+- Its QML lives in \`~/.config/quickshell/ii\`, which is often a deployed copy of a dotfiles repo. Check for one before editing there, or the change is lost on the next deploy.
+- Never kill or restart the shell to apply something that applies live.
+
+## Don't waste turns
+- Read the current state first (\`hyprctl monitors\`, \`hyprctl getoption\`, \`get_shell_config\`) and skip the change entirely if it already matches what was asked for.
+- One command per step, and read its output before deciding the next one.
+- Never re-run a command that already succeeded, and never repeat a read just to confirm it.
+- Every command is shown to the user for approval before it runs, so combining unrelated work into one long chain gets the whole thing rejected. Keep each command to one purpose.
+`.trim()
     // property var messages: []
     property var messageIDs: []
     property var messageByID: ({})
@@ -1116,7 +1149,9 @@ Singleton {
             if (exitCode === 0) {
                 try {
                     const response = JSON.parse(backgroundMemoryProc.buffer);
-                    const newSummary = response.candidates[0]?.content?.parts[0]?.text;
+                    // A blocked or empty candidate has no parts at all, and this
+                    // runs in the background where a thrown error is just log noise.
+                    const newSummary = response.candidates?.[0]?.content?.parts?.[0]?.text;
                     if (newSummary && newSummary.length > 0) {
                         const fileContent = CF.StringUtils.shellSingleQuoteEscape(newSummary.trim());
                         const safeChatName = CF.StringUtils.shellSingleQuoteEscape(backgroundMemoryProc.chatName);
@@ -1571,18 +1606,6 @@ Singleton {
                 if (msg.reasoningEndTime === 0 && cleanContent.length > 0) msg.reasoningEndTime = Date.now();
             }
 
-            if (msg.contentBeforeCommand && msg.contentBeforeCommand.length > 0) {
-                // Check if the model has started sending text after the tool call sequence
-                const lastMarkerPos = msg.rawContent.lastIndexOf("]]");
-                const hasNewContent = lastMarkerPos !== -1 && msg.rawContent.length > lastMarkerPos + 5;
-                
-                if (hasNewContent) {
-                    msg.contentBeforeCommand = ""; // Resume normal flushing
-                } else {
-                    return; // Still in command mode / waiting for model to actually start text
-                }
-            }
-
             if (msg.content === cleanContent) return;
 
             const len = cleanContent.length;
@@ -1663,6 +1686,7 @@ Singleton {
     function rejectCommand(message: AiMessageData) {
         if (!message.functionPending) return;
         message.functionPending = false;
+        message.commandState = "rejected";
         addFunctionOutputMessage(message.functionName, Translation.tr("Command rejected by user"));
         requester.makeRequest();
     }
@@ -1670,6 +1694,7 @@ Singleton {
     function approveCommand(message: AiMessageData) {
         if (!message.functionPending) return;
         message.functionPending = false;
+        message.commandState = "running";
 
         // Instead of creating a separate function output message,
         // we'll track output directly on the assistant message
@@ -1722,12 +1747,11 @@ Singleton {
                 const outputContent = `[[ Output of ${commandExecutionProc.outputMessage.functionName} ]]\n\n${commandExecutionProc.collectedOutput}`;
                 commandExecutionProc.outputMessage.rawContent = outputContent;
                 commandExecutionProc.outputMessage.content = outputContent;
-                // Update the UI inline: show $ command + last 3 lines of output
-                const cmdName = commandExecutionProc.shellCommand;
-                const lines = commandExecutionProc.collectedOutput.trim().split("\n");
-                const lastLines = lines.slice(-3).join("\n");
-                const baseContent = commandExecutionProc.assistantMessage.contentBeforeCommand ?? commandExecutionProc.assistantMessage.content;
-                commandExecutionProc.assistantMessage.content = baseContent + `\n\n\`\`\`command\n$ ${cmdName}\n${lastLines}\n\`\`\``;
+                // Live tail in the block. The full output still goes to the model.
+                if (commandExecutionProc.assistantMessage) {
+                    commandExecutionProc.assistantMessage.commandOutput =
+                        commandExecutionProc.collectedOutput.trim().split("\n").slice(-8).join("\n");
+                }
             }
         }
         onExited: (exitCode, exitStatus) => {
@@ -1737,12 +1761,10 @@ Singleton {
                 commandExecutionProc.outputMessage.functionResponse += `[[ Command exited with code ${exitCode} (${exitStatus}) ]]\n`;
             }
             if (commandExecutionProc.assistantMessage) {
-                const cmdName = commandExecutionProc.shellCommand;
-                const lines = commandExecutionProc.collectedOutput.trim().split("\n");
-                const lastLines = lines.slice(-5).join("\n");
-                const exitLabel = exitCode === 0 ? "✓" : `✗ exit ${exitCode}`;
-                const baseContent = commandExecutionProc.assistantMessage.contentBeforeCommand ?? commandExecutionProc.assistantMessage.content;
-                commandExecutionProc.assistantMessage.content = baseContent + `\n\n\`\`\`command\n$ ${cmdName} ${exitLabel}\n${lastLines}\n\`\`\``;
+                const msg = commandExecutionProc.assistantMessage;
+                msg.commandOutput = commandExecutionProc.collectedOutput.trim().split("\n").slice(-12).join("\n");
+                msg.commandExitCode = exitCode;
+                msg.commandState = exitCode === 0 ? "done" : "failed";
             }
             commandExecutionProc.collectedOutput = "";
             if (root.aborted) { root.aborted = false; return; }
@@ -1789,8 +1811,8 @@ Singleton {
                 requester.makeRequest();
                 return;
             }
-            // Notify user a search is happening
-            message.content += `\n\n\`\`\`command\n🔍 Searching: ${query}\n\`\`\``;
+            // Show the query as a chip, the same way provider-side search is shown.
+            message.searchQueries = [...message.searchQueries, query];
             // Use xdg-open or a simple curl-based DDG search summary
             webSearchProc.query = query;
             webSearchProc.message = message;
@@ -1817,10 +1839,11 @@ Singleton {
                 addFunctionOutputMessage(name, Translation.tr("Invalid arguments. Must provide `command`."));
                 return;
             }
-            // Save content state before command for clean inline updates
-            message.contentBeforeCommand = message.content;
-            // Show command inline in the UI only (content), not rawContent
-            message.content += `\n\n\`\`\`command\n$ ${args.command}\n...\n\`\`\``;
+            message.commandText = args.command;
+            message.commandOutput = "";
+            message.commandExitCode = 0;
+            message.commandVerdict = "";
+            message.commandState = "pending";
             message.functionPending = true;
             message.functionName = name; // Ensure functionName is set for UI usage
 
@@ -1828,11 +1851,13 @@ Singleton {
             const geminiKey = root.apiKeys ? (root.apiKeys["gemini"] ?? "") : "";
             commandSafety.evaluate(args.command, geminiKey,
                 reason => { // allow
-                    message.content += `\n\n🛡️ *${reason}*`;
+                    message.commandVerdict = reason;
+                    message.commandAutoApproved = true;
                     root.approveCommand(message);
                 },
                 reason => { // confirm — leave the Approve/Reject buttons up for the user
-                    message.content += "\n\n" + Translation.tr("⚠️ **%1** — review before approving.").arg(reason);
+                    message.commandVerdict = reason;
+                    message.commandAutoApproved = false;
                 });
         } else {
             root.addMessage(Translation.tr("Unknown function call: %1").arg(name), root.interfaceRole);
@@ -2099,7 +2124,15 @@ Singleton {
         function current(): string {
             return `${root.currentChatId}\t${root.currentChatDisplayTitle()}`;
         }
+
+        function chats(): string {
+            root.chatListRequested();
+            return "ok";
+        }
     }
+
+    // Raised by `ipc call ai chats`; the sidebar's history sheet listens for it.
+    signal chatListRequested
 
     function savePersistentState(key, value) {
         if (!Persistent.states || !Persistent.states.ai) return;

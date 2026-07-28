@@ -39,7 +39,20 @@ QtObject {
     property var functionCall
     property string functionResponse
     property bool functionPending: false
-    property string contentBeforeCommand
     property var functionCallParts
     property bool visibleToUser: true
+
+    // Shell-command lifecycle, for the command block.
+    //
+    // This used to be spliced into `content` as a ```command fence and read back
+    // out by sniffing the rendered text: "did the body contain a ✓". So a command
+    // whose own output contained a check mark reported success, one awaiting
+    // approval looked identical to one already running, and every line of stdout
+    // re-parsed the entire message's markdown. State belongs here.
+    property string commandState: "" // "" | "pending" | "running" | "done" | "failed" | "rejected"
+    property string commandText      // exactly what will run, so the user approves what they read
+    property string commandOutput    // tail of the output, shown in the block
+    property int commandExitCode: 0
+    property string commandVerdict   // why the safety pipeline allowed it or asked for review
+    property bool commandAutoApproved: false
 }

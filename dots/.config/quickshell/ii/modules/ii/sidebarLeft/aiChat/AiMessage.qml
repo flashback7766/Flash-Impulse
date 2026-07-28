@@ -58,14 +58,16 @@ Item {
             if (child["segmentContent"] === undefined) continue;
             const content = child["segmentContent"] ?? "";
             const lang = child["segmentLang"];
-            const isCmd = child["isCommandRequest"];
             if (child["isQuoteBlock"] === true) {
                 // The markers were stripped for rendering; put them back.
                 newContent += content.split("\n").map(line => "> " + line).join("\n");
             } else if (lang !== undefined) {
-                if (isCmd) continue;
                 const cleanCode = content.replace(/\n+$/, "");
-                newContent += "```" + (lang ?? "") + "\n" + cleanCode + "\n```";
+                // Keep a labelled file name on the fence; dropping it would lose
+                // which file the snippet belongs to on the next render.
+                const filename = child["segmentFilename"] ?? "";
+                const info = (lang ?? "") + (filename.length > 0 ? `:${filename}` : "");
+                newContent += "```" + info + "\n" + cleanCode + "\n```";
             } else {
                 newContent += content;
             }
@@ -308,6 +310,17 @@ Item {
                                 enableMouseSelection: root.enableMouseSelection
                                 segmentContent: modelData.content
                                 segmentLang: modelData.lang
+                                segmentFilename: modelData.filename ?? ""
+                                messageData: root.messageData
+                            } }
+                            DelegateChoice { roleValue: "table"; MessageTableBlock {
+                                editing: root.editing
+                                renderMarkdown: root.renderMarkdown
+                                enableMouseSelection: root.enableMouseSelection
+                                segmentContent: modelData.content
+                                header: modelData.header
+                                aligns: modelData.aligns
+                                rows: modelData.rows
                                 messageData: root.messageData
                             } }
                             DelegateChoice { roleValue: "quote"; MessageQuoteBlock {
@@ -329,6 +342,17 @@ Item {
                         }
                     }
                 }
+            }
+        }
+
+        Loader { // Shell command the model asked to run
+            Layout.fillWidth: true
+            Layout.maximumWidth: root.textColumnWidth
+            Layout.topMargin: 4
+            active: (root.messageData?.commandState ?? "").length > 0
+            visible: active
+            sourceComponent: MessageCommandBlock {
+                messageData: root.messageData
             }
         }
 
