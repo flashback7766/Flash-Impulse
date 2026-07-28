@@ -105,7 +105,17 @@ Item {
         root.enableMouseSelection = false;
     }
 
-    visible: messageData?.visibleToUser ?? true
+    // A finished turn with nothing in it — no text, no reasoning, no command, no
+    // attachment — is a tool call whose content was entirely internal markers.
+    // Showing it gives an author line and a hover toolbar attached to nothing.
+    readonly property bool isEmpty: (root.messageData?.done ?? false)
+        && (root.messageData?.content ?? "").length === 0
+        && !(root.messageData?.hasReasoning ?? false)
+        && !root.isDivider
+        && (root.messageData?.commandState ?? "").length === 0
+        && (root.messageData?.localFilePath ?? "").length === 0
+
+    visible: (messageData?.visibleToUser ?? true) && !root.isEmpty
     height: visible ? implicitHeight : 0
     opacity: visible ? 1 : 0
 

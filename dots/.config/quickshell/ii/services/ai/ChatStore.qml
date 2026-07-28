@@ -97,9 +97,23 @@ Item {
      * @returns the chat object, or null if it can't be read.
      */
     function load(id) {
+        // Two attempts: reading two different chats in a row can hand back the
+        // previous one's text, which the id check below catches. Clearing the path
+        // between attempts forces the view to drop what it was holding.
+        for (let attempt = 0; attempt < 2; attempt++) {
+            const chat = root._readChat(id);
+            if (chat) return chat;
+        }
+        return null;
+    }
+
+    function _readChat(id) {
         try {
+            // Reset first: assigning a path the view isn't already on is what
+            // triggers a fresh blocking read. reload() on top of a stale path can
+            // return the text that was already there.
+            chatReadFile.path = "";
             chatReadFile.path = root.chatPath(id);
-            chatReadFile.reload();
             const text = chatReadFile.text();
             if (!text || text.length < 2) return null;
             const chat = JSON.parse(text);

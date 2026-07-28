@@ -1979,6 +1979,14 @@ The shell (Quickshell config "ii"):
                     "visibleToUser": message.visibleToUser,
                     "dividerText": message.dividerText,
                     "dividerIcon": message.dividerIcon,
+                    // What ran, so a reopened chat still shows the commands rather
+                    // than a run of empty assistant turns. Output is capped: the
+                    // model already has the full text in its function response.
+                    "commandState": message.commandState,
+                    "commandText": message.commandText,
+                    "commandExitCode": message.commandExitCode,
+                    "commandVerdict": message.commandVerdict,
+                    "commandOutput": (message.commandOutput ?? "").slice(-2000),
                 })
             })
     }
@@ -2043,7 +2051,12 @@ The shell (Quickshell config "ii"):
     function loadChatById(id) {
         const chat = chatStore.load(id);
         if (!chat) {
-            root.addMessage(Translation.tr("Could not open that chat."), root.interfaceRole);
+            // Deliberately not addMessage(): that appends to whatever conversation
+            // is open and persists it, so a failed open wrote its own error message
+            // into the user's saved chat. And deliberately not remove(): a read can
+            // fail for reasons that have nothing to do with the file still being
+            // there, and deleting it would turn a bad read into lost history.
+            console.log("[AI] No readable chat for id:", id);
             return false;
         }
         root.clearMessages();
@@ -2108,6 +2121,15 @@ The shell (Quickshell config "ii"):
                 "visibleToUser": message.visibleToUser,
                 "dividerText": message.dividerText ?? "",
                 "dividerIcon": message.dividerIcon ?? "",
+                // A command that was still awaiting approval when the chat was
+                // saved is not resurrected as pending — the turn it belonged to is
+                // long over, so it reads as history.
+                "commandState": (message.commandState === "pending" || message.commandState === "running")
+                    ? "rejected" : (message.commandState ?? ""),
+                "commandText": message.commandText ?? "",
+                "commandExitCode": message.commandExitCode ?? 0,
+                "commandVerdict": message.commandVerdict ?? "",
+                "commandOutput": message.commandOutput ?? "",
             });
             // Restore Gemini thought signature data (dynamic props, set after creation)
             if (message.functionCallParts) root.messageByID[saveIds[i]].functionCallParts = message.functionCallParts;
