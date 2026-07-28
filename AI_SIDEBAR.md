@@ -167,19 +167,17 @@ Disables **syntax highlighting**, lowers **stream repaint frequency**, drops
 
 1. **Done** — Reasoning parsing and rendering (`ebae9497`, extended in `e0349700`)
 2. **Done** — Saves, autosave, chat list, session binding (`49151b29`, `a4e3eebe`)
-3. **Mostly done** — Message design, markdown, code blocks (`271dc5f8`, `4ea8991f`)
+3. **Done** — Message design, markdown, code blocks (`271dc5f8`, `4ea8991f`,
+   `9dcd61e0`, `f9a6f80e`)
 4. Modes, GUI settings, wizard, MCP
 5. Model catalogue, local models, branches
 6. Selection hotkey, polish, performance mode
 
-### Stage 3 — what's left
+### Carried into stage 4
 
-- Density toggle (spacious ↔ compact) in chat settings.
-- Dividers on events: model switch, context compaction, mode change.
 - Own-drawn provider icons instead of vendor brand files.
-- Streaming: queue a message typed while generating instead of aborting the
-  turn; animated dots while waiting for the first token; a dot on the bar
-  button when a background answer finishes.
+- The density toggle is `/density` and a persistent state; it wants a real
+  control once there's a settings surface to put it on.
 
 ### Testing
 
