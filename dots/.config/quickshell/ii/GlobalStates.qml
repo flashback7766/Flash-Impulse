@@ -21,7 +21,10 @@ Singleton {
     property bool overviewOpen: false
     property bool regionSelectorOpen: false
     property bool searchOpen: false
-    property bool screenLocked: false
+    // Held across reloads. As a plain property it reset to false whenever the
+    // config reloaded, which released the session lock — so editing any QML file
+    // while the screen was locked unlocked the machine.
+    property alias screenLocked: lockState.screenLocked
     property bool screenLockContainsCharacters: false
     property bool screenUnlockFailed: false
     property bool screenTranslatorOpen: false
@@ -30,6 +33,12 @@ Singleton {
     property bool superReleaseMightTrigger: true
     property bool wallpaperSelectorOpen: false
     property bool workspaceShowNumbers: false
+
+    PersistentProperties {
+        id: lockState
+        reloadableId: "globalLockState"
+        property bool screenLocked: false
+    }
 
     onSidebarRightOpenChanged: {
         if (GlobalStates.sidebarRightOpen) {
