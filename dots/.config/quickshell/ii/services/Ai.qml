@@ -2504,8 +2504,22 @@ The shell (Quickshell config "ii"):
      * losing a conversation to a crash or a restart is not acceptable, and the
      * write is a single small file.
      */
+    /**
+     * True once anything has actually been said. Interface lines — mode changes,
+     * command output, error notices — are commentary on a conversation, not one
+     * themselves; a chat holding nothing else is what you get from cycling a
+     * setting on a fresh tab, and it has no business in the history list.
+     */
+    readonly property bool currentChatHasConversation: {
+        for (let i = 0; i < root.messageIDs.length; i++) {
+            const role = root.messageByID[root.messageIDs[i]]?.role;
+            if (role === "user" || role === "assistant") return true;
+        }
+        return false;
+    }
+
     function persistCurrentChat() {
-        if (root.messageIDs.length === 0) {
+        if (!root.currentChatHasConversation) {
             // Nothing to keep. If the chat had already been written, drop the file
             // rather than leaving an empty husk in the list.
             if (root.currentChatId.length > 0) {

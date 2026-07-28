@@ -232,6 +232,10 @@ for path in glob.glob(os.path.join(sys.argv[1], "chat_*.json")):
     if not isinstance(chat, dict):
         continue
     messages = chat.get("messages") or []
+    # Same rule the shell applies before saving: interface notices alone are not
+    # a conversation. Chats written before that rule existed get dropped here.
+    if not any(m.get("role") in ("user", "assistant") for m in messages):
+        continue
     preview = ""
     for m in messages:
         if m.get("role") == "user":

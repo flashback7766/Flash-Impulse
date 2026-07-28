@@ -456,7 +456,9 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
         function open() {
             functionsPopup.close();
             var pos = modelPickerButton.mapToItem(root, 0, 0);
-            x = pos.x;
+            // Kept on screen: the button sits near the right edge, and a popup
+            // wider than the button used to hang off it.
+            x = Math.max(12, Math.min(pos.x, root.width - width - 12));
             y = pos.y - implicitHeight - 6;
             isOpen = true;
         }
@@ -490,7 +492,10 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
             }
         ]
 
-        width: 240
+        // Wide enough for the names it lists, capped by the sidebar. At a fixed
+        // 240 every model read "Gemini Flash-Lite / Online | Google's mo…" — the
+        // description elided away exactly where it started being useful.
+        width: Math.min(340, root.width - 24)
         readonly property real maxPopupHeight: 300
         readonly property real naturalHeight: modelPickerColumn.implicitHeight + 16
         implicitHeight: Math.min(naturalHeight, maxPopupHeight)
@@ -532,6 +537,18 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
             }
 
             // Scroll bar
+            // Says there's more below, rather than leaving the last row sliced in
+            // half against the popup's edge. Parented past the Flickable on
+            // purpose — declared as its child it becomes content and scrolls away
+            // with everything it's meant to be fading.
+            ScrollEdgeFade {
+                parent: modelPickerPopup
+                target: modelPickerFlickable
+                vertical: true
+                color: Appearance.colors.colLayer2Base
+                z: 9
+            }
+
             Rectangle {
                 id: modelPickerScrollbar
                 parent: modelPickerFlickable
