@@ -490,6 +490,40 @@ Item {
                     StyledToolTip { text: Translation.tr("Regenerate") }
                 }
 
+                // Which attempt you're looking at. Only there once there's more
+                // than one, so a single answer carries no chrome for a choice
+                // that doesn't exist.
+                RowLayout {
+                    visible: root.messageData?.hasVariants ?? false
+                    Layout.leftMargin: 2
+                    Layout.rightMargin: 2
+                    spacing: 0
+
+                    AiMessageControlButton {
+                        implicitWidth: 24
+                        buttonIcon: "chevron_left"
+                        enabled: (root.messageData?.variantIndex ?? 0) > 0
+                        onClicked: Ai.selectVariant(root.modelData, root.messageData.variantIndex - 1)
+                        StyledToolTip { text: Translation.tr("Previous answer") }
+                    }
+
+                    StyledText {
+                        Layout.alignment: Qt.AlignVCenter
+                        font.pixelSize: Appearance.font.pixelSize.smaller
+                        font.family: Appearance.font.family.monospace
+                        color: Appearance.colors.colSubtext
+                        text: `${(root.messageData?.variantIndex ?? 0) + 1}/${root.messageData?.variantCount ?? 1}`
+                    }
+
+                    AiMessageControlButton {
+                        implicitWidth: 24
+                        buttonIcon: "chevron_right"
+                        enabled: (root.messageData?.variantIndex ?? 0) < (root.messageData?.variantCount ?? 1) - 1
+                        onClicked: Ai.selectVariant(root.modelData, root.messageData.variantIndex + 1)
+                        StyledToolTip { text: Translation.tr("Next answer") }
+                    }
+                }
+
                 AiMessageControlButton {
                     id: editButton
                     activated: root.editing

@@ -110,6 +110,9 @@ Singleton {
         if (requester.retryPending) requester.retryPending = false;
         // Drop any deferred follow-up turn that handleFunctionCall queued mid-stream
         requester.dispatchAfterExit = false;
+        // A regenerate that never reached the network shouldn't leave its stored
+        // answers waiting to attach themselves to whatever asks next.
+        requester.pendingVariants = [];
         // Kill any running AI processes
         if (commandExecutionProc.running) {
             commandExecutionProc.running = false;
@@ -1868,6 +1871,9 @@ The shell (Quickshell config "ii"):
         // Set when handleFunctionCall wants to dispatch the follow-up turn but the
         // streaming process hasn't exited yet — drained in onExited.
         property bool dispatchAfterExit: false
+        // Earlier answers handed over by regenerateById, attached to the message
+        // this request is about to create.
+        property var pendingVariants: []
         property ApiStrategy currentStrategy
 
         function markDone() {
@@ -1976,7 +1982,10 @@ The shell (Quickshell config "ii"):
                     "content": "",
                     "rawContent": "",
                     "done": false,
+                    "variants": requester.pendingVariants ?? [],
+                    "variantIndex": 0,
                 });
+                requester.pendingVariants = [];
                 const id = idForMessage(requester.message);
                 // map-first so the delegate's `Ai.messageByID[id]` binding is non-null
                 // the instant the ScriptModel sees the new id (mutating a `var`'s
@@ -2208,6 +2217,42 @@ The shell (Quickshell config "ii"):
         root.pendingFilePath = CF.FileUtils.trimFileProtocol(filePath);
     }
 
+    function snapshotOf(message: AiMessageData) {
+        return {
+            "content": message.content,
+            "rawContent": message.rawContent,
+            "reasoning": message.reasoning,
+            "reasoningSeconds": message.reasoningSeconds,
+            "reasoningTokens": message.reasoningTokens,
+            "model": message.model,
+            "timestamp": message.timestamp,
+            "annotationSources": message.annotationSources,
+            "searchQueries": message.searchQueries
+        };
+    }
+
+    function applySnapshot(message: AiMessageData, snap) {
+        message.content = snap.content ?? "";
+        message.rawContent = snap.rawContent ?? "";
+        message.reasoning = snap.reasoning ?? "";
+        // The clock is stored as a duration, so fake a pair that reproduces it.
+        message.reasoningStartTime = (snap.reasoning ?? "").length > 0 ? 1 : 0;
+        message.reasoningEndTime = (snap.reasoning ?? "").length > 0
+            ? 1 + (snap.reasoningSeconds ?? 0) * 1000 : 0;
+        message.reasoningTokens = snap.reasoningTokens ?? 0;
+        message.model = snap.model ?? "";
+        message.timestamp = snap.timestamp ?? 0;
+        message.annotationSources = snap.annotationSources ?? [];
+        message.searchQueries = snap.searchQueries ?? [];
+    }
+
+    /**
+     * Regenerate an answer, keeping the one being replaced.
+     *
+     * Overwriting it meant the only way to compare two attempts was to remember
+     * the first, and the only way back was to ask again and hope. The previous
+     * answer becomes a variant and the message gains a 1/2 switcher.
+     */
     function regenerateById(id) {
         const messageIndex = root.messageIDs.indexOf(id);
         if (messageIndex === -1) return;
@@ -2219,10 +2264,36 @@ The shell (Quickshell config "ii"):
         if (requester.running && requester.message === message) {
             root.abortAll();
         }
-        // Remove all messages after this one in bulk
+
+        // Keep what's on screen, plus anything already stored, and drop the
+        // follow-up turns that were answers to the version being replaced.
+        const kept = [...(message.variants ?? [])];
+        kept.splice(message.variantIndex, 0, root.snapshotOf(message));
+
         const countToRemove = root.messageIDs.length - messageIndex;
         root.removeMessagesRange(messageIndex, countToRemove);
+        requester.pendingVariants = kept;
         requester.makeRequest();
+    }
+
+    /**
+     * Show a stored answer. The live one is swapped into the store as it leaves,
+     * so switching back and forth never loses either.
+     */
+    function selectVariant(id, index) {
+        const message = root.messageByID[id];
+        if (!message?.hasVariants) return;
+        const clamped = Math.max(0, Math.min(index, message.variantCount - 1));
+        if (clamped === message.variantIndex) return;
+
+        const store = [...message.variants];
+        // Put the live answer back where it came from, take the requested one out.
+        store.splice(message.variantIndex, 0, root.snapshotOf(message));
+        const incoming = store.splice(clamped, 1)[0];
+        root.applySnapshot(message, incoming);
+        message.variants = store;
+        message.variantIndex = clamped;
+        root.persistCurrentChat();
     }
 
     function createFunctionOutputMessage(name, output, includeOutputInChat = true) {
@@ -2478,6 +2549,8 @@ The shell (Quickshell config "ii"):
                     "commandExitCode": message.commandExitCode,
                     "commandVerdict": message.commandVerdict,
                     "commandOutput": (message.commandOutput ?? "").slice(-2000),
+                    "variants": message.variants,
+                    "variantIndex": message.variantIndex,
                 })
             })
     }
@@ -2636,6 +2709,8 @@ The shell (Quickshell config "ii"):
                 "commandExitCode": message.commandExitCode ?? 0,
                 "commandVerdict": message.commandVerdict ?? "",
                 "commandOutput": message.commandOutput ?? "",
+                "variants": message.variants ?? [],
+                "variantIndex": message.variantIndex ?? 0,
             });
             // Restore Gemini thought signature data (dynamic props, set after creation)
             if (message.functionCallParts) root.messageByID[saveIds[i]].functionCallParts = message.functionCallParts;

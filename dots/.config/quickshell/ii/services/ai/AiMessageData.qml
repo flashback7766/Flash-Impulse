@@ -42,6 +42,15 @@ QtObject {
     property var functionCallParts
     property bool visibleToUser: true
 
+    // Earlier answers to the same question, kept when you regenerate instead of
+    // being overwritten. Each entry is a plain snapshot — content, reasoning,
+    // which model wrote it — so switching between them is a field swap and needs
+    // nothing from the network.
+    property var variants: []
+    property int variantIndex: 0
+    readonly property int variantCount: (variants?.length ?? 0) + 1
+    readonly property bool hasVariants: variantCount > 1
+
     // Set on a message that marks an event rather than something anyone said —
     // the model was switched, the context was compacted. The UI draws it as a
     // labelled hairline in place of the usual author/body/controls.
