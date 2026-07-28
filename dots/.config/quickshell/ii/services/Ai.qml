@@ -2984,24 +2984,34 @@ The shell (Quickshell config "ii"):
     }
 
     /**
-     * Which company's model this is, for grouping in the picker. key_id is the
-     * closest thing to a provider the model definitions carry — models sharing a
-     * key are by definition the same provider — and a local model has no key at
-     * all, which is exactly what distinguishes it.
+     * Which company's model this is, for grouping in the picker.
+     *
+     * Order matters. Grouping started from "needs no key, therefore local",
+     * which put Claude Code under Local — it runs a CLI on this machine but the
+     * models are Anthropic's and the inference is not local at all. Not needing
+     * a key and running locally are separate facts about a model, and only the
+     * endpoint speaks to the second one.
      */
     function providerOfModel(id) {
         const model = root.models[id];
         if (!model) return Translation.tr("Other");
-        if (!model.requires_key) return Translation.tr("Local");
+        if (model.api_format === "claude-code") return "Claude Code";
+
         const names = {
             "gemini": "Google Gemini",
             "anthropic": "Anthropic",
             "openai": "OpenAI",
             "openrouter": "OpenRouter",
-            "mistral": "Mistral",
-            "claude-code": "Claude Code"
+            "mistral": "Mistral"
         };
-        return names[model.key_id] ?? (model.key_id ?? Translation.tr("Other"));
+        if ((model.key_id ?? "").length > 0) return names[model.key_id] ?? model.key_id;
+
+        const endpoint = model.endpoint ?? "";
+        if (endpoint.indexOf("localhost") !== -1 || endpoint.indexOf("127.0.0.1") !== -1
+            || endpoint.indexOf("://0.0.0.0") !== -1) {
+            return Translation.tr("Local");
+        }
+        return Translation.tr("Other");
     }
 
     function savePersistentState(key, value) {
