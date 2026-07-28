@@ -171,6 +171,22 @@ Item {
             }
         },
         {
+            name: "density",
+            description: Translation.tr("Message spacing: compact or spacious. Usage: /density compact"),
+            execute: args => {
+                const mode = (args[0] ?? "").toLowerCase();
+                if (mode === "compact") Ai.setCompactMessages(true);
+                else if (mode === "spacious") Ai.setCompactMessages(false);
+                else if (mode.length === 0) Ai.setCompactMessages(!Ai.compactMessages);
+                else {
+                    Ai.addMessage(Translation.tr("Usage: %1density [compact|spacious]").arg(root.commandPrefix), Ai.interfaceRole);
+                    return;
+                }
+                Ai.addDivider(Ai.compactMessages ? Translation.tr("Compact spacing")
+                    : Translation.tr("Spacious spacing"), "density_medium");
+            }
+        },
+        {
             name: "new",
             description: Translation.tr("Start a new chat (the current one stays in history)"),
             execute: () => {

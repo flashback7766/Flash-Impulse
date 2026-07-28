@@ -174,6 +174,11 @@ The shell (Quickshell config "ii"):
     }
     property var postResponseHook
     property real temperature: Persistent.states?.ai?.temperature ?? 0.5
+    property bool compactMessages: Persistent.states?.ai?.compactMessages ?? false
+
+    function setCompactMessages(enabled) {
+        root.savePersistentState("compactMessages", enabled);
+    }
 
     property bool promptCaching: Persistent.states?.ai?.promptCaching ?? true
     property bool functionsAutoConfirm: true

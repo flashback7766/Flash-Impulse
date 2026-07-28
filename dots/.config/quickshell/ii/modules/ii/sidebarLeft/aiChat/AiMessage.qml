@@ -26,8 +26,11 @@ Item {
     property var messageData
     property var messageInputField
 
-    property real messagePadding: 7
-    property real contentSpacing: 4
+    // Density is spacing only — type size stays put, since fitting more on
+    // screen shouldn't cost legibility.
+    readonly property bool compact: Ai.compactMessages
+    property real messagePadding: root.compact ? 5 : 7
+    property real contentSpacing: root.compact ? 2 : 4
 
     property bool enableMouseSelection: false
     property bool renderMarkdown: true
@@ -128,7 +131,7 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        anchors.topMargin: root.isContinuation ? 2 : 10
+        anchors.topMargin: root.isContinuation ? (root.compact ? 1 : 2) : (root.compact ? 5 : 10)
         spacing: root.contentSpacing
 
         ChatDivider { // Something about the conversation changed here
