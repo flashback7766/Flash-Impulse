@@ -1075,17 +1075,130 @@ The shell (Quickshell config "ii"):
         root.addMessage(Translation.tr("API key set for %1").arg(model.name), Ai.interfaceRole);
     }
 
+    /**
+     * Whether a key is set, and enough of it to tell two apart — never the key.
+     * It used to print the whole thing into the chat, which then went to disk in
+     * the autosave and into the context of the next summarisation call.
+     */
+    function maskKey(key) {
+        if (!key || key.length === 0) return "";
+        if (key.length <= 8) return "•".repeat(key.length);
+        return `${key.slice(0, 4)}${"•".repeat(6)}${key.slice(-4)}`;
+    }
+
     function printApiKey() {
         const model = models[currentModelId];
-        if (model.requires_key) {
-            const key = root.apiKeys[model.key_id];
-            if (key) {
-                root.addMessage(Translation.tr("API key:\n\n```txt\n%1\n```").arg(key), Ai.interfaceRole);
-            } else {
-                root.addMessage(Translation.tr("No API key set for %1").arg(model.name), Ai.interfaceRole);
-            }
-        } else {
+        if (!model.requires_key) {
             root.addMessage(Translation.tr("%1 does not require an API key").arg(model.name), Ai.interfaceRole);
+            return;
+        }
+        const key = root.apiKeys[model.key_id];
+        if (key) {
+            root.addMessage(Translation.tr("API key for %1 is set: `%2`\n\nIt lives in the system keyring; the shell never shows it in full.")
+                .arg(model.name).arg(root.maskKey(key)), Ai.interfaceRole);
+        } else {
+            root.addMessage(Translation.tr("No API key set for %1").arg(model.name), Ai.interfaceRole);
+        }
+    }
+
+    /**
+     * Distinct providers that take a key, for the settings panel. Derived from the
+     * model catalogue so a new model can't quietly introduce a provider the
+     * settings don't know about.
+     */
+    // Title-casing the id gives "Openai" and "Openrouter"; providers get to be
+    // spelled the way they spell themselves.
+    readonly property var providerNames: ({
+        "gemini": "Google Gemini",
+        "anthropic": "Anthropic",
+        "openai": "OpenAI",
+        "openrouter": "OpenRouter",
+        "mistral": "Mistral",
+        "deepseek": "DeepSeek",
+        "xai": "xAI"
+    })
+
+    readonly property var keyProviders: {
+        const seen = {};
+        const out = [];
+        for (const id in root.models) {
+            const model = root.models[id];
+            if (!model.requires_key || !model.key_id) continue;
+            if (seen[model.key_id]) continue;
+            seen[model.key_id] = true;
+            out.push({
+                id: model.key_id,
+                name: root.providerNames[model.key_id] ?? CF.StringUtils.toTitleCase(model.key_id),
+                keyGetLink: model.key_get_link ?? "",
+                exampleModel: id
+            });
+        }
+        return out;
+    }
+
+    function setProviderKey(keyId, key) {
+        if (!keyId) return;
+        KeyringStorage.setNestedField(["apiKeys", keyId], (key ?? "").trim());
+    }
+
+    // Raised by `ipc call ai settings` and the input-row button.
+    signal settingsRequested
+
+    /**
+     * Write the open conversation to a Markdown file in Downloads. Hidden
+     * messages (function calls and their output) are left out — the point is a
+     * readable transcript, not a replayable log.
+     */
+    function exportChat() {
+        const lines = [];
+        const title = root.currentChatDisplayTitle();
+        lines.push(`# ${title}`, "");
+        for (let i = 0; i < root.messageIDs.length; i++) {
+            const message = root.messageByID[root.messageIDs[i]];
+            if (!message || !message.visibleToUser) continue;
+            if ((message.dividerText ?? "").length > 0) {
+                lines.push(`---`, "", `*${message.dividerText}*`, "");
+                continue;
+            }
+            const body = (message.content ?? "").trim();
+            const command = (message.commandText ?? "").trim();
+            if (body.length === 0 && command.length === 0) continue;
+
+            const who = message.role === "user" ? (SystemInfo.username || "You")
+                : message.role === "assistant" ? (root.models[message.model]?.name ?? message.model ?? "Assistant")
+                : "Interface";
+            lines.push(`## ${who}`, "");
+            if ((message.reasoning ?? "").length > 0) {
+                lines.push("<details><summary>Reasoning</summary>", "", message.reasoning, "", "</details>", "");
+            }
+            if (body.length > 0) lines.push(body, "");
+            if (command.length > 0) {
+                lines.push("```bash", `$ ${command}`, "```", "");
+                if ((message.commandOutput ?? "").length > 0) {
+                    lines.push("```", message.commandOutput, "```", "");
+                }
+            }
+        }
+
+        const safeTitle = title.replace(/[^\p{L}\p{N} _-]/gu, "").trim().replace(/\s+/g, "-").slice(0, 60) || "chat";
+        const dir = CF.FileUtils.trimFileProtocol(Directories.downloads);
+        const target = `${dir}/${safeTitle}.md`;
+        chatExportProc.target = target;
+        chatExportProc.command = ["bash", "-c",
+            `printf '%s' '${CF.StringUtils.shellSingleQuoteEscape(lines.join("\n"))}' > '${CF.StringUtils.shellSingleQuoteEscape(target)}'`];
+        chatExportProc.running = true;
+    }
+
+    Process {
+        id: chatExportProc
+        property string target: ""
+        onExited: (exitCode) => {
+            if (exitCode === 0) {
+                Quickshell.execDetached(["notify-send", Translation.tr("Chat exported"),
+                    Translation.tr("Saved to %1").arg(chatExportProc.target), "-a", "Shell"]);
+            } else {
+                root.addMessage(Translation.tr("Could not export the chat (exit %1)").arg(exitCode), root.interfaceRole);
+            }
         }
     }
 
@@ -1093,27 +1206,6 @@ The shell (Quickshell config "ii"):
         root.addMessage(Translation.tr("Temperature: %1").arg(root.temperature), Ai.interfaceRole);
     }
 
-    function exportChat() {
-        const msgs = root.messageIDs.map(id => root.messageByID[id]).filter(m => m && m.visibleToUser);
-        if (msgs.length === 0) {
-            root.addMessage(Translation.tr("Nothing to export"), root.interfaceRole);
-            return;
-        }
-        let md = `# AI Chat Export\n**Date:** ${DateTime.time}, ${DateTime.collapsedCalendarFormat}\n**Model:** ${root.models[root.currentModelId]?.name ?? root.currentModelId}\n\n---\n\n`;
-        for (const m of msgs) {
-            if (m.role === root.interfaceRole) continue;
-            const label = m.role === "user" ? "**User**" : `**${root.models[m.model]?.name ?? "Assistant"}**`;
-            md += `### ${label}\n\n${m.content}\n\n---\n\n`;
-        }
-        const exportPath = `${CF.FileUtils.trimFileProtocol(Directories.downloads)}/ai-chat-${Date.now()}.md`;
-        chatExportFile.path = Qt.resolvedUrl(exportPath);
-        chatExportFile.setText(md);
-        root.addMessage(Translation.tr("Chat exported to `%1`").arg(exportPath), root.interfaceRole);
-    }
-
-    FileView {
-        id: chatExportFile
-    }
 
     /**
      * Start a new chat. The current one is already on disk (autosave), so this is
@@ -2342,6 +2434,22 @@ The shell (Quickshell config "ii"):
         function chats(): string {
             root.chatListRequested();
             return "ok";
+        }
+
+        function settings(): string {
+            root.settingsRequested();
+            return "ok";
+        }
+
+        function mode(name: string): string {
+            if (!name || name.length === 0) return root.permissionMode;
+            root.setPermissionMode(name.toLowerCase());
+            return root.permissionMode;
+        }
+
+        function export_(): string {
+            root.exportChat();
+            return "exporting";
         }
     }
 

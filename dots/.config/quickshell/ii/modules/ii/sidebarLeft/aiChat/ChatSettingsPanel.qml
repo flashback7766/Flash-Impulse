@@ -1,0 +1,482 @@
+pragma ComponentBehavior: Bound
+
+import qs.services
+import qs.modules.common
+import qs.modules.common.widgets
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+import Quickshell
+
+/**
+ * The settings you reach for mid-conversation, as a sheet over the chat.
+ *
+ * Everything here was previously a slash command and nothing else, which meant
+ * the only way to discover any of it was to already know it existed. The rare
+ * things — prompt editing, provider defaults — stay in the settings app.
+ *
+ * Keys are shown masked and only ever written to the system keyring; the panel
+ * never renders one in full, because the chat it sits over is autosaved to a
+ * plain file on disk.
+ */
+Item {
+    id: root
+
+    property bool shown: false
+    signal requestClose
+
+    function open() {
+        root.shown = true;
+    }
+
+    function close() {
+        root.shown = false;
+        root.requestClose();
+    }
+
+    visible: opacity > 0
+    enabled: root.shown
+    opacity: root.shown ? 1 : 0
+    Behavior on opacity {
+        animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+    }
+
+    Connections {
+        target: Ai
+        function onSettingsRequested() {
+            root.open();
+        }
+    }
+
+    Rectangle {
+        id: panel
+        anchors.fill: parent
+        // Opaque for the same reason the history sheet is: the layer colours are
+        // semi-transparent by design and this has to hide the conversation.
+        color: Appearance.m3colors.m3surfaceContainerLow
+        radius: Appearance.rounding.normal
+
+        transform: Translate {
+            y: root.shown ? 0 : 12
+            Behavior on y {
+                animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+            }
+        }
+
+        MouseArea { anchors.fill: parent } // Swallow clicks meant for the chat underneath
+
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 12
+            spacing: 8
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 4
+
+                StyledText {
+                    Layout.fillWidth: true
+                    font.pixelSize: Appearance.font.pixelSize.larger
+                    font.weight: Font.DemiBold
+                    color: Appearance.colors.colOnLayer1
+                    text: Translation.tr("Assistant settings")
+                }
+
+                RippleButton {
+                    implicitWidth: 34
+                    implicitHeight: 34
+                    buttonRadius: Appearance.rounding.full
+                    onClicked: root.close()
+                    contentItem: MaterialSymbol {
+                        horizontalAlignment: Text.AlignHCenter
+                        text: "close"
+                        iconSize: Appearance.font.pixelSize.larger
+                        color: Appearance.colors.colOnLayer1
+                    }
+                    StyledToolTip { text: Translation.tr("Close (Esc)") }
+                }
+            }
+
+            Flickable {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                contentWidth: width
+                contentHeight: settingsColumn.implicitHeight
+                boundsBehavior: Flickable.StopAtBounds
+
+                ScrollBar.vertical: ScrollBar {
+                    policy: ScrollBar.AsNeeded
+                    contentItem: Rectangle {
+                        implicitWidth: 5
+                        radius: Appearance.rounding.full
+                        color: Appearance.colors.colLayer2Active
+                    }
+                }
+
+                ColumnLayout {
+                    id: settingsColumn
+                    width: parent.width
+                    spacing: 6
+
+                    // ---- What it may do without asking ------------------------
+
+                    SectionLabel { text: Translation.tr("Permission") }
+
+                    Repeater {
+                        model: Ai.permissionModes
+
+                        delegate: Rectangle {
+                            id: modeRow
+                            required property var modelData
+                            readonly property bool active: modeRow.modelData.id === Ai.permissionMode
+
+                            Layout.fillWidth: true
+                            implicitHeight: modeColumn.implicitHeight + 16
+                            radius: Appearance.rounding.small
+                            color: modeRow.active ? Appearance.colors.colSecondaryContainer
+                                : modeArea.containsMouse ? Appearance.colors.colLayer2Hover
+                                : "transparent"
+
+                            Behavior on color {
+                                animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
+                            }
+
+                            MouseArea {
+                                id: modeArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: Ai.setPermissionMode(modeRow.modelData.id)
+                            }
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.margins: 8
+                                anchors.leftMargin: 10
+                                spacing: 10
+
+                                MaterialSymbol {
+                                    Layout.alignment: Qt.AlignVCenter
+                                    iconSize: Appearance.font.pixelSize.larger
+                                    color: modeRow.modelData.id === "yolo" ? Appearance.colors.colError
+                                        : modeRow.active ? Appearance.colors.colOnSecondaryContainer
+                                        : Appearance.colors.colSubtext
+                                    text: modeRow.modelData.icon
+                                }
+
+                                ColumnLayout {
+                                    id: modeColumn
+                                    Layout.fillWidth: true
+                                    spacing: 1
+
+                                    StyledText {
+                                        Layout.fillWidth: true
+                                        font.pixelSize: Appearance.font.pixelSize.small
+                                        font.weight: modeRow.active ? Font.DemiBold : Font.Normal
+                                        color: modeRow.active ? Appearance.colors.colOnSecondaryContainer
+                                            : Appearance.colors.colOnLayer1
+                                        text: modeRow.modelData.name
+                                    }
+                                    StyledText {
+                                        Layout.fillWidth: true
+                                        wrapMode: Text.Wrap
+                                        font.pixelSize: Appearance.font.pixelSize.smaller
+                                        color: Appearance.colors.colSubtext
+                                        text: modeRow.modelData.hint
+                                    }
+                                }
+
+                                MaterialSymbol {
+                                    visible: modeRow.active
+                                    iconSize: Appearance.font.pixelSize.large
+                                    color: Appearance.colors.colOnSecondaryContainer
+                                    text: "check"
+                                }
+                            }
+                        }
+                    }
+
+                    // ---- Temperature ------------------------------------------
+
+                    SectionLabel { text: Translation.tr("Temperature") }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Layout.leftMargin: 10
+                        Layout.rightMargin: 10
+                        spacing: 10
+
+                        StyledSlider {
+                            id: temperatureSlider
+                            Layout.fillWidth: true
+                            from: 0
+                            to: 2
+                            stepSize: 0.05
+                            value: Ai.temperature
+                            onMoved: Ai.setTemperature(temperatureSlider.value)
+                        }
+
+                        StyledText {
+                            Layout.preferredWidth: 34
+                            horizontalAlignment: Text.AlignRight
+                            font.family: Appearance.font.family.monospace
+                            font.pixelSize: Appearance.font.pixelSize.smaller
+                            color: Appearance.colors.colOnLayer1
+                            text: Ai.temperature.toFixed(2)
+                        }
+                    }
+
+                    StyledText {
+                        Layout.fillWidth: true
+                        Layout.leftMargin: 10
+                        Layout.rightMargin: 10
+                        wrapMode: Text.Wrap
+                        font.pixelSize: Appearance.font.pixelSize.smaller
+                        color: Appearance.colors.colSubtext
+                        text: Translation.tr("Low is literal and repeatable; high wanders. 0.5 suits most work.")
+                    }
+
+                    // ---- Display ----------------------------------------------
+
+                    SectionLabel { text: Translation.tr("Display") }
+
+                    ToggleRow {
+                        Layout.fillWidth: true
+                        label: Translation.tr("Compact spacing")
+                        hint: Translation.tr("Fits more of the conversation on screen. Text size is unchanged.")
+                        checked: Ai.compactMessages
+                        onToggled: enabled => Ai.setCompactMessages(enabled)
+                    }
+
+                    // ---- Keys --------------------------------------------------
+
+                    SectionLabel { text: Translation.tr("API keys") }
+
+                    StyledText {
+                        Layout.fillWidth: true
+                        Layout.leftMargin: 10
+                        Layout.rightMargin: 10
+                        Layout.bottomMargin: 2
+                        wrapMode: Text.Wrap
+                        font.pixelSize: Appearance.font.pixelSize.smaller
+                        color: Appearance.colors.colSubtext
+                        text: Translation.tr("Stored in the system keyring, never in a config file. Shown masked.")
+                    }
+
+                    Repeater {
+                        model: Ai.keyProviders
+
+                        delegate: ColumnLayout {
+                            id: providerRow
+                            required property var modelData
+                            readonly property string storedKey: Ai.apiKeys[providerRow.modelData.id] ?? ""
+                            readonly property bool hasKey: providerRow.storedKey.length > 0
+                            property bool editing: false
+
+                            Layout.fillWidth: true
+                            Layout.leftMargin: 10
+                            Layout.rightMargin: 10
+                            Layout.bottomMargin: 6
+                            spacing: 4
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 8
+
+                                MaterialSymbol {
+                                    iconSize: Appearance.font.pixelSize.normal
+                                    color: providerRow.hasKey ? Appearance.colors.colPrimary : Appearance.colors.colSubtext
+                                    text: providerRow.hasKey ? "key" : "key_off"
+                                }
+
+                                StyledText {
+                                    font.pixelSize: Appearance.font.pixelSize.small
+                                    font.weight: Font.DemiBold
+                                    color: Appearance.colors.colOnLayer1
+                                    text: providerRow.modelData.name
+                                }
+
+                                StyledText {
+                                    Layout.fillWidth: true
+                                    elide: Text.ElideRight
+                                    font.family: Appearance.font.family.monospace
+                                    font.pixelSize: Appearance.font.pixelSize.smaller
+                                    color: Appearance.colors.colSubtext
+                                    text: providerRow.hasKey ? Ai.maskKey(providerRow.storedKey)
+                                        : Translation.tr("not set")
+                                }
+
+                                AiMessageControlButton {
+                                    visible: providerRow.modelData.keyGetLink.length > 0 && !providerRow.hasKey
+                                    buttonIcon: "open_in_new"
+                                    onClicked: Qt.openUrlExternally(providerRow.modelData.keyGetLink)
+                                    StyledToolTip { text: Translation.tr("Where to get one") }
+                                }
+
+                                AiMessageControlButton {
+                                    activated: providerRow.editing
+                                    buttonIcon: providerRow.hasKey ? "edit" : "add"
+                                    onClicked: providerRow.editing = !providerRow.editing
+                                    StyledToolTip {
+                                        text: providerRow.hasKey ? Translation.tr("Replace key") : Translation.tr("Add key")
+                                    }
+                                }
+
+                                AiMessageControlButton {
+                                    id: clearKeyButton
+                                    property bool armed: false
+                                    visible: providerRow.hasKey
+                                    buttonIcon: clearKeyButton.armed ? "delete_forever" : "delete"
+                                    onClicked: {
+                                        if (clearKeyButton.armed) {
+                                            Ai.setProviderKey(providerRow.modelData.id, "");
+                                            clearKeyButton.armed = false;
+                                        } else {
+                                            clearKeyButton.armed = true;
+                                            clearKeyTimer.restart();
+                                        }
+                                    }
+                                    Timer {
+                                        id: clearKeyTimer
+                                        interval: 2000
+                                        onTriggered: clearKeyButton.armed = false
+                                    }
+                                    StyledToolTip {
+                                        text: clearKeyButton.armed ? Translation.tr("Click again to remove")
+                                            : Translation.tr("Remove key")
+                                    }
+                                }
+                            }
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                visible: providerRow.editing
+                                spacing: 6
+
+                                MaterialTextField {
+                                    id: keyField
+                                    Layout.fillWidth: true
+                                    // The field is write-only: it starts empty even when a
+                                    // key exists, so nothing puts the stored key on screen.
+                                    placeholderText: Translation.tr("Paste key, then press Enter")
+                                    echoMode: TextInput.Password
+                                    wrapMode: TextEdit.NoWrap
+                                    onAccepted: {
+                                        if (keyField.text.trim().length === 0) return;
+                                        Ai.setProviderKey(providerRow.modelData.id, keyField.text);
+                                        keyField.text = "";
+                                        providerRow.editing = false;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // ---- Chat --------------------------------------------------
+
+                    SectionLabel { text: Translation.tr("This chat") }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Layout.leftMargin: 10
+                        Layout.rightMargin: 10
+                        Layout.bottomMargin: 10
+                        spacing: 8
+
+                        RippleButton {
+                            implicitHeight: 32
+                            buttonRadius: Appearance.rounding.full
+                            colBackground: Appearance.colors.colLayer2
+                            colBackgroundHover: Appearance.colors.colLayer2Hover
+                            enabled: Ai.messageIDs.length > 0
+                            onClicked: {
+                                Ai.exportChat();
+                                root.close();
+                            }
+                            contentItem: RowLayout {
+                                spacing: 5
+                                MaterialSymbol {
+                                    iconSize: Appearance.font.pixelSize.normal
+                                    color: Appearance.colors.colOnLayer2
+                                    text: "download"
+                                }
+                                StyledText {
+                                    font.pixelSize: Appearance.font.pixelSize.smaller
+                                    color: Appearance.colors.colOnLayer2
+                                    text: Translation.tr("Export as Markdown")
+                                }
+                            }
+                        }
+
+                        Item { Layout.fillWidth: true }
+                    }
+                }
+            }
+        }
+    }
+
+    component SectionLabel: StyledText {
+        Layout.fillWidth: true
+        Layout.topMargin: 12
+        Layout.bottomMargin: 2
+        Layout.leftMargin: 10
+        font.pixelSize: Appearance.font.pixelSize.smallest
+        font.weight: Font.DemiBold
+        font.capitalization: Font.AllUppercase
+        color: Appearance.colors.colSubtext
+    }
+
+    component ToggleRow: Rectangle {
+        id: toggleRoot
+        property string label: ""
+        property string hint: ""
+        property bool checked: false
+        signal toggled(bool enabled)
+
+        implicitHeight: toggleColumn.implicitHeight + 16
+        radius: Appearance.rounding.small
+        color: toggleArea.containsMouse ? Appearance.colors.colLayer2Hover : "transparent"
+
+        MouseArea {
+            id: toggleArea
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: toggleRoot.toggled(!toggleRoot.checked)
+        }
+
+        RowLayout {
+            anchors.fill: parent
+            anchors.margins: 8
+            anchors.leftMargin: 10
+            spacing: 10
+
+            ColumnLayout {
+                id: toggleColumn
+                Layout.fillWidth: true
+                spacing: 1
+
+                StyledText {
+                    Layout.fillWidth: true
+                    font.pixelSize: Appearance.font.pixelSize.small
+                    color: Appearance.colors.colOnLayer1
+                    text: toggleRoot.label
+                }
+                StyledText {
+                    Layout.fillWidth: true
+                    visible: toggleRoot.hint.length > 0
+                    wrapMode: Text.Wrap
+                    font.pixelSize: Appearance.font.pixelSize.smaller
+                    color: Appearance.colors.colSubtext
+                    text: toggleRoot.hint
+                }
+            }
+
+            StyledSwitch {
+                checked: toggleRoot.checked
+                onToggled: toggleRoot.toggled(checked)
+            }
+        }
+    }
+}

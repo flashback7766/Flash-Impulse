@@ -33,6 +33,7 @@ Item {
     Keys.onPressed: event => {
         // Escape closes any open popup
         if (event.key === Qt.Key_Escape) {
+            if (chatSettingsPanel.shown) { chatSettingsPanel.close(); event.accepted = true; return; }
             if (chatListPanel.shown) { chatListPanel.close(); event.accepted = true; return; }
             if (modelPickerPopup.isOpen) { modelPickerPopup.close(); event.accepted = true; return; }
             if (functionsPopup.isOpen) { functionsPopup.close(); event.accepted = true; return; }
@@ -43,7 +44,7 @@ Item {
             event.accepted = true;
             return;
         }
-        if (chatListPanel.shown) return; // The panel owns the keyboard while it's up
+        if (chatListPanel.shown || chatSettingsPanel.shown) return; // A sheet owns the keyboard while it's up
         messageInputField.forceActiveFocus();
         if (event.modifiers === Qt.NoModifier) {
             if (event.key === Qt.Key_PageUp) {
@@ -126,6 +127,13 @@ Item {
                 else Ai.addMessage(Ai.permissionMode === "yolo"
                     ? Translation.tr("Yolo mode is ON. Disable with /yolo off")
                     : Translation.tr("Yolo mode is off. Enable with /yolo on (risky!)"), Ai.interfaceRole);
+            }
+        },
+        {
+            name: "settings",
+            description: Translation.tr("Open the assistant settings: permission mode, temperature, API keys, export"),
+            execute: () => {
+                chatSettingsPanel.open();
             }
         },
         {
@@ -380,6 +388,13 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
         id: chatListPanel
         anchors.fill: parent
         z: 900
+        onRequestClose: messageInputField.forceActiveFocus()
+    }
+
+    ChatSettingsPanel {
+        id: chatSettingsPanel
+        anchors.fill: parent
+        z: 901
         onRequestClose: messageInputField.forceActiveFocus()
     }
 
@@ -1688,6 +1703,24 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                 // First in the row: what the assistant is allowed to do without
                 // asking is the thing to read before pressing send.
                 PermissionModeChip {}
+
+                // Settings
+                RippleButton {
+                    id: settingsButton
+                    implicitWidth: 36
+                    implicitHeight: 36
+                    buttonRadius: 18
+                    colBackground: Appearance.colors.colLayer2
+                    colBackgroundHover: Appearance.colors.colLayer2Hover
+                    onClicked: chatSettingsPanel.open()
+                    StyledToolTip { text: Translation.tr("Assistant settings") }
+                    contentItem: MaterialSymbol {
+                        anchors.centerIn: parent
+                        text: "tune"
+                        iconSize: Appearance.font.pixelSize.large
+                        color: Appearance.colors.colOnLayer2
+                    }
+                }
 
                 // Chat history
                 RippleButton {
