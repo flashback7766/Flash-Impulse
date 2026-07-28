@@ -49,9 +49,11 @@ QtObject {
         /\bmv\s+.*\s+\/(?:bin|boot|dev|etc|home|lib|lib64|lost\+found|mnt|opt|proc|root|run|sbin|srv|sys|tmp|usr|var|[^\w\-]|$)/,
         /\bchmod\s+.*-R.*\s+\/(?:bin|boot|dev|etc|home|lib|lib64|lost\+found|mnt|opt|proc|root|run|sbin|srv|sys|tmp|usr|var|[^\w\-]|$)/,
         /\bchown\s+.*-R.*\s+\/(?:bin|boot|dev|etc|home|lib|lib64|lost\+found|mnt|opt|proc|root|run|sbin|srv|sys|tmp|usr|var|[^\w\-]|$)/,
-        // Recursive delete of HOME / cwd / glob
-        /\brm\s+(?:-[a-zA-Z]*\s+)*-[rfRF]+[a-zA-Z]*(?:\s+-[a-zA-Z]+)*\s+(?:~|\$HOME|\$\{HOME\}|\.|\.\/|\*|\.\*)(?:\s|$)/,
-        /\brm\s+.*\s+(?:~|\$HOME|\$\{HOME\}|\*|\.\*)(?:\s|$)/,
+        // Recursive delete of HOME / cwd / glob. The target takes an optional
+        // trailing path or glob: without it `rm -rf ~/` and `rm -rf ~/*` — the
+        // two ways anyone actually wipes a home directory — both walked past.
+        /\brm\s+(?:-[a-zA-Z]*\s+)*-[rfRF]+[a-zA-Z]*(?:\s+-[a-zA-Z]+)*\s+(?:~|\$HOME|\$\{HOME\}|\.|\*|\.\*)(?:[\/\\]\S*)?(?:\s|$)/,
+        /\brm\s+.*\s+(?:~|\$HOME|\$\{HOME\}|\*|\.\*)(?:[\/\\]\S*)?(?:\s|$)/,
         // Low level disk access
         /\bdd\s+.*of=\/dev\//,
         /\bmkfs\b/,
@@ -77,11 +79,27 @@ QtObject {
         return blacklistPatterns.some(pattern => pattern.test(cmd));
     }
 
+    /**
+     * Subcommands and flags that turn one of the whitelisted commands into a
+     * writing one. Matching on the command name alone said "read-only" to
+     * `find -delete`, `ip link set … down` and `journalctl --vacuum-size=0`,
+     * all of which auto-ran in Auto mode whenever the judge wasn't reachable.
+     */
+    readonly property var whitelistDisqualifiers: [
+        // find can delete and can run arbitrary programs
+        /\bfind\b[\s\S]*\s-(?:delete|exec|execdir|ok|okdir|fls|fprint|fprintf)\b/,
+        // ip reconfigures networking; only the query verbs are read-only
+        /\bip\b[\s\S]*\s(?:add|del|delete|set|change|replace|flush|append|up|down)\b/,
+        // journalctl can discard the journal
+        /\bjournalctl\b[\s\S]*--(?:vacuum|rotate|flush|relinquish|setup-keys)/
+    ]
+
     function isWhitelisted(cmd): bool {
         if (!cmd) return false;
         const trimmed = cmd.trim();
         // Any shell metacharacter disqualifies from the fast path.
         if (/[;&|<>`$(){}]/.test(trimmed)) return false;
+        if (whitelistDisqualifiers.some(pattern => pattern.test(trimmed))) return false;
         return whitelistPrefixes.some(p =>
             trimmed === p || trimmed.startsWith(p + " ") || trimmed.startsWith(p + "\t"));
     }
