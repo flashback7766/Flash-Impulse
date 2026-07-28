@@ -1244,6 +1244,106 @@ The shell (Quickshell config "ii"):
     // Raised by `ipc call ai settings` and the input-row button.
     signal settingsRequested
 
+    // ---- key verification --------------------------------------------------
+
+    // "" | "checking" | "ok" | "badkey" | "error", per provider id.
+    property var keyCheckState: ({})
+    property var keyCheckDetail: ({})
+    signal keyChecked(string provider, string state)
+
+    function _setKeyCheck(provider, state, detail) {
+        const next = Object.assign({}, root.keyCheckState);
+        next[provider] = state;
+        root.keyCheckState = next;
+        const nextDetail = Object.assign({}, root.keyCheckDetail);
+        nextDetail[provider] = detail ?? "";
+        root.keyCheckDetail = nextDetail;
+        root.keyChecked(provider, state);
+    }
+
+    /**
+     * Send one throwaway request and report only the HTTP status. Checking the
+     * status rather than parsing a reply keeps this the same code for every
+     * provider — 200 means the key was accepted, 401/403 means it wasn't, and
+     * anything else is worth showing verbatim rather than guessing about.
+     */
+    function verifyProviderKey(providerId) {
+        const provider = root.keyProviders.find(p => p.id === providerId);
+        if (!provider) return;
+        const key = root.apiKeys[providerId] ?? "";
+        if (key.length === 0) {
+            root._setKeyCheck(providerId, "badkey", Translation.tr("No key set"));
+            return;
+        }
+        const model = root.models[provider.exampleModel];
+        const strategy = root.apiStrategies[model.api_format];
+        if (!model || !strategy) {
+            root._setKeyCheck(providerId, "error", Translation.tr("No model to test with"));
+            return;
+        }
+
+        const probe = root.aiMessageComponent.createObject(root, {
+            "role": "user", "rawContent": "ping", "content": "ping", "done": true
+        });
+        let data;
+        try {
+            data = strategy.buildRequestData(model, [probe], "", 0, [], "");
+        } catch (e) {
+            probe.destroy();
+            root._setKeyCheck(providerId, "error", String(e));
+            return;
+        }
+        probe.destroy();
+
+        const authHeader = strategy.buildAuthorizationHeader(root.apiKeyEnvVarName);
+        const script = `curl -s -o /dev/null -w '%{http_code}' --max-time 15 "${model.endpoint}"`
+            + ` -H 'Content-Type: application/json'`
+            + (authHeader ? ` ${authHeader}` : "")
+            + ` --data '${CF.StringUtils.shellSingleQuoteEscape(JSON.stringify(data))}'`;
+
+        keyCheckProc.provider = providerId;
+        keyCheckProc.buffer = "";
+        // Heredoc, so the key never becomes an argv entry visible in the process list.
+        keyCheckProc.command = ["bash", "-c",
+            `bash <<'EOP_KEYCHECK'\nexport ${root.apiKeyEnvVarName}='${CF.StringUtils.shellSingleQuoteEscape(key)}'\n${script}\nEOP_KEYCHECK\n`];
+        root._setKeyCheck(providerId, "checking", "");
+        keyCheckProc.running = true;
+    }
+
+    Process {
+        id: keyCheckProc
+        property string provider: ""
+        property string buffer: ""
+        stdout: StdioCollector {
+            onStreamFinished: keyCheckProc.buffer = text.trim()
+        }
+        onExited: (exitCode) => {
+            const code = parseInt(keyCheckProc.buffer, 10);
+            if (exitCode !== 0 || isNaN(code) || code === 0) {
+                root._setKeyCheck(keyCheckProc.provider, "error", Translation.tr("Could not reach the provider"));
+            } else if (code === 200) {
+                root._setKeyCheck(keyCheckProc.provider, "ok", "");
+            } else if (code === 401 || code === 403) {
+                root._setKeyCheck(keyCheckProc.provider, "badkey", Translation.tr("The provider rejected this key"));
+            } else if (code === 429) {
+                root._setKeyCheck(keyCheckProc.provider, "error", Translation.tr("Rate limited — the key looks valid but is throttled"));
+            } else {
+                root._setKeyCheck(keyCheckProc.provider, "error", Translation.tr("Provider answered HTTP %1").arg(code));
+            }
+        }
+    }
+
+    // ---- first run ---------------------------------------------------------
+
+    // No key for anything, so nothing can answer yet. Drives the setup wizard.
+    readonly property bool needsSetup: {
+        if (!root.apiKeysLoaded) return false;
+        for (let i = 0; i < root.keyProviders.length; i++) {
+            if ((root.apiKeys[root.keyProviders[i].id] ?? "").length > 0) return false;
+        }
+        return true;
+    }
+
     /**
      * Write the open conversation to a Markdown file in Downloads. Hidden
      * messages (function calls and their output) are left out — the point is a

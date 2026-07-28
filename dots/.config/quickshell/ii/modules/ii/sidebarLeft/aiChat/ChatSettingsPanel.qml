@@ -369,6 +369,58 @@ Item {
                                         : Translation.tr("not set")
                                 }
 
+                                Item {
+                                    id: checkIndicator
+                                    readonly property string checkState: Ai.keyCheckState[providerRow.modelData.id] ?? ""
+                                    // StyledToolTip shows unconditionally when its parent
+                                    // has no `hovered` property, so anything carrying one
+                                    // has to provide it.
+                                    property bool hovered: checkIndicatorArea.containsMouse
+
+                                    visible: checkIndicator.checkState.length > 0
+                                    implicitWidth: 18
+                                    implicitHeight: 18
+
+                                    MaterialSymbol {
+                                        anchors.centerIn: parent
+                                        iconSize: Appearance.font.pixelSize.normal
+                                        color: checkIndicator.checkState === "ok" ? Appearance.colors.colPrimary
+                                            : checkIndicator.checkState === "checking" ? Appearance.colors.colSubtext
+                                            : Appearance.colors.colError
+                                        text: checkIndicator.checkState === "ok" ? "check_circle"
+                                            : checkIndicator.checkState === "checking" ? "hourglass_top"
+                                            : "error"
+
+                                        SequentialAnimation on opacity {
+                                            running: checkIndicator.checkState === "checking"
+                                            loops: Animation.Infinite
+                                            alwaysRunToEnd: true
+                                            NumberAnimation { from: 1; to: 0.4; duration: 600 }
+                                            NumberAnimation { from: 0.4; to: 1; duration: 600 }
+                                        }
+                                    }
+
+                                    MouseArea {
+                                        id: checkIndicatorArea
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        acceptedButtons: Qt.NoButton
+                                    }
+
+                                    StyledToolTip {
+                                        text: (Ai.keyCheckDetail[providerRow.modelData.id] ?? "").length > 0
+                                            ? Ai.keyCheckDetail[providerRow.modelData.id]
+                                            : Translation.tr("The provider accepted this key")
+                                    }
+                                }
+
+                                AiMessageControlButton {
+                                    visible: providerRow.hasKey
+                                    buttonIcon: "wifi_tethering"
+                                    onClicked: Ai.verifyProviderKey(providerRow.modelData.id)
+                                    StyledToolTip { text: Translation.tr("Check the key works") }
+                                }
+
                                 AiMessageControlButton {
                                     visible: providerRow.modelData.keyGetLink.length > 0 && !providerRow.hasKey
                                     buttonIcon: "open_in_new"

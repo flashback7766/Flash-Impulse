@@ -417,6 +417,12 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
         onRequestClose: messageInputField.forceActiveFocus()
     }
 
+    SetupWizard {
+        id: setupWizard
+        anchors.fill: parent
+        z: 902
+    }
+
     // Model picker popup — lives at root level to escape inputWrapper's clip:true
     Rectangle {
         id: modelPickerPopup
