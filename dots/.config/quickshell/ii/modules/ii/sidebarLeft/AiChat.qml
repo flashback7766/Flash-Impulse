@@ -314,7 +314,10 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                 Ai.addMessage(Translation.tr("Unknown command: ") + command, Ai.interfaceRole);
             }
         } else {
-            Ai.sendUserMessage(inputText);
+            // Queues instead of sending if an answer is still streaming; a slash
+            // command above is deliberately not queued, since those act on the
+            // shell rather than on the conversation.
+            Ai.queueUserMessage(inputText);
         }
 
         // Always scroll to bottom when user sends a message
@@ -1242,6 +1245,10 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
             }
         }
 
+        QueuedMessagesBar { // What's waiting to go once this answer lands
+            Layout.fillWidth: true
+        }
+
         Rectangle { // Input area
             id: inputWrapper
             property real spacing: 6
@@ -1496,12 +1503,12 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                                     // Insert newline
                                     messageInputField.insert(messageInputField.cursorPosition, "\n");
                                     event.accepted = true;
-                                } else if (Ai.isGenerating) {
-                                    // Stop generation instead of sending
+                                } else if (Ai.isGenerating && messageInputField.text.length === 0) {
+                                    // Enter on an empty box while generating still stops
                                     Ai.abortAll();
                                     event.accepted = true;
                                 } else {
-                                    // Accept text
+                                    // Accept text — queued if an answer is still arriving
                                     const inputText = messageInputField.text;
                                     messageInputField.clear();
                                     root.handleInput(inputText);
@@ -1597,12 +1604,17 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                     enabled: messageInputField.text.length > 0 || Ai.isGenerating
                     toggled: enabled
 
+                    // Stop only with nothing typed. With text in the box the button
+                    // sends — queued behind the answer that's still arriving —
+                    // because reaching for Send and getting Stop loses the answer.
+                    readonly property bool stops: Ai.isGenerating && messageInputField.text.length === 0
+
                     // Micro-scale animation on press
                     scale: sendButton.down ? 0.92 : 1.0
                     Behavior on scale { NumberAnimation { duration: 100; easing.type: Easing.OutCubic } }
 
                     onClicked: {
-                        if (Ai.isGenerating) {
+                        if (sendButton.stops) {
                             Ai.abortAll();
                         } else {
                             const inputText = messageInputField.text;
@@ -1616,7 +1628,7 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                         horizontalAlignment: Text.AlignHCenter
                         iconSize: 22
                         color: sendButton.enabled ? Appearance.m3colors.m3onPrimary : Appearance.colors.colOnLayer2Disabled
-                        text: Ai.isGenerating ? "stop" : "arrow_upward"
+                        text: sendButton.stops ? "stop" : "arrow_upward"
                         Behavior on text { PropertyAnimation { duration: 0 } }
                     }
                 }

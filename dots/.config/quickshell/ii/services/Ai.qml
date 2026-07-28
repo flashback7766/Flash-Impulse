@@ -39,7 +39,57 @@ Singleton {
     property bool condensing: false // Indicates background summarization is active
     readonly property string summarizerModelId: "gemini-3.5-flash-lite"
 
+    // A message typed while an answer is still streaming is queued rather than
+    // interrupting it. Pressing Enter used to abort the running turn, throwing
+    // away a half-finished answer nobody had read yet.
+    property var queuedMessages: []
+
+    /**
+     * @returns true if the message was queued rather than sent immediately.
+     */
+    function queueUserMessage(text) {
+        const message = (text ?? "").trim();
+        if (message.length === 0) return false;
+        if (!root.isGenerating && root.queuedMessages.length === 0) {
+            root.sendUserMessage(message);
+            return false;
+        }
+        root.queuedMessages = [...root.queuedMessages, message];
+        return true;
+    }
+
+    function clearQueue() {
+        root.queuedMessages = [];
+    }
+
+    function sendNextQueued() {
+        if (root.queuedMessages.length === 0) return;
+        // Only once the whole exchange has settled. A tool call ends one turn and
+        // immediately starts another, and a command can be sitting there waiting
+        // for approval — jumping in at either point interleaves two conversations.
+        if (root.isGenerating || requester.dispatchAfterExit || requester.retryPending) return;
+        for (let i = 0; i < root.messageIDs.length; i++) {
+            if (root.messageByID[root.messageIDs[i]]?.functionPending) return;
+        }
+        const next = root.queuedMessages[0];
+        root.queuedMessages = root.queuedMessages.slice(1);
+        root.sendUserMessage(next);
+    }
+
+    onResponseFinished: queueDrainTimer.restart()
+
+    Timer {
+        id: queueDrainTimer
+        // Long enough for a follow-up turn to have started, so the idle check
+        // above sees it rather than racing it.
+        interval: 300
+        onTriggered: root.sendNextQueued()
+    }
+
     function abortAll() {
+        // Stop means stop: a queue drained after an abort would start the very
+        // thing the user just interrupted.
+        root.clearQueue();
         // Mark aborted so onExited handlers don't auto-restart the conversation
         root.aborted = true;
         // Cancel any pending retry so makeRequest doesn't fire after the user aborted
@@ -985,6 +1035,8 @@ The shell (Quickshell config "ii"):
     }
 
     function resetSessionState() {
+        // Anything still queued belongs to the conversation being cleared
+        root.clearQueue();
         // Destroy any live message objects to avoid leaking QML instances
         for (let i = 0; i < root.messageIDs.length; i++) {
             const msg = root.messageByID[root.messageIDs[i]];
