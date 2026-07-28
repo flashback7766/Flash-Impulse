@@ -8,6 +8,10 @@ RippleButton {
     id: root
 
     property bool showPing: false
+    // Generation carries on with the sidebar closed, so say so: a steady dot for
+    // an answer that's waiting to be read, a pulsing one for an answer still
+    // being written.
+    readonly property bool workingUnseen: Ai.isGenerating && !GlobalStates.sidebarLeftOpen
 
     property bool aiChatEnabled: Config.options.policies.ai !== 0
     property bool translatorEnabled: Config.options.sidebar.translator.enable
@@ -62,7 +66,8 @@ RippleButton {
         color: Appearance.colors.colOnLayer0
 
         Rectangle {
-            opacity: root.showPing ? 1 : 0
+            id: pingDot
+            opacity: (root.showPing || root.workingUnseen) ? 1 : 0
             visible: opacity > 0
             anchors {
                 bottom: parent.bottom
@@ -73,10 +78,21 @@ RippleButton {
             implicitWidth: 8
             implicitHeight: 8
             radius: Appearance.rounding.full
-            color: Appearance.colors.colTertiary
+            color: root.workingUnseen ? Appearance.colors.colPrimary : Appearance.colors.colTertiary
 
             Behavior on opacity {
                 animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+            }
+            Behavior on color {
+                animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
+            }
+
+            SequentialAnimation on scale {
+                running: root.workingUnseen
+                loops: Animation.Infinite
+                alwaysRunToEnd: true
+                NumberAnimation { from: 1; to: 0.55; duration: 600; easing.type: Easing.InOutSine }
+                NumberAnimation { from: 0.55; to: 1; duration: 600; easing.type: Easing.InOutSine }
             }
         }
     }
