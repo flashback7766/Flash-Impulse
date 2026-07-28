@@ -96,6 +96,56 @@ Singleton {
         return reasoning.split(/\n\s*\n/).map(s => s.trim()).filter(s => s.length > 0);
     }
 
+    /**
+     * splitMarkdownBlocks, plus blockquotes pulled out into their own blocks.
+     *
+     * Qt's markdown renderer draws a blockquote as an anonymous indent, which is
+     * indistinguishable from a nested list or a stray tab. Lifting quote runs out
+     * lets the UI give them the accent bar that makes them read as a quote at all.
+     * Quotes inside fenced code are untouched, since fences are split off first.
+     */
+    function splitMessageBlocks(markdown) {
+        const blocks = splitMarkdownBlocks(markdown);
+        const result = [];
+        for (let i = 0; i < blocks.length; i++) {
+            if (blocks[i].type !== "text") {
+                result.push(blocks[i]);
+                continue;
+            }
+            const parts = splitQuoteRuns(blocks[i].content);
+            for (let j = 0; j < parts.length; j++) result.push(parts[j]);
+        }
+        return result;
+    }
+
+    function splitQuoteRuns(text) {
+        if (!text || text.indexOf(">") === -1) return [{ type: "text", content: text }];
+        const lines = text.split("\n");
+        const out = [];
+        let buffer = [];
+        let inQuote = false;
+
+        const flush = () => {
+            if (buffer.length === 0) return;
+            const content = buffer.join("\n");
+            if (content.trim().length > 0) out.push({ type: inQuote ? "quote" : "text", content: content });
+            buffer = [];
+        };
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const quoted = /^\s{0,3}>/.test(line);
+            if (quoted !== inQuote) {
+                flush();
+                inQuote = quoted;
+            }
+            // Strip the marker so the quote body renders as ordinary markdown.
+            buffer.push(quoted ? line.replace(/^\s{0,3}>\s?/, "") : line);
+        }
+        flush();
+        return out.length > 0 ? out : [{ type: "text", content: text }];
+    }
+
     function splitMarkdownBlocks(markdown) {
         // Two alternatives: with-language-then-newline, or one-liner with no language.
         const regex = /```(\w+)\n([\s\S]*?)```|```([\s\S]*?)```/g;

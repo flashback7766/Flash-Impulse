@@ -1853,6 +1853,7 @@ Singleton {
                     "localFilePath": message.localFilePath,
                     "model": message.model,
                     "done": true,
+                    "timestamp": message.timestamp,
                     "reasoning": message.reasoning,
                     "reasoningSeconds": message.reasoningSeconds,
                     "reasoningTokens": message.reasoningTokens,
@@ -1984,6 +1985,7 @@ Singleton {
                 "localFilePath": message.localFilePath,
                 "model": message.model,
                 "done": message.done ?? true,
+                "timestamp": message.timestamp ?? 0,
                 "annotations": message.annotations,
                 "annotationSources": message.annotationSources,
                 "functionName": message.functionName,
@@ -2062,6 +2064,41 @@ Singleton {
         if (!chat) return;
         chat.title = title;
         chatStore.save(chat);
+    }
+
+    /**
+     * Headless control over the chat, for scripting and for driving the sidebar
+     * from a keybind without going through the input field.
+     */
+    IpcHandler {
+        target: "ai"
+
+        function list(): string {
+            return (chatStore.index ?? [])
+                .map(e => `${e.id}\t${e.title || e.preview || "(untitled)"}\t${e.messageCount}`)
+                .join("\n");
+        }
+
+        function open(id: string): string {
+            if (!id || id.length === 0) return "usage: open <chat id>";
+            root.persistCurrentChat();
+            return root.loadChatById(id) ? `opened ${id}` : `no such chat: ${id}`;
+        }
+
+        function newChat(): string {
+            root.newChat();
+            return "ok";
+        }
+
+        function send(message: string): string {
+            if (!message || message.trim().length === 0) return "nothing to send";
+            root.sendUserMessage(message);
+            return "sent";
+        }
+
+        function current(): string {
+            return `${root.currentChatId}\t${root.currentChatDisplayTitle()}`;
+        }
     }
 
     function savePersistentState(key, value) {

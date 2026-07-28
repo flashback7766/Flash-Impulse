@@ -106,7 +106,14 @@ ColumnLayout {
                 font.pixelSize: Appearance.font.pixelSize.small + 2
                 font.weight: Font.DemiBold
                 color: Appearance.colors.colOnLayer2
-                text: root.displayLang ? Repository.definitionForName(root.displayLang).name : "plain"
+                // KSyntaxHighlighting answers "None" for anything it doesn't know
+                // (ini, toml, conf, ...) — showing the fence's own language beats
+                // labelling a perfectly good snippet "None".
+                text: {
+                    if (!root.displayLang) return "plain";
+                    const known = Repository.definitionForName(root.displayLang).name;
+                    return (known && known !== "None") ? known : root.displayLang;
+                }
             }
 
             Item { Layout.fillWidth: true }

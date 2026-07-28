@@ -22,6 +22,9 @@ QtObject {
         ? (reasoningEndTime - reasoningStartTime) / 1000 : 0
     // True while reasoning is still arriving — drives the header ticker.
     readonly property bool reasoningActive: reasoningStartTime > 0 && reasoningEndTime === 0 && !done
+    // Wall-clock creation time, shown on hover. Zero on messages saved before this
+    // existed, which the UI treats as "no timestamp" rather than 1970.
+    property double timestamp: Date.now()
     property string fileMimeType
     property string fileUri
     property string fileBase64
