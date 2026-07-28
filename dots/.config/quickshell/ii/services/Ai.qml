@@ -1344,7 +1344,7 @@ The shell (Quickshell config "ii"):
             return;
         }
         const model = root.models[provider.exampleModel];
-        const strategy = root.apiStrategies[model.api_format];
+        const strategy = model ? root.apiStrategies[model.api_format] : null;
         if (!model || !strategy) {
             root._setKeyCheck(providerId, "error", Translation.tr("No model to test with"));
             return;
@@ -1364,7 +1364,13 @@ The shell (Quickshell config "ii"):
         probe.destroy();
 
         const authHeader = strategy.buildAuthorizationHeader(root.apiKeyEnvVarName);
-        const script = `curl -s -o /dev/null -w '%{http_code}' --max-time 15 "${model.endpoint}"`
+        // buildEndpoint, not model.endpoint: Gemini carries its key as a query
+        // parameter and returns nothing from buildAuthorizationHeader, so the raw
+        // endpoint sent an unauthenticated probe, got 403, and put a red badge on
+        // a key that was working perfectly well two lines further down the file.
+        // The URL it returns can contain $API_KEY, which the heredoc has exported.
+        const endpoint = strategy.buildEndpoint(model);
+        const script = `curl -s -o /dev/null -w '%{http_code}' --max-time 15 "${endpoint}"`
             + ` -H 'Content-Type: application/json'`
             + (authHeader ? ` ${authHeader}` : "")
             + ` --data '${CF.StringUtils.shellSingleQuoteEscape(JSON.stringify(data))}'`;
