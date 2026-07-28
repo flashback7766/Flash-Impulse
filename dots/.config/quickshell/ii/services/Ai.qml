@@ -2856,6 +2856,44 @@ The shell (Quickshell config "ii"):
     // of commands, so it is the one that can run them.
     signal commandRequested(string text)
 
+    // ---- favourites --------------------------------------------------------
+
+    readonly property var favouriteModels: Persistent.states?.ai?.favouriteModels ?? []
+
+    function isFavouriteModel(id) {
+        return root.favouriteModels.indexOf(id) !== -1;
+    }
+
+    function toggleFavouriteModel(id) {
+        if (!id || id.length === 0) return;
+        const current = [...root.favouriteModels];
+        const at = current.indexOf(id);
+        if (at === -1) current.push(id);
+        else current.splice(at, 1);
+        root.savePersistentState("favouriteModels", current);
+    }
+
+    /**
+     * Which company's model this is, for grouping in the picker. key_id is the
+     * closest thing to a provider the model definitions carry — models sharing a
+     * key are by definition the same provider — and a local model has no key at
+     * all, which is exactly what distinguishes it.
+     */
+    function providerOfModel(id) {
+        const model = root.models[id];
+        if (!model) return Translation.tr("Other");
+        if (!model.requires_key) return Translation.tr("Local");
+        const names = {
+            "gemini": "Google Gemini",
+            "anthropic": "Anthropic",
+            "openai": "OpenAI",
+            "openrouter": "OpenRouter",
+            "mistral": "Mistral",
+            "claude-code": "Claude Code"
+        };
+        return names[model.key_id] ?? (model.key_id ?? Translation.tr("Other"));
+    }
+
     function savePersistentState(key, value) {
         if (!Persistent.states || !Persistent.states.ai) return;
         Persistent.states.ai[key] = value;

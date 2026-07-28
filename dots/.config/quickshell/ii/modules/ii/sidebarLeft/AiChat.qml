@@ -443,13 +443,56 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
         enabled: opacity > 0
         z: 1000
 
-        // Custom models first, then built-ins
-        property var sortedModelList: {
-            const custom  = Ai.modelList.filter(id =>  Ai.isRemovableModel(id));
-            const builtin = Ai.modelList.filter(id => !Ai.isRemovableModel(id));
-            return [...custom, ...builtin];
+        // Favourites, then anything you added yourself, then one section per
+        // provider. Grouping beats one flat list the moment Ollama contributes a
+        // dozen local models whose names all start the same way.
+        readonly property string query: modelSearchField.text.trim().toLowerCase()
+
+        readonly property var sections: {
+            // Inlined rather than calling a method on this object: the binding is
+            // evaluated while the popup is still being built, and at that point
+            // its own functions aren't attached yet.
+            const q = modelPickerPopup.query;
+            const matches = id => {
+                if (q.length === 0) return true;
+                const model = Ai.models[id];
+                return id.toLowerCase().indexOf(q) !== -1
+                    || (model?.name ?? "").toLowerCase().indexOf(q) !== -1
+                    || (model?.description ?? "").toLowerCase().indexOf(q) !== -1;
+            };
+            const all = Ai.modelList.filter(matches);
+            const out = [];
+            const taken = {};
+
+            const favourites = all.filter(id => Ai.isFavouriteModel(id));
+            if (favourites.length > 0) {
+                favourites.forEach(id => taken[id] = true);
+                out.push({ label: Translation.tr("Favourites"), ids: favourites });
+            }
+
+            const custom = all.filter(id => !taken[id] && Ai.isRemovableModel(id));
+            if (custom.length > 0) {
+                custom.forEach(id => taken[id] = true);
+                out.push({ label: Translation.tr("Custom"), ids: custom });
+            }
+
+            const byProvider = {};
+            const order = [];
+            all.filter(id => !taken[id]).forEach(id => {
+                const provider = Ai.providerOfModel(id);
+                if (!byProvider[provider]) {
+                    byProvider[provider] = [];
+                    order.push(provider);
+                }
+                byProvider[provider].push(id);
+            });
+            order.forEach(provider => out.push({ label: provider, ids: byProvider[provider] }));
+            return out;
         }
-        property bool hasCustomModels: sortedModelList.some(id => Ai.isRemovableModel(id))
+
+        readonly property int matchCount: modelPickerPopup.sections.reduce((n, s) => n + s.ids.length, 0)
+        readonly property string firstMatch: modelPickerPopup.sections.length > 0
+            ? (modelPickerPopup.sections[0].ids[0] ?? "") : ""
 
         property bool isOpen: false
 
@@ -461,9 +504,11 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
             x = Math.max(12, Math.min(pos.x, root.width - width - 12));
             y = pos.y - implicitHeight - 6;
             isOpen = true;
+            Qt.callLater(() => modelSearchField.forceActiveFocus());
         }
         function close() {
             isOpen = false;
+            modelSearchField.text = "";
         }
         function toggle() {
             if (isOpen) close(); else open();
@@ -596,207 +641,92 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                 spacing: 4
 
                 Item { Layout.fillWidth: true; implicitHeight: 4 }
-                StyledText {
-                    Layout.leftMargin: 12
-                    Layout.topMargin: 2
-                    font.pixelSize: Appearance.font.pixelSize.smaller + 2
-                    font.weight: Font.DemiBold
-                    color: Appearance.m3colors.m3primary
-                    text: Translation.tr("Select Model")
-                }
 
-                // Custom models section (only shown when custom models exist)
-                ColumnLayout {
+                RowLayout {
                     Layout.fillWidth: true
-                    spacing: 2
-                    visible: modelPickerPopup.hasCustomModels
+                    Layout.leftMargin: 12
+                    Layout.rightMargin: 10
+                    Layout.topMargin: 2
+                    spacing: 6
 
                     StyledText {
-                        Layout.leftMargin: 8
-                        Layout.topMargin: 2
-                        font.pixelSize: Appearance.font.pixelSize.smaller + 2
-                        color: Appearance.colors.colSubtext
-                        opacity: 0.6
-                        text: Translation.tr("Custom")
-                    }
-
-                    Repeater {
-                        model: modelPickerPopup.sortedModelList.filter(id => Ai.isRemovableModel(id))
-                        delegate: RippleButton {
-                            required property var modelData
-                            property bool pendingDelete: false
-                            Layout.fillWidth: true
-                            implicitHeight: 52
-                            buttonRadius: Appearance.rounding.normal
-                            toggled: Ai.currentModelId === modelData
-                            colBackground: toggled ? Qt.alpha(Appearance.m3colors.m3primaryContainer, 0.85) : "transparent"
-                            colBackgroundHover: Qt.alpha(Appearance.colors.colLayer2Hover, 0.8)
-                            onClicked: {
-                                if (pendingDelete) { pendingDelete = false; return; }
-                                Ai.setModel(modelData, false); modelPickerPopup.close();
-                            }
-                            Timer {
-                                id: deleteResetTimer
-                                interval: 2500
-                                onTriggered: parent.pendingDelete = false
-                            }
-                            contentItem: RowLayout {
-                                anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 10
-                                spacing: 12
-                                Rectangle {
-                                    width: 32; height: 32; radius: 8
-                                    color: Qt.alpha(Appearance.colors.colSubtext, 0.1)
-                                    CustomIcon {
-                                        anchors.centerIn: parent
-                                        visible: Ai.models[modelData]?.icon?.length > 0
-                                        width: 20; height: 20
-                                        source: Ai.models[modelData]?.icon ?? ""; colorize: true
-                                        color: parent.parent.parent.toggled ? Appearance.m3colors.m3primary : Appearance.m3colors.m3onSurface
-                                        Behavior on color { ColorAnimation { duration: 150 } }
-                                    }
-                                    MaterialSymbol {
-                                        anchors.centerIn: parent
-                                        visible: !Ai.models[modelData]?.icon
-                                        text: "smart_toy"
-                                        iconSize: 20
-                                        color: parent.parent.parent.toggled ? Appearance.m3colors.m3primary : Appearance.colors.colSubtext
-                                    }
-                                }
-                                ColumnLayout {
-                                    Layout.fillWidth: true; spacing: 0
-                                    StyledText {
-                                        Layout.fillWidth: true;
-                                        font.pixelSize: Appearance.font.pixelSize.small + 2;
-                                        font.weight: Font.DemiBold;
-                                        color: parent.parent.parent.toggled ? Appearance.m3colors.m3onPrimaryContainer : Appearance.m3colors.m3onSurface
-                                        opacity: parent.parent.parent.toggled ? 1.0 : 0.85
-                                        text: Ai.models[modelData]?.name ?? modelData;
-                                        elide: Text.ElideRight
-                                    }
-                                    StyledText {
-                                        Layout.fillWidth: true;
-                                        font.pixelSize: Appearance.font.pixelSize.smaller + 1;
-                                        color: parent.parent.parent.toggled ? Qt.alpha(Appearance.m3colors.m3onPrimaryContainer, 0.75) : Appearance.colors.colSubtext;
-                                        text: (Ai.models[modelData]?.description ?? "").split("\n")[0] ?? "";
-                                        elide: Text.ElideRight
-                                    }
-                                }
-                                MaterialSymbol {
-                                    visible: parent.parent.toggled && !parent.parent.pendingDelete
-                                    text: "check_circle"; iconSize: 18; color: Appearance.m3colors.m3primary
-                                }
-                                // Delete controls
-                                RowLayout {
-                                    visible: parent.parent.pendingDelete
-                                    spacing: 8
-                                    StyledText {
-                                        font.pixelSize: Appearance.font.pixelSize.smaller
-                                        color: Appearance.m3colors.m3error
-                                        text: Translation.tr("Remove?")
-                                    }
-                                    MaterialSymbol {
-                                        text: "delete_forever"; iconSize: 20; color: Appearance.m3colors.m3error
-                                        MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: Ai.removeModel(modelData) }
-                                    }
-                                }
-                                MaterialSymbol {
-                                    visible: !parent.parent.pendingDelete && !parent.parent.toggled
-                                    text: "close"; iconSize: 18; color: Appearance.colors.colSubtext; opacity: 0.5
-                                    MouseArea { 
-                                        anchors.fill: parent; cursorShape: Qt.PointingHandCursor; 
-                                        onClicked: { parent.parent.parent.pendingDelete = true; deleteResetTimer.restart(); } 
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // Divider
-                    RowLayout {
                         Layout.fillWidth: true
-                        Layout.topMargin: 4
-                        spacing: 8
-                        Rectangle {
-                            Layout.fillWidth: true
-                            Layout.leftMargin: 6
-                            Layout.rightMargin: 6
-                            implicitHeight: 1
-                            color: Appearance.colors.colOutlineVariant
-                            opacity: 0.5
+                        font.pixelSize: Appearance.font.pixelSize.smaller + 2
+                        font.weight: Font.DemiBold
+                        color: Appearance.m3colors.m3primary
+                        text: Translation.tr("Select Model")
+                    }
+
+                    StyledText {
+                        font.pixelSize: Appearance.font.pixelSize.smaller
+                        color: Appearance.colors.colSubtext
+                        text: modelPickerPopup.matchCount > 0 ? String(modelPickerPopup.matchCount) : ""
+                    }
+                }
+
+                // Ollama can leave a couple of dozen models here, and a flat list
+                // that long is faster to scroll past than to read.
+                MaterialTextField {
+                    id: modelSearchField
+                    Layout.fillWidth: true
+                    Layout.leftMargin: 8
+                    Layout.rightMargin: 8
+                    placeholderText: Translation.tr("Search models")
+                    wrapMode: TextEdit.NoWrap
+                    Keys.onPressed: event => {
+                        if (event.key === Qt.Key_Escape) {
+                            modelPickerPopup.close();
+                            event.accepted = true;
+                        } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                            const first = modelPickerPopup.firstMatch;
+                            if (first.length > 0) {
+                                Ai.setModel(first, false);
+                                modelPickerPopup.close();
+                            }
+                            event.accepted = true;
                         }
                     }
                 }
 
-                // Built-in models section label (only when custom models exist)
                 StyledText {
-                    visible: modelPickerPopup.hasCustomModels
-                    Layout.leftMargin: 8
-                    Layout.topMargin: 2
-                    font.pixelSize: Appearance.font.pixelSize.smaller + 2
+                    Layout.fillWidth: true
+                    Layout.topMargin: 12
+                    horizontalAlignment: Text.AlignHCenter
+                    visible: modelPickerPopup.matchCount === 0
+                    font.pixelSize: Appearance.font.pixelSize.smaller
                     color: Appearance.colors.colSubtext
-                    opacity: 0.6
-                    text: Translation.tr("Built-in")
+                    text: Translation.tr("No model matches that")
                 }
 
                 Repeater {
-                    model: modelPickerPopup.sortedModelList.filter(id => !Ai.isRemovableModel(id))
-                    delegate: RippleButton {
+                    model: modelPickerPopup.sections
+
+                    delegate: ColumnLayout {
+                        id: section
                         required property var modelData
                         Layout.fillWidth: true
-                        implicitHeight: 52
-                        buttonRadius: Appearance.rounding.normal
-                        toggled: Ai.currentModelId === modelData
-                        colBackground: toggled ? Qt.alpha(Appearance.m3colors.m3primaryContainer, 0.85) : "transparent"
-                        colBackgroundHover: Qt.alpha(Appearance.colors.colLayer2Hover, 0.8)
-                        onClicked: { Ai.setModel(modelData, false); modelPickerPopup.close(); }
-                        contentItem: RowLayout {
-                            anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 10
-                            spacing: 12
-                            Rectangle {
-                                width: 32; height: 32; radius: 8
-                                color: Qt.alpha(Appearance.colors.colSubtext, 0.1)
-                                CustomIcon {
-                                    anchors.centerIn: parent
-                                    visible: Ai.models[modelData]?.icon?.length > 0
-                                    width: 20; height: 20
-                                    source: Ai.models[modelData]?.icon ?? ""; colorize: true
-                                    color: parent.parent.parent.toggled ? Appearance.m3colors.m3primary : Appearance.m3colors.m3onSurface
-                                    Behavior on color { ColorAnimation { duration: 150 } }
-                                }
-                                MaterialSymbol {
-                                    anchors.centerIn: parent
-                                    visible: !Ai.models[modelData]?.icon
-                                    text: Ai.guessModelLogo(modelData)
-                                    iconSize: 20
-                                    color: parent.parent.parent.toggled ? Appearance.m3colors.m3primary : Appearance.colors.colSubtext
-                                }
-                            }
-                            ColumnLayout {
-                                Layout.fillWidth: true; spacing: 0
-                                StyledText {
-                                    Layout.fillWidth: true;
-                                    font.pixelSize: Appearance.font.pixelSize.small + 2;
-                                    font.weight: Font.DemiBold;
-                                    color: parent.parent.parent.toggled ? Appearance.m3colors.m3onPrimaryContainer : Appearance.m3colors.m3onSurface
-                                    opacity: 1.0
-                                    text: Ai.models[modelData]?.name ?? modelData;
-                                    elide: Text.ElideRight
-                                }
-                                StyledText {
-                                    Layout.fillWidth: true;
-                                    font.pixelSize: Appearance.font.pixelSize.smaller + 1;
-                                    color: parent.parent.parent.toggled ? Qt.alpha(Appearance.m3colors.m3onPrimaryContainer, 0.75) : Appearance.colors.colSubtext;
-                                    text: (Ai.models[modelData]?.description ?? "").split("\n")[0] ?? "";
-                                    elide: Text.ElideRight
-                                }
-                            }
-                            MaterialSymbol {
-                                visible: parent.parent.toggled
-                                text: "check_circle"; iconSize: 18; color: Appearance.m3colors.m3primary
+                        spacing: 2
+
+                        StyledText {
+                            Layout.leftMargin: 8
+                            Layout.topMargin: 4
+                            font.pixelSize: Appearance.font.pixelSize.smaller + 2
+                            color: Appearance.colors.colSubtext
+                            opacity: 0.6
+                            text: section.modelData.label
+                        }
+
+                        Repeater {
+                            model: section.modelData.ids
+                            delegate: ModelPickerRow {
+                                required property string modelData
+                                modelId: modelData
+                                onChosen: modelPickerPopup.close()
                             }
                         }
                     }
                 }
+
                 Item { Layout.fillWidth: true; implicitHeight: 4 }
             }
         }

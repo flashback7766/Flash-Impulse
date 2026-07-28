@@ -72,6 +72,8 @@ Singleton {
                 // The toggle wrote here without the key existing, so it worked for
                 // the session and was gone on the next start.
                 property bool promptCaching: true
+                // Model ids pinned to the top of the picker.
+                property list<string> favouriteModels: []
             }
 
             property JsonObject cheatsheet: JsonObject {
