@@ -197,6 +197,68 @@ Item {
                         }
                     }
 
+                    // ---- How it should answer ----------------------------------
+
+                    SectionLabel { text: Translation.tr("Style") }
+
+                    Flow {
+                        Layout.fillWidth: true
+                        Layout.leftMargin: 10
+                        Layout.rightMargin: 10
+                        spacing: 6
+
+                        Repeater {
+                            model: Ai.promptProfiles
+
+                            delegate: RippleButton {
+                                id: profileChip
+                                required property var modelData
+                                readonly property bool active: profileChip.modelData.id === Ai.promptProfile
+
+                                implicitHeight: 30
+                                implicitWidth: profileRow.implicitWidth + 20
+                                buttonRadius: Appearance.rounding.full
+                                toggled: profileChip.active
+                                colBackground: Appearance.colors.colLayer2
+                                colBackgroundHover: Appearance.colors.colLayer2Hover
+                                onClicked: Ai.setPromptProfile(profileChip.modelData.id)
+
+                                contentItem: RowLayout {
+                                    id: profileRow
+                                    spacing: 5
+                                    MaterialSymbol {
+                                        Layout.alignment: Qt.AlignVCenter
+                                        iconSize: Appearance.font.pixelSize.normal
+                                        color: profileChip.active ? Appearance.colors.colOnPrimary
+                                            : Appearance.colors.colOnLayer2
+                                        text: profileChip.modelData.icon
+                                    }
+                                    StyledText {
+                                        Layout.alignment: Qt.AlignVCenter
+                                        font.pixelSize: Appearance.font.pixelSize.smaller
+                                        font.weight: profileChip.active ? Font.DemiBold : Font.Normal
+                                        color: profileChip.active ? Appearance.colors.colOnPrimary
+                                            : Appearance.colors.colOnLayer2
+                                        text: profileChip.modelData.name
+                                    }
+                                }
+
+                                StyledToolTip { text: profileChip.modelData.summary }
+                            }
+                        }
+                    }
+
+                    StyledText {
+                        Layout.fillWidth: true
+                        Layout.leftMargin: 10
+                        Layout.rightMargin: 10
+                        Layout.topMargin: 4
+                        wrapMode: Text.Wrap
+                        font.pixelSize: Appearance.font.pixelSize.smaller
+                        color: Appearance.colors.colSubtext
+                        text: Ai.promptProfileInfo?.summary ?? ""
+                    }
+
                     // ---- Temperature ------------------------------------------
 
                     SectionLabel { text: Translation.tr("Temperature") }

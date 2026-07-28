@@ -125,8 +125,91 @@ Singleton {
         root.responseFinished();
     }
 
+    /**
+     * Shipped prompt profiles. The inherited prompt is kept as "Custom" rather
+     * than being the only option: it mixes tone, presentation and tooling advice
+     * into one block, so the profiles below each say one thing well instead.
+     *
+     * Only the persona lives here. What the machine is (desktopRules) and what
+     * the assistant may do (modeRules) are appended by the shell to every
+     * profile, since neither is a matter of taste.
+     */
+    readonly property var promptProfiles: [
+        {
+            id: "code",
+            name: Translation.tr("Code & Linux"),
+            icon: "terminal",
+            summary: Translation.tr("Pair programming and system work"),
+            prompt: "You are a sharp, informal engineer sitting next to the user on their Linux desktop.\n"
+                + "- Answer the question asked. No preamble, no restating it back, no \"as an AI\".\n"
+                + "- Prefer doing over describing: check the actual state with a command before theorising about it.\n"
+                + "- When something is broken, say why it broke, not just what to type. One quick fix and one proper fix, in that order.\n"
+                + "- Code gets comments only where the logic isn't obvious. Match the style of the file you're editing.\n"
+                + "- Say when you're unsure or when you're guessing, and say what would settle it.\n"
+                + "- Format for a narrow sidebar: short paragraphs, bullets over prose, a table when comparing options.\n"
+                + "- Use LaTeX in $$ delimiters for maths, never for ordinary documents."
+        },
+        {
+            id: "plain",
+            name: Translation.tr("Plain conversation"),
+            icon: "chat_bubble",
+            summary: Translation.tr("Talking, thinking out loud, no tooling"),
+            prompt: "You are a thoughtful, direct conversational partner.\n"
+                + "- Talk like a person: plain words, contractions, no bullet-point dumps unless the content is genuinely a list.\n"
+                + "- Engage with what was actually said. Disagree when you disagree, and say why.\n"
+                + "- Don't run commands or inspect the system unless explicitly asked; this is a conversation, not a work session.\n"
+                + "- Length follows the question. A short question gets a short answer."
+        },
+        {
+            id: "terse",
+            name: Translation.tr("Terse"),
+            icon: "compress",
+            summary: Translation.tr("Answer only, minimum words"),
+            prompt: "Answer in as few words as the question allows.\n"
+                + "- No preamble, no summary, no offers of further help, no restating the question.\n"
+                + "- A command, a number or a single sentence is a complete answer when it is one.\n"
+                + "- Expand only when correctness genuinely requires it, and only by as much as it requires.\n"
+                + "- Never pad with caveats the user didn't ask for."
+        },
+        {
+            id: "ctf",
+            name: Translation.tr("CTF & reversing"),
+            icon: "lock_open",
+            summary: Translation.tr("Security challenges and binary analysis"),
+            prompt: "You are assisting with CTF challenges, reverse engineering and authorised security testing.\n"
+                + "- Assume competence: skip the introductions to concepts the user clearly already uses.\n"
+                + "- Work from evidence — file, strings, checksec, disassembly — before hypothesising.\n"
+                + "- Name the class of the bug or the primitive when you spot one, and what it gets you.\n"
+                + "- Give concrete payloads, offsets and commands, not descriptions of what a payload would look like.\n"
+                + "- This is for challenges and systems the user is authorised to test. If a request looks like it targets "
+                + "someone else's live system, say so and stop."
+        },
+        {
+            id: "custom",
+            name: Translation.tr("Custom"),
+            icon: "edit_note",
+            summary: Translation.tr("Whatever is in the config file"),
+            prompt: ""
+        }
+    ]
+
+    property string promptProfile: Persistent.states?.ai?.promptProfile ?? "code"
+    readonly property var promptProfileInfo: root.promptProfiles.find(p => p.id === root.promptProfile)
+        ?? root.promptProfiles[0]
+
+    function setPromptProfile(id) {
+        const profile = root.promptProfiles.find(p => p.id === id);
+        if (!profile || id === root.promptProfile) return;
+        root.savePersistentState("promptProfile", id);
+        root.addDivider(Translation.tr("%1 — %2").arg(profile.name).arg(profile.summary), profile.icon);
+    }
+
     property string systemPrompt: {
-        let prompt = Config.options?.ai?.systemPrompt ?? "";
+        // The custom profile is the config file's prompt; every other profile
+        // replaces it outright rather than appending, or the two would argue.
+        let prompt = root.promptProfile === "custom"
+            ? (Config.options?.ai?.systemPrompt ?? "")
+            : root.promptProfileInfo.prompt;
         for (let key in root.promptSubstitutions) {
             // QML/JS doesn't support replaceAll, so use split/join
             prompt = prompt.split(key).join(root.promptSubstitutions[key]);
@@ -135,7 +218,24 @@ Singleton {
         // are facts about *this* machine, and they have to survive the user
         // rewriting their prompt — getting them wrong costs a round of commands
         // that edit the wrong file or change something already set.
-        return prompt + "\n\n" + root.desktopRules + "\n\n" + root.modeRules;
+        return [prompt, root.contextBlock, root.desktopRules, root.modeRules]
+            .filter(part => part.length > 0).join("\n\n");
+    }
+
+    // Where the assistant is running. Appended to every profile rather than left
+    // in the prompt text: it's true regardless of which persona is selected, and
+    // a profile that forgot to include it would be answering blind.
+    readonly property string contextBlock: {
+        const parts = [
+            "## Where you are",
+            `- ${SystemInfo.distroName}, ${SystemInfo.desktopEnvironment} on ${SystemInfo.windowingSystem}`,
+            `- Now: ${DateTime.time}, ${DateTime.collapsedCalendarFormat}`,
+            `- Focused app: ${ToplevelManager.activeToplevel?.appId ?? "unknown"}`
+        ];
+        if (root.previousChatSummary.length > 0) {
+            parts.push("", "## What the recent conversations were about", root.previousChatSummary);
+        }
+        return parts.join("\n");
     }
 
     readonly property string modeRules: {

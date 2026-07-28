@@ -67,6 +67,8 @@ Singleton {
                 property bool compactMessages: false
                 // plan | default | auto | yolo — see Ai.permissionModes
                 property string permissionMode: "auto"
+                // code | plain | terse | ctf | custom — see Ai.promptProfiles
+                property string promptProfile: "code"
             }
 
             property JsonObject cheatsheet: JsonObject {

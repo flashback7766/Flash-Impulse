@@ -119,6 +119,25 @@ Item {
             }
         },
         {
+            name: "style",
+            description: Translation.tr("How answers should read: code, plain, terse, ctf or custom"),
+            execute: args => {
+                const wanted = (args[0] ?? "").toLowerCase();
+                if (wanted.length === 0) {
+                    const lines = Ai.promptProfiles.map(p =>
+                        `${p.id === Ai.promptProfile ? "**→ " : "- "}${p.name}${p.id === Ai.promptProfile ? "**" : ""} (\`${p.id}\`) — ${p.summary}`);
+                    Ai.addMessage(Translation.tr("Answer styles:\n\n%1").arg(lines.join("\n")), Ai.interfaceRole);
+                    return;
+                }
+                if (!Ai.promptProfiles.some(p => p.id === wanted)) {
+                    Ai.addMessage(Translation.tr("Unknown style: '%1'. One of: %2")
+                        .arg(wanted).arg(Ai.promptProfiles.map(p => p.id).join(", ")), Ai.interfaceRole);
+                    return;
+                }
+                Ai.setPromptProfile(wanted);
+            }
+        },
+        {
             name: "yolo",
             description: Translation.tr("Auto-approve ALL AI shell commands, including dangerous ones (risky!). Usage: /yolo on|off"),
             execute: args => {
