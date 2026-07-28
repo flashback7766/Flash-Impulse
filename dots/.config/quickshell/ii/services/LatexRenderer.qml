@@ -16,7 +16,15 @@ import Quickshell
 Singleton {
     id: root
     
-    readonly property var renderPadding: 4 // This is to prevent cutoff in the rendered images
+    // Just enough to keep ascenders and descenders off the edge. At 4 the image
+    // was visibly taller than the line it sat in, which pushed the whole
+    // paragraph apart and left a gap between a formula and the comma after it.
+    readonly property var renderPadding: 1
+
+    // Matched to the text a formula appears in, not to the UI's base size — a
+    // formula set two points larger than the sentence around it reads as a
+    // pasted-in picture rather than part of the line.
+    readonly property int renderTextSize: Appearance.font.pixelSize.small
 
     property list<string> processedHashes: []
     property var processedExpressions: ({})
@@ -59,7 +67,7 @@ Singleton {
                 command: [ "bash", "-c", 
                     "cd ${root.microtexBinaryDir} && ./${root.microtexBinaryName} -headless '-input=${StringUtils.shellSingleQuoteEscape(StringUtils.escapeBackslashes(expression))}' "
                     + "'-output=${imagePath}' " 
-                    + "'-textsize=${Appearance.font.pixelSize.normal}' "
+                    + "'-textsize=${root.renderTextSize}' "
                     + "'-padding=${renderPadding}' "
                     // + "'-background=${Appearance.m3colors.m3tertiary}' "
                     + "'-foreground=${Appearance.colors.colOnLayer1}' "
