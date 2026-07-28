@@ -165,9 +165,29 @@ Disables **syntax highlighting**, lowers **stream repaint frequency**, drops
 
 ## Order of work
 
-1. Reasoning parsing and rendering
-2. Saves, autosave, chat list, session binding
-3. Message design, markdown, code blocks
+1. **Done** — Reasoning parsing and rendering (`ebae9497`, extended in `e0349700`)
+2. **Done** — Saves, autosave, chat list, session binding (`49151b29`, `a4e3eebe`)
+3. **Mostly done** — Message design, markdown, code blocks (`271dc5f8`, `4ea8991f`)
 4. Modes, GUI settings, wizard, MCP
 5. Model catalogue, local models, branches
 6. Selection hotkey, polish, performance mode
+
+### Stage 3 — what's left
+
+- Density toggle (spacious ↔ compact) in chat settings.
+- Dividers on events: model switch, context compaction, mode change.
+- Own-drawn provider icons instead of vendor brand files.
+- Streaming: queue a message typed while generating instead of aborting the
+  turn; animated dots while waiting for the first token; a dot on the bar
+  button when a background answer finishes.
+
+### Testing
+
+`harness.qml` renders block widgets offscreen to a PNG, so a change can be
+checked without restarting the shell:
+
+    HARNESS_OUT=/tmp/blocks.png qs -p ~/.config/quickshell/ii/harness.qml
+
+Never `qs -c ii kill` while the screen is locked — it kills the lockscreen and
+drops Hyprland into a fallback only clearable from a TTY. Check first with
+`qs -c ii ipc call lock status`.
