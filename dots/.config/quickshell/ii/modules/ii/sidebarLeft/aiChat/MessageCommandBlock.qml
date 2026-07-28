@@ -48,6 +48,9 @@ Item {
     readonly property bool running: root.commandState === "running"
     readonly property bool failed: root.commandState === "failed"
     readonly property bool rejected: root.commandState === "rejected"
+    // Claude Code blocked it for want of permission. Not a failure — nothing
+    // went wrong, it simply wasn't allowed to start.
+    readonly property bool denied: root.commandState === "denied"
 
     // Output opens while there's something to watch and stays open when it went
     // wrong; a command that succeeded is noise you can ask for.
@@ -55,11 +58,12 @@ Item {
     property bool userToggled: false
     onCommandStateChanged: {
         if (root.userToggled) return;
-        root.outputExpanded = (root.commandState === "running" || root.commandState === "failed");
+        root.outputExpanded = (root.commandState === "running" || root.commandState === "failed"
+            || root.commandState === "denied");
     }
 
     readonly property color accent: root.failed ? Appearance.colors.colError
-        : root.pending ? Appearance.m3colors.m3tertiary
+        : (root.pending || root.denied) ? Appearance.m3colors.m3tertiary
         : root.running ? Appearance.colors.colPrimary
         : Appearance.colors.colSubtext
 
@@ -99,7 +103,7 @@ Item {
                     color: root.accent
                     text: root.failed ? "error"
                         : root.rejected ? "block"
-                        : root.pending ? "gavel"
+                        : (root.pending || root.denied) ? "gavel"
                         : root.running ? "terminal"
                         : "check_circle"
 
@@ -118,7 +122,8 @@ Item {
                     font.weight: Font.DemiBold
                     color: root.accent
                     elide: Text.ElideRight
-                    text: root.title.length > 0 ? root.title
+                    text: root.denied ? Translation.tr("%1 · needs permission").arg(root.title.length > 0 ? root.title : Translation.tr("Command"))
+                        : root.title.length > 0 ? root.title
                         : root.pending ? Translation.tr("Wants to run a command")
                         : root.running ? Translation.tr("Running…")
                         : root.rejected ? Translation.tr("Rejected")
@@ -190,13 +195,14 @@ Item {
                 Layout.rightMargin: 8
                 Layout.bottomMargin: 8
                 spacing: 6
-                visible: root.verdict.length > 0 && (root.pending || (root.messageData?.commandAutoApproved ?? false))
+                visible: root.verdict.length > 0
+                    && (root.pending || root.denied || (root.messageData?.commandAutoApproved ?? false))
 
                 MaterialSymbol {
                     Layout.alignment: Qt.AlignTop
                     iconSize: Appearance.font.pixelSize.small
-                    color: root.pending ? Appearance.m3colors.m3tertiary : Appearance.colors.colSubtext
-                    text: root.pending ? "warning" : "shield"
+                    color: (root.pending || root.denied) ? Appearance.m3colors.m3tertiary : Appearance.colors.colSubtext
+                    text: (root.pending || root.denied) ? "warning" : "shield"
                 }
 
                 StyledText {

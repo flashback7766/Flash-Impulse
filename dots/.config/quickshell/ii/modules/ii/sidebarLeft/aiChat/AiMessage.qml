@@ -424,7 +424,11 @@ Item {
                 commandState: modelData.state
                 commandText: modelData.text
                 output: modelData.output
-                verdict: ""
+                // Its permission prompt lives in the CLI and can't be answered
+                // from here, so the only useful thing to say is how to get past it.
+                verdict: modelData.state === "denied"
+                    ? Translation.tr("Claude Code asked for permission, and its prompt can't be answered from the sidebar. Shift+Tab to Yolo lets it run without asking.")
+                    : ""
             }
         }
 

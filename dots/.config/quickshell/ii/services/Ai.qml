@@ -391,6 +391,20 @@ The shell (Quickshell config "ii"):
 
     // The pipeline reads the mode rather than the other way round, so /yolo and the
     // chip can't disagree about what's actually in force.
+    // Claude Code enforces permissions itself, so the chip has to reach its CLI
+    // or the two disagree — and its prompt can't be answered from this sidebar,
+    // which makes a mode that asks a dead end rather than a safeguard.
+    Binding {
+        target: root.apiStrategies["claude-code"]
+        property: "permissionMode"
+        value: ({
+            "plan": "plan",
+            "default": "default",
+            "auto": "acceptEdits",
+            "yolo": "bypassPermissions"
+        })[root.permissionMode] ?? "default"
+    }
+
     Binding {
         target: root.commandSafety
         property: "yoloMode"

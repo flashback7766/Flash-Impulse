@@ -93,8 +93,17 @@ ApiStrategy {
         return {}; // Unused — the CLI carries the payload.
     }
 
+    /**
+     * Which permission mode the CLI runs under. Driven by the sidebar's own mode
+     * chip, because a second setting for the same idea is a setting that will
+     * disagree with the one you can see. The config key still wins if set, for
+     * anyone who wants the CLI pinned regardless.
+     */
+    property string permissionMode: "default"
+
     function finalizeScriptContent(scriptContent: string): string {
-        const permissionMode = Config?.options.ai?.claudeCodePermissionMode ?? "acceptEdits";
+        const override = Config?.options.ai?.claudeCodePermissionMode ?? "";
+        const permissionMode = override.length > 0 ? override : root.permissionMode;
         const heredoc = "FI_CLAUDE_PROMPT_EOF";
         const args = [
             "-p",
@@ -167,14 +176,14 @@ ApiStrategy {
      * position: Claude Code runs tools concurrently and the results come back in
      * whatever order they finish.
      */
-    function completeToolCall(message: AiMessageData, id, output, failed) {
+    function completeToolCall(message: AiMessageData, id, output, failed, denied) {
         const calls = [...message.toolCalls];
         for (let i = calls.length - 1; i >= 0; i--) {
             if (calls[i].id !== id) continue;
             const text = (output ?? "").trim();
             calls[i] = Object.assign({}, calls[i], {
                 "output": text.length > 2000 ? text.slice(-2000) : text,
-                "state": failed ? "failed" : "done"
+                "state": denied ? "denied" : (failed ? "failed" : "done")
             });
             message.toolCalls = calls;
             return;
@@ -230,7 +239,12 @@ ApiStrategy {
                         .map(part => part.text ?? "")
                         .join("\n");
                 }
-                root.completeToolCall(message, block.tool_use_id, text, block.is_error === true);
+                // Claude Code reports a blocked tool as an error, but "you didn't
+                // let me" is not "it went wrong" — and there is no way to answer
+                // its prompt from here, so saying so is the only useful thing.
+                const denied = /requires? (?:approval|permission)|permission to use|user (?:denied|rejected)/i.test(text);
+                root.completeToolCall(message, block.tool_use_id, text,
+                    block.is_error === true, denied);
             }
             return {};
         }

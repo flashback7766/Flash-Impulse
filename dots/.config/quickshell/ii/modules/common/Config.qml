@@ -94,6 +94,10 @@ Singleton {
 
                 // offers so two servers can both have a "search".
 
+                // Empty means "follow the sidebar's permission mode chip". Set it
+                // to plan | default | acceptEdits | bypassPermissions to pin the
+                // CLI regardless of what the chip says.
+                property string claudeCodePermissionMode: ""
                 property list<var> mcpServers: []
                 property list<var> extraModels: [
                     {
