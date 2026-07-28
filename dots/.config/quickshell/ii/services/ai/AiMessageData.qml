@@ -42,6 +42,12 @@ QtObject {
     property var functionCallParts
     property bool visibleToUser: true
 
+    // Set on a message that marks an event rather than something anyone said —
+    // the model was switched, the context was compacted. The UI draws it as a
+    // labelled hairline in place of the usual author/body/controls.
+    property string dividerText
+    property string dividerIcon
+
     // Shell-command lifecycle, for the command block.
     //
     // This used to be spliced into `content` as a ```command fence and read back

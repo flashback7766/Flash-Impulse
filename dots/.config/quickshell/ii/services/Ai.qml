@@ -854,6 +854,27 @@ The shell (Quickshell config "ii"):
         root.persistCurrentChat();
     }
 
+    /**
+     * A labelled hairline in the conversation marking something that changed.
+     * @param atStart put it above everything — for compaction, where the event
+     *        applies to the messages that were just removed from the top.
+     */
+    function addDivider(text, icon, atStart = false) {
+        if (!text || text.length === 0) return;
+        const aiMessage = aiMessageComponent.createObject(root, {
+            "role": root.interfaceRole,
+            "content": "",
+            "rawContent": "",
+            "dividerText": text,
+            "dividerIcon": icon ?? "",
+            "done": true,
+        });
+        const id = idForMessage(aiMessage);
+        root.messageByID[id] = aiMessage;
+        root.messageIDs = atStart ? [id, ...root.messageIDs] : [...root.messageIDs, id];
+        root.persistCurrentChat();
+    }
+
     function removeMessage(index) {
         root.removeMessagesRange(index, 1);
     }
@@ -902,7 +923,9 @@ The shell (Quickshell config "ii"):
             root.currentModelId = modelId
             if (setPersistentState) root.savePersistentState("model", modelId)
 
-            if (feedback) root.addMessage(Translation.tr("Switched to **%1**").arg(models[modelId].name), Ai.interfaceRole);
+            // A divider rather than a message: it's an event in the conversation,
+            // not something anyone said, and it belongs exactly where it happened.
+            if (feedback) root.addDivider(Translation.tr("Switched to %1").arg(models[modelId].name), "swap_horiz");
             const model = models[modelId]
             // See if policy prevents online models
             if (Config.options.policies.ai === 2 && !model.endpoint.includes("localhost")) {
@@ -1144,12 +1167,19 @@ The shell (Quickshell config "ii"):
             if (exitCode === 0) {
                 try {
                     const response = JSON.parse(summarizerProc.buffer);
-                    const newSummary = response.candidates[0]?.content?.parts[0]?.text;
+                    // A blocked or empty candidate has no parts at all.
+                    const newSummary = response.candidates?.[0]?.content?.parts?.[0]?.text;
                     if (newSummary && newSummary.length > 0) {
                         root.sessionSummary = newSummary.trim();
                         console.log("[AI] Context compressed. New summary length:", root.sessionSummary.length);
+                        const removed = summarizerProc.countToRemove;
                         // Safely remove messages in bulk (this also saves the chat)
-                        root.removeMessagesRange(0, summarizerProc.countToRemove);
+                        root.removeMessagesRange(0, removed);
+                        // Say so. Compaction used to delete the top of the
+                        // conversation silently, which reads as messages going missing.
+                        root.addDivider(
+                            Translation.tr("Context compacted — %1 earlier messages summarised").arg(removed),
+                            "compress", true);
                     }
                 } catch (e) { console.log("[AI] Summarizer parse error:", e); }
             }
@@ -1942,6 +1972,8 @@ The shell (Quickshell config "ii"):
                     "thoughtSignature": message.thoughtSignature,
                     "functionResponse": message.functionResponse,
                     "visibleToUser": message.visibleToUser,
+                    "dividerText": message.dividerText,
+                    "dividerIcon": message.dividerIcon,
                 })
             })
     }
@@ -2069,6 +2101,8 @@ The shell (Quickshell config "ii"):
                 "functionCall": message.functionCall,
                 "functionResponse": message.functionResponse,
                 "visibleToUser": message.visibleToUser,
+                "dividerText": message.dividerText ?? "",
+                "dividerIcon": message.dividerIcon ?? "",
             });
             // Restore Gemini thought signature data (dynamic props, set after creation)
             if (message.functionCallParts) root.messageByID[saveIds[i]].functionCallParts = message.functionCallParts;

@@ -1132,9 +1132,9 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                     messageData: Ai.messageByID[modelData] ?? null
 
                     property var prevMessageData: index > 0 ? Ai.messageByID[messageListView.model.values[index - 1]] : null
-                    isContinuation: prevMessageData != null 
+                    isContinuation: prevMessageData != null
                         && messageData != null
-                        && messageData.role === prevMessageData?.role 
+                        && messageData.role === prevMessageData?.role
                         && messageData.model === prevMessageData?.model
                         && messageData.role === "assistant"
 

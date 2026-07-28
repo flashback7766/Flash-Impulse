@@ -37,7 +37,10 @@ Item {
     readonly property bool isUser: messageData?.role === "user"
     readonly property bool isAssistant: messageData?.role === "assistant"
     readonly property bool isInterface: messageData?.role === "interface"
-    readonly property bool hovered: hoverArea.containsMouse || actionRowHover.containsMouse
+    // An event marker rather than something someone said: no author, no body,
+    // no controls — just the hairline saying what changed and where.
+    readonly property bool isDivider: (messageData?.dividerText ?? "").length > 0
+    readonly property bool hovered: !root.isDivider && (hoverArea.containsMouse || actionRowHover.containsMouse)
 
     // A wide sidebar shouldn't stretch prose to the full window; long lines are
     // hard to track. Code and tables are exempt — they own their own width.
@@ -128,9 +131,16 @@ Item {
         anchors.topMargin: root.isContinuation ? 2 : 10
         spacing: root.contentSpacing
 
+        ChatDivider { // Something about the conversation changed here
+            Layout.fillWidth: true
+            visible: root.isDivider
+            text: root.messageData?.dividerText ?? ""
+            icon: root.messageData?.dividerIcon ?? ""
+        }
+
         RowLayout { // Authorship
             id: headerRow
-            visible: !root.isContinuation
+            visible: !root.isContinuation && !root.isDivider
             Layout.fillWidth: true
             Layout.leftMargin: 2
             Layout.rightMargin: 2
@@ -240,6 +250,7 @@ Item {
         Item { // Content, bubbled for the user and bare for everyone else
             id: contentWrapper
             Layout.fillWidth: true
+            visible: !root.isDivider
             implicitHeight: bubble.implicitHeight
 
             // The bubble can't be sized from the content column: that column is
@@ -289,10 +300,16 @@ Item {
                         }
                         FadeLoader {
                             id: loadingIndicatorLoader
-                            anchors.centerIn: parent
-                            shown: (root.messageBlocks.length < 1) && (!root.messageData?.done ?? false)
-                            sourceComponent: MaterialLoadingIndicator {
-                                loading: true
+                            anchors.left: parent.left
+                            anchors.verticalCenter: parent.verticalCenter
+                            // Nothing to show yet and still streaming: the answer is
+                            // being composed. Reasoning has its own header, so this is
+                            // only ever the silence before the first token.
+                            shown: (root.messageBlocks.length < 1)
+                                && !(root.messageData?.done ?? false)
+                                && !(root.messageData?.reasoningActive ?? false)
+                            sourceComponent: TypingDots {
+                                color: Appearance.colors.colPrimary
                             }
                         }
                     }

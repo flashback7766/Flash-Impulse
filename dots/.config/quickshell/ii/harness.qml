@@ -6,6 +6,10 @@
 // PNG, so a widget can be checked visually without the sidebar being on screen —
 // which matters because restarting the shell to look at it kills the lock screen
 // when the session happens to be locked.
+//
+// Drive widgets with fixture data only. Anything that reaches into the Ai
+// singleton for real — sendUserMessage, queueUserMessage — runs against the live
+// API and writes a chat file into the user's history.
 import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.ii.sidebarLeft.aiChat
