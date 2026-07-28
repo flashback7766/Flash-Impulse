@@ -123,9 +123,28 @@ Item {
             execute: args => {
                 if (args[0] === "on") Ai.setYolo(true);
                 else if (args[0] === "off") Ai.setYolo(false);
-                else Ai.addMessage(Ai.commandSafety.yoloMode
-                    ? Translation.tr("YOLO mode is ON. Disable with /yolo off")
-                    : Translation.tr("YOLO mode is off. Enable with /yolo on (risky!)"), Ai.interfaceRole);
+                else Ai.addMessage(Ai.permissionMode === "yolo"
+                    ? Translation.tr("Yolo mode is ON. Disable with /yolo off")
+                    : Translation.tr("Yolo mode is off. Enable with /yolo on (risky!)"), Ai.interfaceRole);
+            }
+        },
+        {
+            name: "mode",
+            description: Translation.tr("How much runs without asking: plan, default, auto or yolo (Shift+Tab cycles)"),
+            execute: args => {
+                const wanted = (args[0] ?? "").toLowerCase();
+                if (wanted.length === 0) {
+                    const lines = Ai.permissionModes.map(m =>
+                        `${m.id === Ai.permissionMode ? "**→ " : "- "}${m.name}${m.id === Ai.permissionMode ? "**" : ""} — ${m.hint}`);
+                    Ai.addMessage(Translation.tr("Permission modes (Shift+Tab cycles):\n\n%1").arg(lines.join("\n")), Ai.interfaceRole);
+                    return;
+                }
+                if (!Ai.permissionModes.some(m => m.id === wanted)) {
+                    Ai.addMessage(Translation.tr("Unknown mode: '%1'. One of: %2")
+                        .arg(wanted).arg(Ai.permissionModes.map(m => m.id).join(", ")), Ai.interfaceRole);
+                    return;
+                }
+                Ai.setPermissionMode(wanted);
             }
         },
         {
@@ -1514,6 +1533,12 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                                 }
                                 messageInputField.cursorPosition = messageInputField.text.length;
                                 event.accepted = true;
+                            } else if (event.key === Qt.Key_Backtab
+                                || (event.key === Qt.Key_Tab && (event.modifiers & Qt.ShiftModifier))) {
+                                // Shift+Tab cycles the permission mode. Qt reports it
+                                // as Key_Backtab on most layouts, but not all.
+                                Ai.cyclePermissionMode();
+                                event.accepted = true;
                             } else if ((event.key === Qt.Key_Enter || event.key === Qt.Key_Return)) {
                                 if (event.modifiers & Qt.ShiftModifier) {
                                     // Insert newline
@@ -1660,6 +1685,9 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                 anchors.rightMargin: 10
                 spacing: 10
 
+                // First in the row: what the assistant is allowed to do without
+                // asking is the thing to read before pressing send.
+                PermissionModeChip {}
 
                 // Chat history
                 RippleButton {

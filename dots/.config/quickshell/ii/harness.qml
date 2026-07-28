@@ -8,8 +8,9 @@
 // when the session happens to be locked.
 //
 // Drive widgets with fixture data only. Anything that reaches into the Ai
-// singleton for real — sendUserMessage, queueUserMessage — runs against the live
-// API and writes a chat file into the user's history.
+// singleton for real writes to the user's actual state: sendUserMessage and
+// queueUserMessage hit the live API and leave a chat file behind,
+// setPermissionMode persists the mode. Put the value back if you touch it.
 import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.ii.sidebarLeft.aiChat

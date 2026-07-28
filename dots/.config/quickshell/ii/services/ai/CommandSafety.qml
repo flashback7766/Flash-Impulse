@@ -24,6 +24,8 @@ QtObject {
     id: root
 
     property bool yoloMode: false
+    // Default mode: nothing is auto-approved, not even a read-only command.
+    property bool alwaysConfirm: false
 
     readonly property string logDir: Quickshell.env("HOME") + "/.local/share/flash-impulse/logs"
     readonly property string judgeModel: "gemini-3.5-flash-lite"
@@ -111,6 +113,13 @@ QtObject {
         if (isBlacklisted(cmd)) {
             audit(cmd, "blacklist", "confirm");
             onConfirm("Potentially destructive command — review carefully before approving");
+            return;
+        }
+        if (root.alwaysConfirm) {
+            // Default mode: the judge's opinion is still worth having, but it can't
+            // decide on the user's behalf, so skip straight to asking.
+            audit(cmd, "always-confirm", "confirm");
+            onConfirm("Every command needs approval in Default mode");
             return;
         }
 

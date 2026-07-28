@@ -135,7 +135,29 @@ Singleton {
         // are facts about *this* machine, and they have to survive the user
         // rewriting their prompt — getting them wrong costs a round of commands
         // that edit the wrong file or change something already set.
-        return prompt + "\n\n" + root.desktopRules;
+        return prompt + "\n\n" + root.desktopRules + "\n\n" + root.modeRules;
+    }
+
+    readonly property string modeRules: {
+        if (root.permissionMode === "plan") {
+            return "## Plan mode is on\n"
+                + "You cannot run commands right now — the tool is refused before it executes, "
+                + "so calling it only wastes a turn. Answer with the plan instead: the commands "
+                + "you would run in order, each with one line saying what it does and what it "
+                + "changes, and call out anything irreversible. The user will switch modes when "
+                + "they want it carried out.";
+        }
+        if (root.permissionMode === "default") {
+            return "## Default mode\nEvery command is shown to the user for approval before it runs. "
+                + "Keep each one to a single purpose so it can be judged on its own.";
+        }
+        if (root.permissionMode === "yolo") {
+            return "## Yolo mode\nCommands run without review. Nothing will stop a destructive one, "
+                + "so be correspondingly careful: prefer the narrowest command that does the job, "
+                + "and don't chain unrelated work.";
+        }
+        return "## Auto mode\nA safety judge clears low-risk commands automatically; anything else "
+            + "goes to the user for approval. Keep each command to a single purpose.";
     }
 
     readonly property string desktopRules: `
@@ -178,6 +200,69 @@ The shell (Quickshell config "ii"):
 
     function setCompactMessages(enabled) {
         root.savePersistentState("compactMessages", enabled);
+    }
+
+    // How much the assistant may do without asking. Shift+Tab cycles it, and the
+    // chip beside the input always says which one is active — the difference
+    // between "will ask" and "already ran it" is not something to have to guess.
+    readonly property var permissionModes: [
+        {
+            id: "plan",
+            name: Translation.tr("Plan"),
+            icon: "checklist",
+            hint: Translation.tr("Works out what to do and shows it. Runs nothing.")
+        },
+        {
+            id: "default",
+            name: Translation.tr("Default"),
+            icon: "shield_person",
+            hint: Translation.tr("Asks before every command.")
+        },
+        {
+            id: "auto",
+            name: Translation.tr("Auto"),
+            icon: "bolt",
+            hint: Translation.tr("Runs what the safety judge clears; asks about the rest.")
+        },
+        {
+            id: "yolo",
+            name: Translation.tr("Yolo"),
+            icon: "local_fire_department",
+            hint: Translation.tr("Runs everything without asking. You accept the consequences.")
+        }
+    ]
+
+    property string permissionMode: Persistent.states?.ai?.permissionMode ?? "auto"
+    readonly property var permissionModeInfo: root.permissionModes.find(m => m.id === root.permissionMode)
+        ?? root.permissionModes[2]
+    readonly property bool planMode: root.permissionMode === "plan"
+
+    function setPermissionMode(mode) {
+        if (!root.permissionModes.some(m => m.id === mode)) return;
+        if (mode === root.permissionMode) return;
+        root.savePersistentState("permissionMode", mode);
+        const info = root.permissionModes.find(m => m.id === mode);
+        root.addDivider(Translation.tr("%1 mode — %2").arg(info.name).arg(info.hint), info.icon);
+    }
+
+    function cyclePermissionMode(backwards = false) {
+        const modes = root.permissionModes;
+        const at = modes.findIndex(m => m.id === root.permissionMode);
+        const next = ((at < 0 ? 2 : at) + (backwards ? -1 : 1) + modes.length) % modes.length;
+        root.setPermissionMode(modes[next].id);
+    }
+
+    // The pipeline reads the mode rather than the other way round, so /yolo and the
+    // chip can't disagree about what's actually in force.
+    Binding {
+        target: root.commandSafety
+        property: "yoloMode"
+        value: root.permissionMode === "yolo"
+    }
+    Binding {
+        target: root.commandSafety
+        property: "alwaysConfirm"
+        value: root.permissionMode === "default"
     }
 
     property bool promptCaching: Persistent.states?.ai?.promptCaching ?? true
@@ -1802,12 +1887,14 @@ The shell (Quickshell config "ii"):
         return commandSafety.isBlacklisted(cmd);
     }
 
+    // Kept for /yolo, but it moves the permission mode rather than reaching past
+    // it — two switches for one behaviour is how they end up disagreeing.
     function setYolo(enabled) {
-        commandSafety.yoloMode = enabled;
         if (enabled) {
-            root.addMessage(Translation.tr("⚠️ **YOLO mode ON** — every command the AI runs is auto-approved, including destructive ones. You accept full responsibility. Disable with /yolo off."), root.interfaceRole);
-        } else {
-            root.addMessage(Translation.tr("YOLO mode off. The safety pipeline is active again."), root.interfaceRole);
+            root.setPermissionMode("yolo");
+            root.addMessage(Translation.tr("⚠️ **Yolo mode** — every command the AI runs is auto-approved, including destructive ones. You accept full responsibility. Shift+Tab or `/mode auto` to step back."), root.interfaceRole);
+        } else if (root.permissionMode === "yolo") {
+            root.setPermissionMode("auto");
         }
     }
 
@@ -1926,6 +2013,20 @@ The shell (Quickshell config "ii"):
                 addFunctionOutputMessage(name, Translation.tr("Invalid arguments. Must provide `command`."));
                 return;
             }
+            // Plan mode never runs anything. Refusing at the tool boundary rather
+            // than trusting the prompt means it holds even when the model forgets.
+            if (root.planMode) {
+                message.commandText = args.command;
+                message.commandState = "rejected";
+                message.commandVerdict = Translation.tr("Plan mode — nothing runs");
+                addFunctionOutputMessage(name, Translation.tr(
+                    "Plan mode is on, so no command was run. Do not try again. "
+                    + "Write out the plan instead: the commands you would run, in order, "
+                    + "each with one line on what it does and what it changes."));
+                requester.makeRequest();
+                return;
+            }
+
             message.commandText = args.command;
             message.commandOutput = "";
             message.commandExitCode = 0;

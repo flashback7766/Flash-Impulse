@@ -65,6 +65,8 @@ Singleton {
                 // without touching type size — it's about how much fits on screen,
                 // not about how readable each message is.
                 property bool compactMessages: false
+                // plan | default | auto | yolo — see Ai.permissionModes
+                property string permissionMode: "auto"
             }
 
             property JsonObject cheatsheet: JsonObject {
