@@ -92,12 +92,28 @@ Rectangle {
             }
 
             StyledText {
+                id: fileNameText
+                // The full path is what you'd want to copy, not what you want to
+                // read — nobody sending a photo wants to see where in the
+                // filesystem it happened to sit.
                 Layout.fillWidth: true
                 Layout.topMargin: 4
-                text: root.filePath
+                text: root.filePath.substring(root.filePath.lastIndexOf("/") + 1)
                 font.pixelSize: Appearance.font.pixelSize.smaller
                 font.family: Appearance.font.family.monospace
                 wrapMode: Text.Wrap
+
+                MouseArea {
+                    id: fileNameArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    acceptedButtons: Qt.NoButton
+                }
+                StyledToolTip {
+                    extraVisibleCondition: false
+                    alternativeVisibleCondition: fileNameArea.containsMouse
+                    text: root.filePath
+                }
             }
 
             RippleButton {
