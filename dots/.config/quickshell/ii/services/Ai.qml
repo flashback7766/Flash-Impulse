@@ -2526,6 +2526,12 @@ The shell (Quickshell config "ii"):
             // the typing dots forever with nothing in the log.
             requester.pendingScript = scriptContent;
             requester.command = ["bash", "-s"];
+            // Closed at the end of the previous request (that's what told bash to
+            // stop reading and run). Every request after the first one needs this
+            // set back to true, or the new process starts with stdin already
+            // disabled — the script never gets written, and bash just sits there
+            // forever with nothing to run and no way to signal it never will.
+            requester.stdinEnabled = true;
             requester.running = true
         }
 
