@@ -44,6 +44,22 @@ Item {
     property var suggestionQuery: ""
     property var suggestionList: []
 
+    // Closing the sidebar with a sheet up used to leave it up: reopening
+    // landed you back on the shortcut cheatsheet or settings instead of your
+    // conversation, because nothing ever told these panels the window went
+    // away. They're transient chrome, not state worth restoring.
+    Connections {
+        target: GlobalStates
+        function onSidebarLeftOpenChanged() {
+            if (GlobalStates.sidebarLeftOpen) return;
+            shortcutSheet.shown = false;
+            if (chatSettingsPanel.shown) chatSettingsPanel.close();
+            if (chatListPanel.shown) chatListPanel.close();
+            if (modelPickerPopup.isOpen) modelPickerPopup.close();
+            if (functionsPopup.isOpen) functionsPopup.close();
+        }
+    }
+
     onFocusChanged: focus => {
         if (focus) {
             root.inputField.forceActiveFocus();
