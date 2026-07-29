@@ -446,6 +446,17 @@ Item {
             }
         }
 
+        Loader { // A genuine multiple-choice question the model asked instead of guessing
+            Layout.fillWidth: true
+            Layout.maximumWidth: root.textColumnWidth
+            Layout.topMargin: root.isMechanical ? 0 : 4
+            active: (root.messageData?.askQuestion ?? "").length > 0
+            visible: active
+            sourceComponent: MessageQuestionBlock {
+                messageData: root.messageData
+            }
+        }
+
         // A long run of tool calls folds into one line. Claude Code can fire a
         // dozen in a turn, and twelve cards saying a thing went fine is a wall
         // between you and the answer. Anything that failed or is still running

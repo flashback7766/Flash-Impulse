@@ -80,4 +80,12 @@ QtObject {
     // from any other model does — the point being that a Claude Code turn should
     // not look like a different program.
     property var toolCalls: []
+
+    // A multiple-choice question the model asked instead of guessing. Same
+    // "pending until the user acts" idea as a command, but there's nothing to
+    // approve or reject — just an option to pick.
+    property string askQuestion
+    property var askOptions: []
+    property bool askPending: false
+    property string askAnswer
 }

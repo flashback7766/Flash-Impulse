@@ -781,6 +781,25 @@ The shell (Quickshell config "ii"):
                         "required": ["command"]
                     }
                 },
+                {
+                    "name": "ask_user_question",
+                    "description": "Ask the user a genuine multiple-choice question and wait for them to pick before continuing. Use this instead of guessing when a real decision is theirs to make — not for anything you could work out yourself by reading the system, and not for routine confirmations.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "question": {
+                                "type": "string",
+                                "description": "The question, phrased so any of the options is a complete answer."
+                            },
+                            "options": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "2 to 4 short, mutually exclusive answers."
+                            }
+                        },
+                        "required": ["question", "options"]
+                    }
+                },
             ]}],
             "search": [{
                 "google_search": {}
@@ -863,6 +882,28 @@ The shell (Quickshell config "ii"):
                                 },
                             },
                             "required": ["command"]
+                        }
+                    },
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "ask_user_question",
+                        "description": "Ask the user a genuine multiple-choice question and wait for them to pick before continuing. Use this instead of guessing when a real decision is theirs to make — not for anything you could work out yourself by reading the system, and not for routine confirmations.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "question": {
+                                    "type": "string",
+                                    "description": "The question, phrased so any of the options is a complete answer."
+                                },
+                                "options": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                    "description": "2 to 4 short, mutually exclusive answers."
+                                }
+                            },
+                            "required": ["question", "options"]
                         }
                     },
                 },
@@ -950,6 +991,25 @@ The shell (Quickshell config "ii"):
                             }
                         },
                         "required": ["command"]
+                    }
+                },
+                {
+                    "name": "ask_user_question",
+                    "description": "Ask the user a genuine multiple-choice question and wait for them to pick before continuing. Use this instead of guessing when a real decision is theirs to make — not for anything you could work out yourself by reading the system, and not for routine confirmations.",
+                    "input_schema": {
+                        "type": "object",
+                        "properties": {
+                            "question": {
+                                "type": "string",
+                                "description": "The question, phrased so any of the options is a complete answer."
+                            },
+                            "options": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "2 to 4 short, mutually exclusive answers."
+                            }
+                        },
+                        "required": ["question", "options"]
                     }
                 }
             ],
@@ -1767,6 +1827,8 @@ The shell (Quickshell config "ii"):
         if ((message.dividerText ?? "").length > 0) return;
         if ((message.commandState ?? "").length > 0) return;
         if ((message.localFilePath ?? "").length > 0) return;
+        if ((message.askQuestion ?? "").length > 0) return;
+        if ((message.toolCalls?.length ?? 0) > 0) return;
         message.visibleToUser = false;
     }
 
@@ -3056,9 +3118,31 @@ The shell (Quickshell config "ii"):
                     message.commandVerdict = reason;
                     message.commandAutoApproved = false;
                 });
+        } else if (name === "ask_user_question") {
+            const question = args?.question ?? "";
+            const options = Array.isArray(args?.options) ? args.options.filter(o => (o ?? "").length > 0).slice(0, 4) : [];
+            if (question.length === 0 || options.length < 2) {
+                addFunctionOutputMessage(name, Translation.tr("Invalid arguments. Must provide `question` and at least 2 `options`."));
+                requester.makeRequest();
+                return;
+            }
+            message.askQuestion = question;
+            message.askOptions = options;
+            message.askPending = true;
+            message.functionName = name;
+            // No requester.makeRequest() here — answerQuestion() resumes the
+            // turn once the user actually picks something.
         } else {
             root.addMessage(Translation.tr("Unknown function call: %1").arg(name), root.interfaceRole);
         }
+    }
+
+    function answerQuestion(message: AiMessageData, choice: string) {
+        if (!message.askPending) return;
+        message.askPending = false;
+        message.askAnswer = choice;
+        addFunctionOutputMessage(message.functionName, Translation.tr("The user chose: %1").arg(choice));
+        requester.makeRequest();
     }
 
     function chatToJson() {
@@ -3100,6 +3184,9 @@ The shell (Quickshell config "ii"):
                     "variants": message.variants,
                     "toolCalls": message.toolCalls,
                     "variantIndex": message.variantIndex,
+                    "askQuestion": message.askQuestion,
+                    "askOptions": message.askOptions,
+                    "askAnswer": message.askAnswer,
                 })
             })
     }
@@ -3261,6 +3348,13 @@ The shell (Quickshell config "ii"):
                 "variants": message.variants ?? [],
                 "toolCalls": message.toolCalls ?? [],
                 "variantIndex": message.variantIndex ?? 0,
+                "askQuestion": message.askQuestion ?? "",
+                "askOptions": message.askOptions ?? [],
+                // Never restored as pending: there's no live request left to
+                // resume, so an unanswered question reopens as history, not
+                // as something you can still click.
+                "askPending": false,
+                "askAnswer": message.askAnswer ?? "",
             });
             // Restore Gemini thought signature data (dynamic props, set after creation)
             if (message.functionCallParts) root.messageByID[saveIds[i]].functionCallParts = message.functionCallParts;
