@@ -1275,6 +1275,10 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                     font.pixelSize: Appearance.font.pixelSize.huge
                     font.weight: Font.DemiBold
                     color: Appearance.colors.colOnLayer1
+                    // Some persona greetings run longer than "How can I help?" ever
+                    // did — without wrapping, this ran past the edge of the sidebar
+                    // instead of onto a second line.
+                    wrapMode: Text.WordWrap
                     // Persona-voiced where the profile bothers to have a voice —
                     // a tsundere chat and a plain coding session shouldn't open
                     // on the same neutral line.
@@ -1609,7 +1613,11 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                             } else if (event.key === Qt.Key_Down && suggestions.visible) {
                                 suggestions.selectedIndex = Math.min(Math.max(0, root.suggestionList.length - 1), suggestions.selectedIndex + 1);
                                 event.accepted = true;
-                            } else if (event.key === Qt.Key_Up && event.modifiers === Qt.NoModifier) {
+                            } else if (event.key === Qt.Key_Up && event.modifiers === Qt.NoModifier
+                                    && messageInputField.cursorRectangle.y <= 0) {
+                                // Only when the cursor is already on the first visual line —
+                                // otherwise Up on a pasted multi-line draft replaced the whole
+                                // box with chat history instead of just moving the cursor up.
                                 // Walk back through prior user prompts
                                 const hist = messageInputField._userPromptHistory();
                                 if (hist.length === 0) { event.accepted = false; return; }
@@ -1623,7 +1631,12 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                                     messageInputField.cursorPosition = messageInputField.text.length;
                                 }
                                 event.accepted = true;
-                            } else if (event.key === Qt.Key_Down && event.modifiers === Qt.NoModifier) {
+                            } else if (event.key === Qt.Key_Down && event.modifiers === Qt.NoModifier
+                                    && messageInputField.cursorRectangle.y + messageInputField.cursorRectangle.height
+                                        >= messageInputField.contentHeight) {
+                                // Same reasoning as Up: a history entry can itself be
+                                // multi-line, and Down should move within it until the
+                                // cursor is already on its last visual line.
                                 // Come forward; at the end, restore the draft
                                 if (messageInputField._historyIndex < 0) { event.accepted = false; return; }
                                 const hist = messageInputField._userPromptHistory();
