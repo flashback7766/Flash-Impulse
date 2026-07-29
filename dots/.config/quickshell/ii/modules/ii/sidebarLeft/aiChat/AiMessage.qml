@@ -582,7 +582,9 @@ Item {
                 // A transparent button is still a button as far as the mouse is
                 // concerned; without this you could click one you couldn't see.
                 enabled: root.hovered || root.editing
-                spacing: 2
+                // 2px between 28px icons is a target you can miss by aiming at the
+                // icon you can see and landing on the edge of its neighbour instead.
+                spacing: 8
 
                 Behavior on opacity {
                     animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)

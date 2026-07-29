@@ -24,6 +24,12 @@ GroupButton {
     colBackgroundHover: Appearance.colors.colSecondaryContainerHover
     colBackgroundActive: Appearance.colors.colSecondaryContainerActive
 
+    // The visual icon stays 28px so the action strip's height doesn't change
+    // everywhere else it's reused, but the clickable area extends a few
+    // pixels past it — a row of these packed together is an easy row to miss
+    // by a couple of pixels and hit nothing at all.
+    mouseArea.anchors.margins: -4
+
     contentItem: MaterialSymbol {
         horizontalAlignment: Text.AlignHCenter
         iconSize: Appearance.font.pixelSize.larger
