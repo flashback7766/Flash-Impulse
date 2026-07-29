@@ -1236,7 +1236,11 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                 model: ScriptModel {
                     values: Ai.messageIDs.filter(id => {
                         const message = Ai.messageByID[id];
-                        return message?.visibleToUser ?? true;
+                        // A null message must not become a row. This is the same
+                        // hole the delegate had: `undefined ?? true` is true, so an
+                        // id with nothing behind it stayed in the model and got a
+                        // delegate that rendered as a ghost "Interface" line.
+                        return message != null && (message.visibleToUser ?? true);
                     })
                 }
                 delegate: AiMessage {

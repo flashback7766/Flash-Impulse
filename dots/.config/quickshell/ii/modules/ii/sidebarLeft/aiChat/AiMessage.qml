@@ -225,16 +225,17 @@ Item {
             }
 
             StyledText {
-                // The name earns its place when it changes — or when you ask for it
-                // by hovering. Otherwise the provider icon already says enough.
-                // Your own name above your own question, every single time, is the
-                // one label that can never tell you anything — the bubble is
-                // already on your side of the conversation. Same rule as the model.
-                // Which model answered varies, so it stays put; your own name above
-                // your own question never tells you anything the side of the bubble
-                // didn't, so it waits for hover. On a turn that only ran commands
-                // the icon was left hanging with nothing beside it.
-                opacity: root.isUser ? (root.hovered ? 1 : 0) : 1
+                // A label earns its place by telling you something that varies.
+                // Your own name above your own question never does — the bubble is
+                // already on your side — so it waits for hover. Which model
+                // answered does vary, but only when it changes, so it shows on the
+                // first answer, on a switch, and on hover. The provider icon stays
+                // either way and is what marks where an answer begins.
+                //
+                // This had drifted back to always-on while fixing something else;
+                // namesModel was still being set by the list and read by nobody.
+                opacity: root.isUser ? (root.hovered ? 1 : 0)
+                    : (root.isInterface || root.namesModel || root.hovered) ? 1 : 0
                 Behavior on opacity {
                     animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
                 }
