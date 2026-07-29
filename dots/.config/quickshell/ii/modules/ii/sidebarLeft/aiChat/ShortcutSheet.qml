@@ -32,6 +32,7 @@ Item {
                 ["Shift+Enter", Translation.tr("New line")],
                 ["Esc", Translation.tr("Reject a waiting command · close a panel")],
                 ["Ctrl+E", Translation.tr("Reword your last question")],
+                ["Ctrl+Shift+C", Translation.tr("Copy the last answer")],
                 ["↑ / ↓", Translation.tr("Walk back through what you've asked")]
             ]
         },
@@ -41,6 +42,7 @@ Item {
                 ["Ctrl+K", Translation.tr("Chat history")],
                 ["Ctrl+Shift+O", Translation.tr("New chat")],
                 ["Ctrl+M", Translation.tr("Model picker")],
+                ["Ctrl+,", Translation.tr("Assistant settings")],
                 ["Ctrl+/  ·  F1", Translation.tr("This list")],
                 ["PgUp / PgDn", Translation.tr("Scroll the conversation")]
             ]

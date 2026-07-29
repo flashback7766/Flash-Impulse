@@ -80,6 +80,28 @@ Item {
             event.accepted = true;
             return;
         }
+        // Ctrl+, for settings: the convention nearly every app uses, so it's
+        // worth honouring even though the gear icon already reaches the same
+        // panel.
+        if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_Comma) {
+            chatSettingsPanel.shown ? chatSettingsPanel.close() : chatSettingsPanel.open();
+            event.accepted = true;
+            return;
+        }
+        // Ctrl+Shift+C copies the last answer without reaching for the mouse to
+        // hover the message and find its copy button.
+        if ((event.modifiers & Qt.ControlModifier) && (event.modifiers & Qt.ShiftModifier)
+                && event.key === Qt.Key_C) {
+            const last = Ai.lastAssistantMessage();
+            if (last) {
+                Quickshell.clipboardText = last.rawContent;
+                // Keyed so mashing the shortcut collapses to one line instead of
+                // stacking — the same reasoning as the temperature divider.
+                Ai.addDivider(Translation.tr("Copied last answer to clipboard"), "content_copy", false, "copy-last");
+            }
+            event.accepted = true;
+            return;
+        }
         // F1 as well as Ctrl+/: on a Cyrillic layout the slash key doesn't report
         // as Key_Slash, so the shortcut for finding out what the keyboard does
         // would itself have been unreachable for anyone not typing in English.
@@ -2026,6 +2048,57 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                 onPicked: prompt => {
                     Ai.queueUserMessage(prompt);
                     messageInputField.forceActiveFocus();
+                }
+            }
+        }
+    }
+
+    // Dragging a file in from a file manager did nothing at all before this —
+    // no highlight, no drop target, not even an error. Attaching one was only
+    // ever possible via /attach, the file-picker button, or clipboard paste.
+    DropArea {
+        id: fileDropArea
+        anchors.fill: parent
+        z: 1000
+        property bool draggingFile: false
+
+        onEntered: drag => { fileDropArea.draggingFile = drag.hasUrls; }
+        onExited: fileDropArea.draggingFile = false
+        onDropped: drop => {
+            fileDropArea.draggingFile = false;
+            if (drop.urls.length === 0) return;
+            Ai.attachFile(drop.urls[0].toString());
+            drop.accept();
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            visible: opacity > 0
+            opacity: fileDropArea.draggingFile ? 1 : 0
+            color: Appearance.colors.colLayer0
+            border.width: 2
+            border.color: Appearance.colors.colPrimary
+            radius: Appearance.rounding.normal
+
+            Behavior on opacity {
+                animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+            }
+
+            ColumnLayout {
+                anchors.centerIn: parent
+                spacing: 6
+                MaterialSymbol {
+                    Layout.alignment: Qt.AlignHCenter
+                    iconSize: Appearance.font.pixelSize.hugeass
+                    color: Appearance.colors.colPrimary
+                    text: "upload_file"
+                }
+                StyledText {
+                    Layout.alignment: Qt.AlignHCenter
+                    font.pixelSize: Appearance.font.pixelSize.large
+                    font.weight: Font.DemiBold
+                    color: Appearance.colors.colPrimary
+                    text: Translation.tr("Drop to attach")
                 }
             }
         }
