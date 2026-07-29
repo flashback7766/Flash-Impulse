@@ -52,6 +52,17 @@ Item {
     // went wrong, it simply wasn't allowed to start.
     readonly property bool denied: root.commandState === "denied"
 
+    /**
+     * A finished command folds to one line: a tick, what ran, a chevron.
+     *
+     * A turn that runs four commands was four two-row cards with gaps between
+     * them — half a screen to say four things went fine. The word "Done" was
+     * saying what the tick already said, on a row of its own. Anything still
+     * waiting, running or broken keeps the full treatment, because those are
+     * the ones you actually have to read.
+     */
+    readonly property bool compact: root.commandState === "done" && !root.outputExpanded
+
     // Output opens while there's something to watch and stays open when it went
     // wrong; a command that succeeded is noise you can ask for.
     property bool outputExpanded: false
@@ -93,8 +104,8 @@ Item {
 
             RowLayout { // Status line
                 Layout.fillWidth: true
-                Layout.margins: 8
-                Layout.bottomMargin: 0
+                Layout.margins: root.compact ? 6 : 8
+                Layout.bottomMargin: root.compact ? 6 : 0
                 spacing: 6
 
                 MaterialSymbol {
@@ -118,11 +129,20 @@ Item {
 
                 StyledText {
                     Layout.fillWidth: true
+                    // Folded, this row *is* the command, so it takes the code face.
+                    font.family: root.compact ? Appearance.font.family.monospace
+                        : Appearance.font.family.main
                     font.pixelSize: Appearance.font.pixelSize.smaller
-                    font.weight: Font.DemiBold
-                    color: root.accent
+                    font.weight: root.compact ? Font.Normal : Font.DemiBold
+                    color: root.compact ? Appearance.colors.colOnLayer2 : root.accent
                     elide: Text.ElideRight
-                    text: root.denied ? Translation.tr("%1 · needs permission").arg(root.title.length > 0 ? root.title : Translation.tr("Command"))
+                    maximumLineCount: 1
+                    text: root.compact
+                        // The tool name earns its place only when it isn't the shell:
+                        // "Read" says something, "Bash" in front of a command doesn't.
+                        ? ((root.title.length > 0 && root.title !== "Bash")
+                            ? `${root.title}  ${root.commandText}` : root.commandText)
+                        : root.denied ? Translation.tr("%1 · needs permission").arg(root.title.length > 0 ? root.title : Translation.tr("Command"))
                         : root.title.length > 0 ? root.title
                         : root.pending ? Translation.tr("Wants to run a command")
                         : root.running ? Translation.tr("Running…")
@@ -152,6 +172,7 @@ Item {
             }
 
             Rectangle { // The command itself — never elided while it needs approval
+                visible: !root.compact
                 Layout.fillWidth: true
                 Layout.margins: 8
                 Layout.topMargin: 6

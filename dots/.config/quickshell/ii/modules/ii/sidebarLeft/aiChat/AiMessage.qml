@@ -56,6 +56,13 @@ Item {
     // hard to track. Code and tables are exempt — they own their own width.
     readonly property real textColumnWidth: Math.min(width, 780)
 
+    // A turn that only ran tools is machinery, not conversation. Given the same
+    // breathing room as a paragraph, four commands in a row took half a screen
+    // to say four things went fine.
+    readonly property bool isMechanical: (root.messageData?.content ?? "").length === 0
+        && (((root.messageData?.commandState ?? "").length > 0)
+            || ((root.messageData?.toolCalls?.length ?? 0) > 0))
+
     property list<var> messageBlocks: StringUtils.splitMessageBlocks(root.messageData?.content ?? "")
 
     anchors.left: parent?.left
@@ -140,7 +147,9 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        anchors.topMargin: root.isContinuation ? (root.compact ? 1 : 2) : (root.compact ? 5 : 10)
+        anchors.topMargin: root.isMechanical ? 2
+            : root.isContinuation ? (root.compact ? 1 : 2)
+            : (root.compact ? 5 : 10)
         spacing: root.contentSpacing
 
         ChatDivider { // Something about the conversation changed here
@@ -203,7 +212,11 @@ Item {
                 // Your own name above your own question, every single time, is the
                 // one label that can never tell you anything — the bubble is
                 // already on your side of the conversation. Same rule as the model.
-                opacity: (root.isInterface || root.namesModel || root.hovered) ? 1 : 0
+                // Which model answered varies, so it stays put; your own name above
+                // your own question never tells you anything the side of the bubble
+                // didn't, so it waits for hover. On a turn that only ran commands
+                // the icon was left hanging with nothing beside it.
+                opacity: root.isUser ? (root.hovered ? 1 : 0) : 1
                 Behavior on opacity {
                     animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
                 }
@@ -397,7 +410,7 @@ Item {
         Loader { // Shell command the model asked to run
             Layout.fillWidth: true
             Layout.maximumWidth: root.textColumnWidth
-            Layout.topMargin: 4
+            Layout.topMargin: root.isMechanical ? 0 : 4
             active: (root.messageData?.commandState ?? "").length > 0
             visible: active
             sourceComponent: MessageCommandBlock {
@@ -416,7 +429,7 @@ Item {
                 required property var modelData
                 Layout.fillWidth: true
                 Layout.maximumWidth: root.textColumnWidth
-                Layout.topMargin: 4
+                Layout.topMargin: root.isMechanical ? 2 : 4
                 messageData: root.messageData
                 approvable: false
                 title: modelData.tool
@@ -471,6 +484,11 @@ Item {
 
         Item { // Actions, revealed on hover
             Layout.fillWidth: true
+            // Not on a turn that only ran a command: there's no text to copy, no
+            // answer to regenerate and nothing to edit, so the reserved strip was
+            // 36 pixels of nothing under every command — the gap that made four
+            // commands in a row take half a screen.
+            visible: !root.isMechanical
             // The strip is always there, only its contents fade. Collapsing it
             // meant there was nothing to aim at: the buttons appeared under the
             // pointer only while the pointer was on the message above them, so
