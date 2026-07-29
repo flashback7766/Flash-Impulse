@@ -68,7 +68,11 @@ Item {
             }
         }
 
-        MouseArea { anchors.fill: parent } // Swallow clicks meant for the chat underneath
+        // hoverEnabled matters as much as the fill: without it this only swallows
+        // clicks, and hover still reaches whatever's underneath — a control the
+        // panel is covering keeps reporting itself hovered and its tooltip sits
+        // there, floating over the panel that's supposed to be in front of it.
+        MouseArea { anchors.fill: parent; hoverEnabled: true }
 
         ColumnLayout {
             anchors.fill: parent

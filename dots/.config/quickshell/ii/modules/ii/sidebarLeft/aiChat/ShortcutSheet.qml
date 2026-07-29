@@ -76,7 +76,9 @@ Item {
         color: Appearance.m3colors.m3surfaceContainerLow
         radius: Appearance.rounding.normal
 
-        MouseArea { anchors.fill: parent }
+        // hoverEnabled too: without it this swallows clicks but not hover, and a
+        // hovered control underneath keeps its tooltip floating over the sheet.
+        MouseArea { anchors.fill: parent; hoverEnabled: true }
 
         ColumnLayout {
             anchors.fill: parent
