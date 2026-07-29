@@ -34,7 +34,6 @@ Singleton {
 
     property bool isGenerating: requester.running || commandExecutionProc.running
     property bool aborted: false
-    property string previousChatSummary: ""
     property string sessionSummary: "" // Accumulated summary of compressed conversation
     property bool condensing: false // Indicates background summarization is active
     readonly property string summarizerModelId: "gemini-3.5-flash-lite"
@@ -235,24 +234,43 @@ Singleton {
         // are facts about *this* machine, and they have to survive the user
         // rewriting their prompt — getting them wrong costs a round of commands
         // that edit the wrong file or change something already set.
-        return [prompt, root.contextBlock, root.desktopRules, root.modeRules]
+        return [prompt, root.contextBlock, root.memory.promptBlock, root.desktopRules, root.modeRules]
             .filter(part => part.length > 0).join("\n\n");
     }
 
     // Where the assistant is running. Appended to every profile rather than left
     // in the prompt text: it's true regardless of which persona is selected, and
     // a profile that forgot to include it would be answering blind.
-    readonly property string contextBlock: {
+    /**
+     * The half of "where you are" that doesn't move.
+     *
+     * Everything in the system prompt is a cached prefix, and caching is an
+     * exact prefix match — so a single changing character re-bills the prefix
+     * *and the whole conversation behind it* at full price. The clock used to
+     * live here, which meant the cache could never hit twice in the same minute,
+     * and the focused window meant alt-tab did the same. Both moved to the turn,
+     * where they cost a dozen tokens and invalidate nothing.
+     */
+    readonly property string contextBlock: [
+        "## Where you are",
+        `- ${SystemInfo.distroName}, ${SystemInfo.desktopEnvironment} on ${SystemInfo.windowingSystem}`
+    ].join("\n")
+
+    /**
+     * The volatile half, attached to the newest user turn instead of the prefix.
+     * Recalled conversations ride along here for the same reason: which ones are
+     * relevant changes with every question.
+     */
+    function volatileContext(question) {
         const parts = [
-            "## Where you are",
-            `- ${SystemInfo.distroName}, ${SystemInfo.desktopEnvironment} on ${SystemInfo.windowingSystem}`,
-            `- Now: ${DateTime.time}, ${DateTime.collapsedCalendarFormat}`,
-            `- Focused app: ${ToplevelManager.activeToplevel?.appId ?? "unknown"}`
+            `Now: ${DateTime.time}, ${DateTime.collapsedCalendarFormat}`,
+            `Focused app: ${ToplevelManager.activeToplevel?.appId ?? "unknown"}`
         ];
-        if (root.previousChatSummary.length > 0) {
-            parts.push("", "## What the recent conversations were about", root.previousChatSummary);
+        const recalled = root.recallForQuestion(question);
+        if (recalled.length > 0) {
+            parts.push("", "Earlier conversations that look related:", recalled);
         }
-        return parts.join("\n");
+        return `[Context: ${parts.join("\n")}]`;
     }
 
     readonly property string modeRules: {
@@ -481,8 +499,13 @@ The shell (Quickshell config "ii"):
         "{DATETIME}": `${DateTime.time}, ${DateTime.collapsedCalendarFormat}`,
         "{WINDOWCLASS}": ToplevelManager.activeToplevel?.appId ?? "Unknown",
         "{DE}": `${SystemInfo.desktopEnvironment} (${SystemInfo.windowingSystem})`,
-        "{PREVIOUS_CHAT_CONTEXT}": root.previousChatSummary.length > 0 ? `\n\n## Previous conversation context\n${root.previousChatSummary}` : "",
-        "{PREVIOUS_CHAT_HISTORY}": root.previousChatSummary.length > 0 ? `\n\n## Previous conversation context\n${root.previousChatSummary}` : ""
+        // Emptied on purpose. These used to paste the last five chat summaries
+        // into the prefix on every request whether or not anything matched, which
+        // is both the cost and the noise: a question about audio dragged monitor
+        // and package chatter along with it. Recall is per-question now and rides
+        // with the turn — see volatileContext.
+        "{PREVIOUS_CHAT_CONTEXT}": "",
+        "{PREVIOUS_CHAT_HISTORY}": ""
     }
 
     // Gemini: https://ai.google.dev/gemini-api/docs/function-calling
@@ -515,6 +538,20 @@ The shell (Quickshell config "ii"):
                             }
                         },
                         "required": ["key", "value"]
+                    }
+                },
+                {
+                    "name": "remember",
+                    "description": "Store one durable fact about the user or their machine so it is available in future chats. Use for settled preferences, hardware, and decisions — not for anything specific to the current task, and not for what you can read live from the system.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "fact": {
+                                "type": "string",
+                                "description": "One short sentence, written so it still makes sense with no other context."
+                            }
+                        },
+                        "required": ["fact"]
                     }
                 },
                 {
@@ -579,6 +616,23 @@ The shell (Quickshell config "ii"):
                                 }
                             },
                             "required": ["key", "value"]
+                        }
+                    }
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "remember",
+                        "description": "Store one durable fact about the user or their machine so it is available in future chats. Use for settled preferences, hardware, and decisions — not for anything specific to the current task, and not for what you can read live from the system.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "fact": {
+                                    "type": "string",
+                                    "description": "One short sentence, written so it still makes sense with no other context."
+                                }
+                            },
+                            "required": ["fact"]
                         }
                     }
                 },
@@ -655,6 +709,20 @@ The shell (Quickshell config "ii"):
                             }
                         },
                         "required": ["key", "value"]
+                    }
+                },
+                {
+                    "name": "remember",
+                    "description": "Store one durable fact about the user or their machine so it is available in future chats. Use for settled preferences, hardware, and decisions — not for anything specific to the current task, and not for what you can read live from the system.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "fact": {
+                                "type": "string",
+                                "description": "One short sentence, written so it still makes sense with no other context."
+                            }
+                        },
+                        "required": ["fact"]
                     }
                 },
                 {
@@ -1692,32 +1760,92 @@ The shell (Quickshell config "ii"):
     // conversation starts knowing roughly what the last ones were about.
     property int recentSummaryCount: 5
 
+    // ---- recall ------------------------------------------------------------
+
+    /**
+     * Past-chat summaries that look related to the question being asked.
+     *
+     * Word overlap, not embeddings: an embedding index would mean an API call
+     * per chat to build and another per question to search, which is the bill
+     * this is trying to avoid. Overlap is free, runs on a handful of one-line
+     * summaries, and is right often enough that being wrong costs nothing —
+     * nothing is injected at all.
+     */
+    function recallForQuestion(question) {
+        const text = (question ?? "").toLowerCase();
+        if (text.length < 8) return "";
+
+        // Words worth matching on: short ones are grammar in every language.
+        // Matched on a stem rather than whole: "наушниках" and "наушники" are the
+        // same word, and a question is almost never phrased in the case the
+        // summary happened to use. Trimming the tail is crude, needs no
+        // dictionary, and errs towards matching — which costs nothing, because a
+        // wrong match adds one line and a missed one adds nothing at all.
+        // Split on punctuation and space rather than on "not a letter": QML's
+        // engine doesn't honour \p{L}, and a negated ASCII class would treat every
+        // Cyrillic character as a separator and leave nothing to match on.
+        const stems = text.split(/[\s,.;:!?()\[\]{}"'`«»<>@#$%^&*+=~|\\\/—–-]+/)
+            .filter(w => w.length >= 4)
+            .map(w => w.slice(0, Math.max(4, Math.ceil(w.length * 0.7))));
+        if (stems.length === 0) return "";
+
+        const scored = [];
+        for (let i = 0; i < root.chatSummaries.length; i++) {
+            const entry = root.chatSummaries[i];
+            if (entry.id === root.currentChatId) continue;
+            const haystack = entry.text.toLowerCase();
+            const hit = {};
+            for (let j = 0; j < stems.length; j++) {
+                if (haystack.indexOf(stems[j]) !== -1) hit[stems[j]] = true;
+            }
+            const score = Object.keys(hit).length;
+            if (score >= 2) scored.push({ score: score, text: entry.text });
+        }
+        if (scored.length === 0) return "";
+
+        scored.sort((a, b) => b.score - a.score);
+        return scored.slice(0, 2).map(e => `- ${e.text}`).join("\n");
+    }
+
+    // [{ id, text }] for every chat that has a summary — the corpus recall
+    // searches. Loaded once at startup and refreshed when a summary is written,
+    // so a question costs no disk reads.
+    property var chatSummaries: []
+
+    /**
+     * Read every chat's summary into the recall corpus.
+     *
+     * Reads them all rather than the five most recent: the whole point of
+     * matching is that the relevant conversation may be old, and a one-line
+     * summary per chat is small enough to hold in memory. Nothing is sent
+     * anywhere until a question actually matches one.
+     */
     function loadRecentChatSummaries() {
         try {
-            let summaries = [];
-            const recent = chatStore.index.slice(0, root.recentSummaryCount);
-            for (let i = 0; i < recent.length; i++) {
-                if (recent[i].id === root.currentChatId) continue;
+            const corpus = [];
+            const all = chatStore.index ?? [];
+            for (let i = 0; i < all.length; i++) {
                 try {
-                    chatSummaryLoader.path = `${Directories.aiChats}/chat_${recent[i].id}.summary.txt`;
-                    chatSummaryLoader.reload();
+                    chatSummaryLoader.path = "";
+                    chatSummaryLoader.path = `${Directories.aiChats}/chat_${all[i].id}.summary.txt`;
                     const content = chatSummaryLoader.text();
-                    if (content && content.length > 5) {
-                        summaries.push(`- ${content.trim()}`);
-                    } else if ((recent[i].preview ?? "").length > 0) {
-                        // No generated summary yet — the opening question is still a
-                        // better hint than nothing.
-                        summaries.push(`- ${recent[i].title || recent[i].preview}`);
+                    if (content && content.trim().length > 5) {
+                        corpus.push({ "id": all[i].id, "text": content.trim() });
+                    } else if ((all[i].title ?? "").length > 0 || (all[i].preview ?? "").length > 0) {
+                        // No generated summary yet — the title and opening question
+                        // are still something to match against.
+                        corpus.push({
+                            "id": all[i].id,
+                            "text": `${all[i].title || ""} ${all[i].preview || ""}`.trim()
+                        });
                     }
                 } catch (e) {
                     continue;
                 }
             }
-            root.previousChatSummary = summaries.length > 0
-                ? summaries.join("\n").substring(0, 1500)
-                : "";
+            root.chatSummaries = corpus;
         } catch (e) {
-            console.log("[AI] Could not load recent chat summaries:", e);
+            console.log("[AI] Could not load chat summaries:", e);
         }
     }
 
@@ -1983,6 +2111,30 @@ The shell (Quickshell config "ii"):
                     "done": true
                 });
                 filteredMessageArray.unshift(summaryMsg);
+            }
+
+            // Time, focused window and any recalled conversation ride on a copy of
+            // the newest user turn rather than in the system prompt. The prefix
+            // stays byte-identical between turns, which is the only way prompt
+            // caching ever hits; this block is a few dozen tokens and is supposed
+            // to change.
+            for (let i = filteredMessageArray.length - 1; i >= 0; i--) {
+                const original = filteredMessageArray[i];
+                if (original.role !== "user" || (original.functionName ?? "").length > 0) continue;
+                const context = root.volatileContext(original.rawContent);
+                const augmented = root.aiMessageComponent.createObject(root, {
+                    "role": "user",
+                    "rawContent": `${original.rawContent}\n\n${context}`,
+                    "fileMimeType": original.fileMimeType,
+                    "fileUri": original.fileUri,
+                    "fileBase64": original.fileBase64,
+                    "fileTextContent": original.fileTextContent,
+                    "localFilePath": original.localFilePath,
+                    "visibleToUser": false,
+                    "done": true
+                });
+                filteredMessageArray[i] = augmented;
+                break;
             }
 
             const toolsForFormat = root.tools[model.api_format] ?? root.tools["openai"];
@@ -2364,6 +2516,11 @@ The shell (Quickshell config "ii"):
     // Command safety pipeline (whitelist / blacklist / Gemini judge / YOLO + audit log)
     property CommandSafety commandSafety: CommandSafety {}
 
+    // Durable facts the model was asked to keep (see AiMemory). Small and rarely
+    // changed, so it earns its place in the cached prefix — unlike a rolling
+    // recap of recent chats, which changes every time a chat ends.
+    property AiMemory memory: AiMemory {}
+
     // MCP servers and the tools they contribute (see McpManager).
     property McpManager mcp: McpManager {
         onCallFinished: (toolName, ok, text) => {
@@ -2531,6 +2688,17 @@ The shell (Quickshell config "ii"):
             const value = args.value;
             Config.setNestedValue(key, value);
             addFunctionOutputMessage(name, Translation.tr("Config updated: %1 = %2").arg(key).arg(value));
+            requester.makeRequest();
+        } else if (name === "remember") {
+            const fact = args?.fact ?? "";
+            const stored = root.memory.remember(fact);
+            addFunctionOutputMessage(name, stored
+                ? Translation.tr("Remembered. It will be there in future chats.")
+                : Translation.tr("Not stored — it was empty or already known."));
+            if (stored) {
+                root.addDivider(Translation.tr("Remembered: %1").arg(root.memory.entries[root.memory.entries.length - 1].text),
+                    "bookmark_added", false, "");
+            }
             requester.makeRequest();
         } else if (name === "run_shell_command") {
             if (!args.command || args.command.length === 0) {

@@ -490,6 +490,102 @@ Item {
                         }
                     }
 
+                    // ---- Memory ------------------------------------------------
+
+                    SectionLabel { text: Translation.tr("Memory") }
+
+                    StyledText {
+                        Layout.fillWidth: true
+                        Layout.leftMargin: 10
+                        Layout.rightMargin: 10
+                        wrapMode: Text.Wrap
+                        font.pixelSize: Appearance.font.pixelSize.smaller
+                        color: Appearance.colors.colSubtext
+                        text: (Ai.memory?.count ?? 0) > 0
+                            ? Translation.tr("Facts the assistant keeps between chats. Past conversations are searched separately and only pulled in when they match what you asked.")
+                            : Translation.tr("Nothing remembered yet. Ask the assistant to remember something and it lands here.")
+                    }
+
+                    Repeater {
+                        model: Ai.memory?.entries ?? []
+
+                        delegate: Rectangle {
+                            id: memoryRow
+                            required property var modelData
+
+                            Layout.fillWidth: true
+                            Layout.leftMargin: 10
+                            Layout.rightMargin: 10
+                            Layout.topMargin: 4
+                            implicitHeight: Math.max(memoryText.implicitHeight + 16, 36)
+                            radius: Appearance.rounding.small
+                            color: Appearance.colors.colLayer2
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 10
+                                anchors.rightMargin: 4
+                                spacing: 6
+
+                                MaterialSymbol {
+                                    Layout.alignment: Qt.AlignVCenter
+                                    iconSize: Appearance.font.pixelSize.normal
+                                    color: Appearance.colors.colSubtext
+                                    text: "bookmark"
+                                }
+
+                                StyledText {
+                                    id: memoryText
+                                    Layout.fillWidth: true
+                                    Layout.alignment: Qt.AlignVCenter
+                                    wrapMode: Text.Wrap
+                                    font.pixelSize: Appearance.font.pixelSize.smaller
+                                    color: Appearance.colors.colOnLayer2
+                                    text: memoryRow.modelData.text
+                                }
+
+                                RippleButton {
+                                    Layout.alignment: Qt.AlignVCenter
+                                    implicitWidth: 28
+                                    implicitHeight: 28
+                                    buttonRadius: Appearance.rounding.full
+                                    onClicked: Ai.memory.forget(memoryRow.modelData.id)
+                                    contentItem: MaterialSymbol {
+                                        horizontalAlignment: Text.AlignHCenter
+                                        text: "delete"
+                                        iconSize: Appearance.font.pixelSize.normal
+                                        color: Appearance.colors.colSubtext
+                                    }
+                                    StyledToolTip { text: Translation.tr("Forget this") }
+                                }
+                            }
+                        }
+                    }
+
+                    RippleButton {
+                        Layout.leftMargin: 10
+                        Layout.topMargin: 4
+                        visible: (Ai.memory?.count ?? 0) > 1
+                        implicitHeight: 30
+                        implicitWidth: forgetAllRow.implicitWidth + 20
+                        buttonRadius: Appearance.rounding.full
+                        onClicked: Ai.memory.forgetAll()
+                        contentItem: RowLayout {
+                            id: forgetAllRow
+                            spacing: 5
+                            MaterialSymbol {
+                                iconSize: Appearance.font.pixelSize.normal
+                                color: Appearance.m3colors.m3error
+                                text: "delete_sweep"
+                            }
+                            StyledText {
+                                font.pixelSize: Appearance.font.pixelSize.smaller
+                                color: Appearance.m3colors.m3error
+                                text: Translation.tr("Forget everything")
+                            }
+                        }
+                    }
+
                     // ---- MCP ---------------------------------------------------
 
                     SectionLabel { text: Translation.tr("MCP servers") }
