@@ -1275,7 +1275,10 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                     font.pixelSize: Appearance.font.pixelSize.huge
                     font.weight: Font.DemiBold
                     color: Appearance.colors.colOnLayer1
-                    text: Translation.tr("How can I help?")
+                    // Persona-voiced where the profile bothers to have a voice —
+                    // a tsundere chat and a plain coding session shouldn't open
+                    // on the same neutral line.
+                    text: Ai.promptProfileInfo.greeting ?? Translation.tr("How can I help?")
                 }
 
                 StyledText {

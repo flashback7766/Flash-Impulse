@@ -49,7 +49,8 @@ ColumnLayout {
     // than one that never changes.
     property var suggestions: []
     function reroll() {
-        root.suggestions = SuggestionPool.pick(root.currentContext(), 4);
+        root.suggestions = SuggestionPool.pick(root.currentContext(), 4,
+            Ai.promptProfileInfo.cardCategories);
     }
     Component.onCompleted: root.reroll()
 
@@ -65,6 +66,9 @@ ColumnLayout {
     Connections {
         target: Ai
         function onChatOpened() { root.reroll(); }
+        // Switching from Code & Linux to CTF & reversing mid-session should
+        // offer CTF cards, not leave the previous persona's picks sitting there.
+        function onPromptProfileChanged() { root.reroll(); }
     }
 
     Repeater {
