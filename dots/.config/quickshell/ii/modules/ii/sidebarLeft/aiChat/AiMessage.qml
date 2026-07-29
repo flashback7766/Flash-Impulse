@@ -46,9 +46,6 @@ Item {
     property bool renderMarkdown: true
     property bool editing: false
     property bool isContinuation: false
-    // Whether this answer states which model produced it. Set by the list, which
-    // is the only thing that can see what came before.
-    property bool namesModel: true
 
     readonly property bool isUser: messageData?.role === "user"
     readonly property bool isAssistant: messageData?.role === "assistant"
@@ -74,6 +71,16 @@ Item {
             || ((root.messageData?.toolCalls?.length ?? 0) > 0))
 
     property list<var> messageBlocks: StringUtils.splitMessageBlocks(root.messageData?.content ?? "")
+
+    readonly property var toolCalls: root.messageData?.toolCalls ?? []
+    readonly property int toolFoldThreshold: 5
+    property bool toolsExpanded: false
+    readonly property bool toolsFoldable: root.toolCalls.length > root.toolFoldThreshold
+    readonly property var shownToolCalls: {
+        if (!root.toolsFoldable || root.toolsExpanded) return root.toolCalls;
+        return root.toolCalls.filter(c => c.state !== "done");
+    }
+    readonly property int foldedToolCount: root.toolCalls.length - root.shownToolCalls.length
 
     anchors.left: parent?.left
     anchors.right: parent?.right
@@ -225,17 +232,11 @@ Item {
             }
 
             StyledText {
-                // A label earns its place by telling you something that varies.
-                // Your own name above your own question never does — the bubble is
-                // already on your side — so it waits for hover. Which model
-                // answered does vary, but only when it changes, so it shows on the
-                // first answer, on a switch, and on hover. The provider icon stays
-                // either way and is what marks where an answer begins.
-                //
-                // This had drifted back to always-on while fixing something else;
-                // namesModel was still being set by the list and read by nobody.
-                opacity: root.isUser ? (root.hovered ? 1 : 0)
-                    : (root.isInterface || root.namesModel || root.hovered) ? 1 : 0
+                // Your own name above your own question tells you nothing the side
+                // of the bubble didn't, so it waits for hover. The model's name
+                // stays put: which one answered is worth knowing at a glance on
+                // every answer, not only where it changed.
+                opacity: root.isUser ? (root.hovered ? 1 : 0) : 1
                 Behavior on opacity {
                     animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
                 }
@@ -442,11 +443,49 @@ Item {
             }
         }
 
+        // A long run of tool calls folds into one line. Claude Code can fire a
+        // dozen in a turn, and twelve cards saying a thing went fine is a wall
+        // between you and the answer. Anything that failed or is still running
+        // stays out of the fold — those are the ones you'd have scrolled to find.
+        RippleButton { // The fold
+            Layout.fillWidth: true
+            Layout.maximumWidth: root.textColumnWidth
+            Layout.topMargin: 4
+            visible: root.toolsFoldable
+            implicitHeight: 32
+            buttonRadius: Appearance.rounding.small
+            colBackground: Appearance.colors.colLayer2
+            colBackgroundHover: Appearance.colors.colLayer2Hover
+            onClicked: root.toolsExpanded = !root.toolsExpanded
+            contentItem: RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 8
+                anchors.rightMargin: 8
+                spacing: 6
+                MaterialSymbol {
+                    iconSize: Appearance.font.pixelSize.normal
+                    color: Appearance.colors.colSubtext
+                    text: root.toolsExpanded ? "unfold_less" : "unfold_more"
+                }
+                StyledText {
+                    Layout.fillWidth: true
+                    font.pixelSize: Appearance.font.pixelSize.smaller
+                    color: Appearance.colors.colSubtext
+                    elide: Text.ElideRight
+                    text: root.toolsExpanded
+                        ? Translation.tr("%1 steps — collapse").arg(root.toolCalls.length)
+                        : (root.foldedToolCount === root.toolCalls.length
+                            ? Translation.tr("%1 steps, all fine — show").arg(root.toolCalls.length)
+                            : Translation.tr("%1 more steps that went fine — show").arg(root.foldedToolCount))
+                }
+            }
+        }
+
         // Claude Code's tools, drawn as the same block. It runs several in one
         // turn under its own permission system, so these report rather than ask.
         Repeater {
             model: ScriptModel {
-                values: root.messageData?.toolCalls ?? []
+                values: root.shownToolCalls
             }
 
             delegate: MessageCommandBlock {

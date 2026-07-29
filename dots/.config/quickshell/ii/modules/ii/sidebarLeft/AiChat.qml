@@ -1251,24 +1251,6 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
 
                     property var prevMessageData: index > 0 ? Ai.messageByID[messageListView.model.values[index - 1]] : null
 
-                    // Name the model on the first answer and whenever it changes;
-                    // the rest of the time the icon is enough and the label is just
-                    // the same six words down the left of every exchange.
-                    namesModel: {
-                        if (messageData?.role !== "assistant") return false;
-                        const vals = messageListView.model.values;
-                        for (let i = index - 1; i >= 0; i--) {
-                            const earlier = Ai.messageByID[vals[i]];
-                            if (earlier?.role === "assistant") return earlier.model !== messageData.model;
-                        }
-                        return true;
-                    }
-                    isContinuation: prevMessageData != null
-                        && messageData != null
-                        && messageData.role === prevMessageData?.role
-                        && messageData.model === prevMessageData?.model
-                        && messageData.role === "assistant"
-
                     messageInputField: root.inputField
                 }
             }
