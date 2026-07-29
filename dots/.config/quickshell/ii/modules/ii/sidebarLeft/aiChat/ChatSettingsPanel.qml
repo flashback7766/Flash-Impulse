@@ -151,6 +151,11 @@ Item {
                                 animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
                             }
 
+                            scale: modeArea.pressed ? 0.98 : 1
+                            Behavior on scale {
+                                NumberAnimation { duration: 100; easing.type: Easing.OutCubic }
+                            }
+
                             MouseArea {
                                 id: modeArea
                                 anchors.fill: parent

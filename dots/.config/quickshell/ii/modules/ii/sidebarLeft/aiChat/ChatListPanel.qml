@@ -322,6 +322,11 @@ print(json.dumps(hits))
                                 animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
                             }
 
+                            scale: rowMouseArea.pressed ? 0.98 : 1
+                            Behavior on scale {
+                                NumberAnimation { duration: 100; easing.type: Easing.OutCubic }
+                            }
+
                             Rectangle { // Marks the conversation you're in
                                 anchors.left: parent.left
                                 anchors.leftMargin: 3

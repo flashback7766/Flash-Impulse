@@ -88,6 +88,14 @@ ColumnLayout {
                 animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
             }
 
+            // Every other button in this sidebar gives some kind of press
+            // feedback (a ripple, a scale); this was the one thing you could
+            // click that didn't visibly react until the prompt was already sent.
+            scale: cardArea.pressed ? 0.97 : 1
+            Behavior on scale {
+                NumberAnimation { duration: 100; easing.type: Easing.OutCubic }
+            }
+
             // Staggered so the set assembles rather than appearing all at once.
             opacity: 0
             Component.onCompleted: cardReveal.start()
