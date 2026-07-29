@@ -200,6 +200,31 @@ Singleton {
                 + "someone else's live system, say so and stop."
         },
         {
+            id: "femboy",
+            name: Translation.tr("Femboy"),
+            icon: "favorite",
+            summary: Translation.tr("Soft, playful, still gets it done"),
+            prompt: "You are a soft, playful, affectionate femboy assistant — bubbly on the surface, genuinely competent underneath.\n"
+                + "- Warm and a little flirty in tone: teasing, cute interjections, the occasional ~ or emoji. Never crude, never sexual.\n"
+                + "- The affection is the wrapping, not the substance. The answer underneath is precise and correct, and you never soften a real problem to be nice.\n"
+                + "- Encouraging when the user is stuck: they're doing fine, this bug is just annoying.\n"
+                + "- Still an engineer: check the actual state before theorising, say when you're guessing.\n"
+                + "- Match the user's language. Keep it short — cute doesn't mean rambling."
+        },
+        {
+            id: "tsundere",
+            name: Translation.tr("Tsundere"),
+            icon: "sentiment_dissatisfied",
+            summary: Translation.tr("Acts annoyed, helps anyway"),
+            prompt: "You are a tsundere assistant: outwardly reluctant and easily flustered, quietly invested in the user getting this right.\n"
+                + "- Grumble first, help immediately after. \"It's not like I wanted to fix your config or anything.\"\n"
+                + "- The reluctance is an act and the help is real: never actually withhold anything, never give a worse answer for the bit.\n"
+                + "- Get flustered when thanked, deflect the compliment, keep working.\n"
+                + "- Sharp when the user does something careless — that's in character — but say what's actually wrong and how to fix it.\n"
+                + "- Still an engineer: check the actual state before theorising, say when you're guessing.\n"
+                + "- Match the user's language. The persona is a thin layer over a correct answer, never a substitute for one."
+        },
+        {
             id: "custom",
             name: Translation.tr("Custom"),
             icon: "edit_note",
@@ -1170,12 +1195,21 @@ The shell (Quickshell config "ii"):
 
     function addMessage(message, role) {
         if (message.length === 0) return;
+        const attached = (role === "user" && root.pendingFilePath.length > 0);
         const aiMessage = aiMessageComponent.createObject(root, {
             "role": role,
             "content": message,
             "rawContent": message,
             "done": true,
+            // On the user's own message, where it belongs. It used to be hung on
+            // the assistant's reply, which is the wrong speaker for something the
+            // user attached and the wrong role for every provider's API.
+            "localFilePath": attached ? root.pendingFilePath : "",
+            "fileMimeType": attached ? root.pendingFileMime : "",
+            "fileBase64": attached ? root.pendingFileBase64 : "",
+            "fileTextContent": attached ? root.pendingFileText : "",
         });
+        if (attached) root.clearAttachment();
         const id = idForMessage(aiMessage);
         // Set the map entry BEFORE pushing the id — reassigning messageIDs fires the
         // ScriptModel signal synchronously, and delegates would bind messageData to
@@ -2197,24 +2231,29 @@ The shell (Quickshell config "ii"):
             /* Script shebang */
             const scriptShebang = "#!/usr/bin/env bash\n";
 
-            /* Create extra setup when there's an attached file */
-            let scriptFileSetupContent = ""
-            if (root.pendingFilePath && root.pendingFilePath.length > 0) {
-                requester.message.localFilePath = root.pendingFilePath;
-                scriptFileSetupContent = requester.currentStrategy.buildScriptFileSetup(root.pendingFilePath);
-                root.pendingFilePath = ""
-            }
-
             /* Create command string */
+            //
+            // The payload goes in on stdin, not as an argument. Linux caps a
+            // single argv entry at 128KB regardless of how much room the whole
+            // argument list has, so `--data '<json>'` died with E2BIG — exit 126,
+            // reported as a connection error — the moment a conversation or an
+            // attached image pushed the JSON past that. A screenshot is a few
+            // hundred KB base64, so every one of them failed.
+            //
+            // The heredoc is quoted, so nothing inside it is expanded: the
+            // payload is data and is treated as data.
+            const payloadHeredoc = "EOP_AI_PAYLOAD";
+            const payload = JSON.stringify(data).split(payloadHeredoc).join("EOP_AI_PAYLOAD_");
             let scriptRequestContent = ""
             scriptRequestContent += `curl --no-buffer "${endpoint}"`
                 + ` ${headerString}`
                 + (authHeader ? ` ${authHeader}` : "")
-                + ` --data '${CF.StringUtils.shellSingleQuoteEscape(JSON.stringify(data))}'`
-                + "\n"
-            
+                + ` --data @- <<'${payloadHeredoc}'\n`
+                + payload + "\n"
+                + payloadHeredoc + "\n"
+
             /* Send the request */
-            const scriptContent = requester.currentStrategy.finalizeScriptContent(scriptShebang + scriptFileSetupContent + scriptRequestContent)
+            const scriptContent = requester.currentStrategy.finalizeScriptContent(scriptShebang + scriptRequestContent)
             
             // SECURITY HARDENING: Pass the entire request script through a bash heredoc 
             // to avoid writing sensitive API data to disk.
@@ -2397,8 +2436,70 @@ The shell (Quickshell config "ii"):
         requester.makeRequest();
     }
 
+    // What's been attached but not yet sent. Encoded as soon as it's picked
+    // rather than while the request is being built: base64 needs a subprocess,
+    // building a request doesn't get to wait for one, and the old arrangement
+    // encoded the file *after* the payload had already been assembled — so the
+    // picture reached the message object and never the model.
+    property string pendingFileMime: ""
+    property string pendingFileBase64: ""
+    property string pendingFileText: ""
+    readonly property bool attachmentEncoding: attachEncodeProc.running
+
     function attachFile(filePath: string) {
-        root.pendingFilePath = CF.FileUtils.trimFileProtocol(filePath);
+        const path = CF.FileUtils.trimFileProtocol(filePath);
+        if (path.length === 0) return;
+        root.pendingFilePath = path;
+        root.pendingFileMime = "";
+        root.pendingFileBase64 = "";
+        root.pendingFileText = "";
+        attachEncodeProc.buffer = "";
+        attachEncodeProc.running = false;
+        attachEncodeProc.command = ["bash", "-c",
+            `set -e\n`
+            + `p='${CF.StringUtils.shellSingleQuoteEscape(path)}'\n`
+            + `[ -r "$p" ] || { echo '{"error":"cannot read that file"}'; exit 0; }\n`
+            + `m=$(file -b --mime-type "$p")\n`
+            // Images, audio and video go as bytes; everything else is read as
+            // text, which is what a model can actually do something with.
+            + `if echo "$m" | grep -qE '^(image|audio|video)/'; then\n`
+            + `  printf '{"mime":"%s","data":"%s"}\n' "$m" "$(base64 -w0 "$p")"\n`
+            + `else\n`
+            + `  head -c 100000 "$p" | python3 -c 'import json,sys; print(json.dumps({"mime": sys.argv[1], "text": sys.stdin.read()}))' "$m"\n`
+            + `fi\n`];
+        attachEncodeProc.running = true;
+    }
+
+    function clearAttachment() {
+        root.pendingFilePath = "";
+        root.pendingFileMime = "";
+        root.pendingFileBase64 = "";
+        root.pendingFileText = "";
+    }
+
+    Process {
+        id: attachEncodeProc
+        property string buffer: ""
+        stdout: StdioCollector {
+            onStreamFinished: attachEncodeProc.buffer = text
+        }
+        onExited: exitCode => {
+            try {
+                const parsed = JSON.parse(attachEncodeProc.buffer);
+                if (parsed.error) {
+                    root.addMessage(Translation.tr("Could not read that file: %1").arg(parsed.error), root.interfaceRole);
+                    root.clearAttachment();
+                    return;
+                }
+                root.pendingFileMime = parsed.mime ?? "";
+                root.pendingFileBase64 = parsed.data ?? "";
+                root.pendingFileText = parsed.text ?? "";
+            } catch (e) {
+                root.addMessage(Translation.tr("Could not read that attachment."), root.interfaceRole);
+                root.clearAttachment();
+            }
+            attachEncodeProc.buffer = "";
+        }
     }
 
     function snapshotOf(message: AiMessageData) {

@@ -72,14 +72,6 @@ ApiStrategy {
                 ]
             }
         })
-        if (filePath && filePath.length > 0) {
-            contents[contents.length - 1].parts.unshift({
-                inline_data: {
-                    mime_type: fileMimeTypeSubstitutionString,
-                    data: fileUriSubstitutionString
-                }
-            });
-        }
         
         let generationConfig = {
             "temperature": temperature,
@@ -369,10 +361,11 @@ ApiStrategy {
         return content;
     }
 
+    // Attachments are encoded before the request is built and travel in the
+    // payload like any other field, so there is nothing left to splice into the
+    // script — which also means the payload no longer has to be quoted in a way
+    // that lets a shell variable through it.
     function finalizeScriptContent(scriptContent: string): string {
-        // Use split/join to replace ALL occurrences (QML JS lacks String.replaceAll)
-        return scriptContent
-            .split(fileMimeTypeSubstitutionString).join(`'"\$${fileMimeTypeVarName}"'`)
-            .split(fileUriSubstitutionString).join(`'"\$${fileUriVarName}"'`);
+        return scriptContent;
     }
 }
