@@ -23,6 +23,8 @@ Item {
     id: root
 
     property bool shown: false
+    // One side inset for the sheet, matching the history sheet next door.
+    readonly property real inset: 12
     signal requestClose
 
     function open() {
@@ -206,8 +208,8 @@ Item {
 
                     Flow {
                         Layout.fillWidth: true
-                        Layout.leftMargin: 10
-                        Layout.rightMargin: 10
+                        Layout.leftMargin: root.inset
+                        Layout.rightMargin: root.inset
                         spacing: 6
 
                         Repeater {
@@ -253,8 +255,8 @@ Item {
 
                     StyledText {
                         Layout.fillWidth: true
-                        Layout.leftMargin: 10
-                        Layout.rightMargin: 10
+                        Layout.leftMargin: root.inset
+                        Layout.rightMargin: root.inset
                         Layout.topMargin: 4
                         wrapMode: Text.Wrap
                         font.pixelSize: Appearance.font.pixelSize.smaller
@@ -268,8 +270,8 @@ Item {
 
                     RowLayout {
                         Layout.fillWidth: true
-                        Layout.leftMargin: 10
-                        Layout.rightMargin: 10
+                        Layout.leftMargin: root.inset
+                        Layout.rightMargin: root.inset
                         spacing: 10
 
                         StyledSlider {
@@ -300,8 +302,8 @@ Item {
 
                     StyledText {
                         Layout.fillWidth: true
-                        Layout.leftMargin: 10
-                        Layout.rightMargin: 10
+                        Layout.leftMargin: root.inset
+                        Layout.rightMargin: root.inset
                         wrapMode: Text.Wrap
                         font.pixelSize: Appearance.font.pixelSize.smaller
                         color: Appearance.colors.colSubtext
@@ -326,8 +328,8 @@ Item {
 
                     StyledText {
                         Layout.fillWidth: true
-                        Layout.leftMargin: 10
-                        Layout.rightMargin: 10
+                        Layout.leftMargin: root.inset
+                        Layout.rightMargin: root.inset
                         Layout.bottomMargin: 2
                         wrapMode: Text.Wrap
                         font.pixelSize: Appearance.font.pixelSize.smaller
@@ -346,8 +348,8 @@ Item {
                             property bool editing: false
 
                             Layout.fillWidth: true
-                            Layout.leftMargin: 10
-                            Layout.rightMargin: 10
+                            Layout.leftMargin: root.inset
+                            Layout.rightMargin: root.inset
                             Layout.bottomMargin: 6
                             spacing: 4
 
@@ -502,8 +504,8 @@ Item {
 
                     StyledText {
                         Layout.fillWidth: true
-                        Layout.leftMargin: 10
-                        Layout.rightMargin: 10
+                        Layout.leftMargin: root.inset
+                        Layout.rightMargin: root.inset
                         wrapMode: Text.Wrap
                         font.pixelSize: Appearance.font.pixelSize.smaller
                         color: Appearance.colors.colSubtext
@@ -520,8 +522,8 @@ Item {
                             required property var modelData
 
                             Layout.fillWidth: true
-                            Layout.leftMargin: 10
-                            Layout.rightMargin: 10
+                            Layout.leftMargin: root.inset
+                            Layout.rightMargin: root.inset
                             Layout.topMargin: 4
                             implicitHeight: Math.max(memoryText.implicitHeight + 16, 36)
                             radius: Appearance.rounding.small
@@ -569,7 +571,7 @@ Item {
                     }
 
                     RippleButton {
-                        Layout.leftMargin: 10
+                        Layout.leftMargin: root.inset
                         Layout.topMargin: 4
                         visible: (Ai.memory?.count ?? 0) > 1
                         implicitHeight: 30
@@ -598,8 +600,8 @@ Item {
 
                     StyledText {
                         Layout.fillWidth: true
-                        Layout.leftMargin: 10
-                        Layout.rightMargin: 10
+                        Layout.leftMargin: root.inset
+                        Layout.rightMargin: root.inset
                         wrapMode: Text.Wrap
                         font.pixelSize: Appearance.font.pixelSize.smaller
                         color: Appearance.colors.colSubtext
@@ -622,8 +624,8 @@ Item {
                                 : Appearance.colors.colSubtext
 
                             Layout.fillWidth: true
-                            Layout.leftMargin: 10
-                            Layout.rightMargin: 10
+                            Layout.leftMargin: root.inset
+                            Layout.rightMargin: root.inset
                             Layout.topMargin: 4
                             implicitHeight: serverColumn.implicitHeight + 16
                             radius: Appearance.rounding.small
@@ -728,8 +730,8 @@ Item {
 
                     RowLayout { // Add a server
                         Layout.fillWidth: true
-                        Layout.leftMargin: 10
-                        Layout.rightMargin: 10
+                        Layout.leftMargin: root.inset
+                        Layout.rightMargin: root.inset
                         Layout.topMargin: 6
                         spacing: 6
 
@@ -781,8 +783,8 @@ Item {
 
                     RowLayout {
                         Layout.fillWidth: true
-                        Layout.leftMargin: 10
-                        Layout.rightMargin: 10
+                        Layout.leftMargin: root.inset
+                        Layout.rightMargin: root.inset
                         Layout.bottomMargin: 10
                         spacing: 8
 
@@ -820,9 +822,12 @@ Item {
 
     component SectionLabel: StyledText {
         Layout.fillWidth: true
-        Layout.topMargin: 12
-        Layout.bottomMargin: 2
-        Layout.leftMargin: 10
+        // A section heading belongs to what follows it, so it sits closer to its
+        // own content than to the section it ends. At 12 above and 2 below it
+        // read as the tail of the section before.
+        Layout.topMargin: 20
+        Layout.bottomMargin: 6
+        Layout.leftMargin: root.inset
         font.pixelSize: Appearance.font.pixelSize.smallest
         font.weight: Font.DemiBold
         font.capitalization: Font.AllUppercase

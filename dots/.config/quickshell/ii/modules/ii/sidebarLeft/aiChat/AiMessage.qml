@@ -29,8 +29,18 @@ Item {
     // Density is spacing only — type size stays put, since fitting more on
     // screen shouldn't cost legibility.
     readonly property bool compact: Ai.compactMessages
-    property real messagePadding: root.compact ? 5 : 7
+    property real messagePadding: root.compact ? 6 : 8
+    // Author line to body, and the gap the action row sits behind.
     property real contentSpacing: root.compact ? 2 : 4
+    // Between the pieces of one answer — a paragraph, a table, a snippet. Owned
+    // here rather than by each block: quote, table and code each carried their
+    // own margin, 3, 4 and 7 respectively, so the rhythm of an answer depended
+    // on which kinds of block it happened to contain.
+    readonly property real blockSpacing: root.compact ? 5 : 8
+    // Between one exchange and the next. A question and its answer belong
+    // together more than two answers do, so a new speaker gets more room than a
+    // continuation, and pure machinery gets least.
+    readonly property real turnSpacing: root.compact ? 8 : 14
 
     property bool enableMouseSelection: false
     property bool renderMarkdown: true
@@ -119,10 +129,18 @@ Item {
         root.enableMouseSelection = false;
     }
 
+    // `messageData != null` first, and it is not redundant. The list pools and
+    // reuses delegates, so one can briefly hold no message at all — and
+    // `undefined ?? true` is true, which made a delegate with nothing in it
+    // count as visible. With no role it falls through every branch to
+    // "Interface", and with no `done` flag the typing indicator runs forever, so
+    // an empty delegate drew an author line and three pulsing dots on top of
+    // whatever was really there. That's the ghosting.
+    //
     // Empty tool-call turns are dropped by Ai.hideIfEmpty when they finish, so
-    // there is nothing to filter here — a delegate that hides itself is still an
-    // item in the list, and a zero-height item still moves the scroll position.
-    visible: messageData?.visibleToUser ?? true
+    // there is nothing else to filter here — a delegate that hides itself is
+    // still an item in the list, and a zero-height item still moves the scroll.
+    visible: messageData != null && (messageData.visibleToUser ?? true)
     height: visible ? implicitHeight : 0
     opacity: visible ? 1 : 0
 
@@ -148,8 +166,8 @@ Item {
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.topMargin: root.isMechanical ? 2
-            : root.isContinuation ? (root.compact ? 1 : 2)
-            : (root.compact ? 5 : 10)
+            : root.isContinuation ? (root.compact ? 2 : 4)
+            : root.turnSpacing
         spacing: root.contentSpacing
 
         ChatDivider { // Something about the conversation changed here
@@ -167,8 +185,8 @@ Item {
             // every message jump down as the pointer crossed it.
             Layout.preferredHeight: 16
             Layout.fillWidth: true
-            Layout.leftMargin: 2
-            Layout.rightMargin: 2
+            // Flush with the body beneath it: inset by two, the name sat a
+            // couple of pixels right of the text it belongs to.
             spacing: 6
 
             // Explicit spacers rather than layoutDirection: the timestamp is hidden
@@ -332,7 +350,7 @@ Item {
                     anchors.right: parent.right
                     anchors.top: parent.top
                     anchors.margins: root.isUser ? root.messagePadding : 0
-                    spacing: 0
+                    spacing: root.blockSpacing
 
                     Item {
                         Layout.fillWidth: true
@@ -350,9 +368,14 @@ Item {
                             // Nothing to show yet and still streaming: the answer is
                             // being composed. Reasoning has its own header, so this is
                             // only ever the silence before the first token.
-                            shown: (root.messageBlocks.length < 1)
-                                && !(root.messageData?.done ?? false)
-                                && !(root.messageData?.reasoningActive ?? false)
+                            // Defaults to "done" when there's no message at all: a
+                            // pooled delegate holding nothing is not a turn that's
+                            // still being written, and treating it as one left three
+                            // pulsing dots running over the conversation.
+                            shown: (root.messageData != null)
+                                && (root.messageBlocks.length < 1)
+                                && !(root.messageData.done ?? true)
+                                && !(root.messageData.reasoningActive ?? false)
                             sourceComponent: TypingDots {
                                 color: Appearance.colors.colPrimary
                             }

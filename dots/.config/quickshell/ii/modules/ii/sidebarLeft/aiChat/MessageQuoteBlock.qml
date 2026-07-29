@@ -22,8 +22,6 @@ Item {
     readonly property bool isQuoteBlock: true
 
     Layout.fillWidth: true
-    Layout.topMargin: 3
-    Layout.bottomMargin: 3
     implicitHeight: background.implicitHeight
 
     Rectangle {

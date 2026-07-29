@@ -13,10 +13,13 @@ GroupButton {
     Layout.fillWidth: false
     Layout.fillHeight: false
     
-    implicitWidth: 32
-    implicitHeight: 32
-    baseWidth: 32
-    baseHeight: 32
+    // 28, not 32: these set the height of the action strip under every message
+    // and of every code and command header, so four pixels here are four pixels
+    // on each of them.
+    implicitWidth: 28
+    implicitHeight: 28
+    baseWidth: 28
+    baseHeight: 28
     
     colBackgroundHover: Appearance.colors.colSecondaryContainerHover
     colBackgroundActive: Appearance.colors.colSecondaryContainerActive
