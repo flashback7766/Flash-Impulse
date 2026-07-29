@@ -365,7 +365,7 @@ Item {
                     Ai.addMessage(Translation.tr("Temperature %1 out of range. Must be in [0, 2].").arg(temp), Ai.interfaceRole);
                     return;
                 }
-                Ai.setTemperature(temp);
+                Ai.setTemperature(temp, true);
             }
         },
         {

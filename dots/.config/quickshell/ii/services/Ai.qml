@@ -1308,14 +1308,26 @@ The shell (Quickshell config "ii"):
         return root.temperature;
     }
 
-    function setTemperature(value) {
+    /**
+     * @param announce say so in the conversation. Off by default: a slider emits
+     *   a value per pixel of travel, and each one was posting its own message —
+     *   one drag buried the chat under a hundred "Temperature set to 0.5" lines.
+     *   A control that shows its own value has already told you.
+     */
+    function setTemperature(value, announce = false) {
         if (isNaN(value) || value < 0 || value > 2) {
-            root.addMessage(Translation.tr("Temperature must be between 0 and 2"), Ai.interfaceRole);
+            if (announce) root.addMessage(Translation.tr("Temperature must be between 0 and 2"), Ai.interfaceRole);
             return;
         }
+        if (value === root.temperature) return;
         root.savePersistentState("temperature", value)
         root.temperature = value;
-        root.addMessage(Translation.tr("Temperature set to %1").arg(value), Ai.interfaceRole);
+        // A keyed divider, so even repeated /temp leaves the one line saying
+        // where it ended up rather than a column of intermediate values.
+        if (announce) {
+            root.addDivider(Translation.tr("Temperature %1").arg(value.toFixed(2)),
+                "device_thermostat", false, "temperature");
+        }
     }
 
     function setApiKey(key) {

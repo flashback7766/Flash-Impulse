@@ -279,7 +279,11 @@ Item {
                             to: 2
                             stepSize: 0.05
                             value: Ai.temperature
-                            onMoved: Ai.setTemperature(temperatureSlider.value)
+                            // Committed on release rather than on every move: the
+                            // handle travels through dozens of values on the way to
+                            // the one you meant, and each was a write to disk.
+                            onPressedChanged: if (!pressed) Ai.setTemperature(temperatureSlider.value)
+                            onMoved: if (!pressed) Ai.setTemperature(temperatureSlider.value)
                         }
 
                         StyledText {
@@ -288,7 +292,9 @@ Item {
                             font.family: Appearance.font.family.monospace
                             font.pixelSize: Appearance.font.pixelSize.smaller
                             color: Appearance.colors.colOnLayer1
-                            text: Ai.temperature.toFixed(2)
+                            // Follows the handle, so the number moves with your
+                            // thumb even though nothing is committed until release.
+                            text: temperatureSlider.value.toFixed(2)
                         }
                     }
 
