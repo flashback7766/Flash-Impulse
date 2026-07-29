@@ -184,6 +184,10 @@ ColumnLayout {
             // The user bubble is sized from a separate unwrapped measurement of
             // the same string, which can't see that padding — so a short question
             // got a bubble ~12px too narrow and "Спасибо!" wrapped mid-word.
+            // TextArea draws a control background of its own. It happens to be
+            // invisible against a light theme, which is why it went unnoticed —
+            // on a dark one every paragraph sat in a visible box.
+            background: null
             padding: 0
             readOnly: !editing
             selectByMouse: enableMouseSelection || editing

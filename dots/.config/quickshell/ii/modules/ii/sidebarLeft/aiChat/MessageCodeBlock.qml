@@ -295,6 +295,10 @@ ColumnLayout {
                             TextArea {
                                 id: codeTextArea
                                 Layout.fillWidth: true
+                                // The block already paints its own surface; the
+                                // control's default background sat on top of it and
+                                // showed as a second panel on a dark theme.
+                                background: null
                                 readOnly: !root.editing
                                 selectByMouse: root.enableMouseSelection || root.editing
                                 renderType: Text.NativeRendering
