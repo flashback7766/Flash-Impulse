@@ -311,7 +311,10 @@ Item {
         Item { // Content, bubbled for the user and bare for everyone else
             id: contentWrapper
             Layout.fillWidth: true
+            // A picture sent without a caption has nothing to put in a bubble, and
+            // an empty one under the image reads as a failed send.
             visible: !root.isDivider
+                && !(root.isUser && (root.messageData?.content ?? "").length === 0)
             implicitHeight: bubble.implicitHeight
 
             // The bubble can't be sized from the content column: that column is

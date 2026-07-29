@@ -173,9 +173,22 @@ Scope { // Scope
             }
 
             // Content
+            //
+            // anchors.fill only mirrors the target's layout geometry (x/y/width/
+            // height) — it does not follow opacity or a transform, since those are
+            // purely visual. Without matching them here, the panel fades and slides
+            // away on close while the shadow stays put at full strength until the
+            // window itself finally unmaps, reading as a shadow left hanging in
+            // place for the whole close animation.
+            Translate {
+                id: sidebarRevealTranslate
+                x: (panelWindow.reveal - 1) * 36
+            }
             StyledRectangularShadow {
                 target: sidebarLeftBackground
                 radius: sidebarLeftBackground.radius
+                opacity: panelWindow.reveal
+                transform: sidebarRevealTranslate
             }
             Rectangle {
                 id: sidebarLeftBackground
@@ -193,7 +206,7 @@ Scope { // Scope
                 // A short slide from the edge it lives on, not a full-width one:
                 // travelling the whole width reads as slow however fast it is.
                 opacity: panelWindow.reveal
-                transform: Translate { x: (panelWindow.reveal - 1) * 36 }
+                transform: sidebarRevealTranslate
 
                 Behavior on width {
                     // Off while dragging: an eased width lags the pointer, and a

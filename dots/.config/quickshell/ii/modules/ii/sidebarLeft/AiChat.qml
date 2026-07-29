@@ -1749,12 +1749,17 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                     implicitHeight: 44
                     buttonRadius: 22  // Full circle (FAB style)
                     enabled: messageInputField.text.length > 0 || Ai.isGenerating
+                        || Ai.pendingFilePath.length > 0
                     toggled: enabled
 
                     // Stop only with nothing typed. With text in the box the button
                     // sends — queued behind the answer that's still arriving —
                     // because reaching for Send and getting Stop loses the answer.
-                    readonly property bool stops: Ai.isGenerating && messageInputField.text.length === 0
+                    // Not while something is waiting to be sent: with a picture
+                    // attached and no caption, Send has something to do.
+                    readonly property bool stops: Ai.isGenerating
+                        && messageInputField.text.length === 0
+                        && Ai.pendingFilePath.length === 0
 
                     // Micro-scale animation on press
                     scale: sendButton.down ? 0.92 : 1.0

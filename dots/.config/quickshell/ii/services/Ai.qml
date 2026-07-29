@@ -48,7 +48,9 @@ Singleton {
      */
     function queueUserMessage(text) {
         const message = (text ?? "").trim();
-        if (message.length === 0) return false;
+        // An attachment is content. A picture with no caption is a complete
+        // thing to send — "look at this" is implied by sending it.
+        if (message.length === 0 && root.pendingFilePath.length === 0) return false;
         if (root.conversationIdle && root.queuedMessages.length === 0) {
             root.sendUserMessage(message);
             return false;
@@ -1194,8 +1196,8 @@ The shell (Quickshell config "ii"):
     }
 
     function addMessage(message, role) {
-        if (message.length === 0) return;
         const attached = (role === "user" && root.pendingFilePath.length > 0);
+        if (message.length === 0 && !attached) return;
         const aiMessage = aiMessageComponent.createObject(root, {
             "role": role,
             "content": message,
@@ -2056,6 +2058,14 @@ The shell (Quickshell config "ii"):
 
     Process {
         id: requester
+        stdinEnabled: true
+        onRunningChanged: {
+            if (!requester.running || requester.pendingScript.length === 0) return;
+            requester.write(requester.pendingScript);
+            requester.pendingScript = "";
+            // Closing stdin is what tells bash the script has ended and to run it.
+            requester.stdinEnabled = false;
+        }
         property list<string> baseCommand: ["bash", "-c"]
         property AiMessageData message
         property int retryCount: 0
@@ -2067,6 +2077,8 @@ The shell (Quickshell config "ii"):
         // Earlier answers handed over by regenerateById, attached to the message
         // this request is about to create.
         property var pendingVariants: []
+        // Written to the process's stdin once it's up; see makeRequest.
+        property string pendingScript: ""
         property ApiStrategy currentStrategy
 
         function markDone() {
@@ -2255,11 +2267,17 @@ The shell (Quickshell config "ii"):
             /* Send the request */
             const scriptContent = requester.currentStrategy.finalizeScriptContent(scriptShebang + scriptRequestContent)
             
-            // SECURITY HARDENING: Pass the entire request script through a bash heredoc 
-            // to avoid writing sensitive API data to disk.
-            const bashCommand = `bash <<'EOP_AI_REQUEST'\n${scriptContent}\nEOP_AI_REQUEST\n`;
-            
-            requester.command = ["bash", "-c", bashCommand];
+            // The script goes to bash on stdin, not as an argument.
+            //
+            // Nothing sensitive touches disk either way — that was the point of the
+            // heredoc — but a heredoc inside `bash -c "<script>"` is still one argv
+            // entry, and Linux caps a single entry at 128KB. Moving the payload off
+            // curl's argv wasn't enough: the payload is *inside* the script, so an
+            // attached photo blew the same limit one level up. The process then
+            // failed to exec with no exit code to report, which is why it sat on
+            // the typing dots forever with nothing in the log.
+            requester.pendingScript = scriptContent;
+            requester.command = ["bash", "-s"];
             requester.running = true
         }
 
@@ -2431,7 +2449,7 @@ The shell (Quickshell config "ii"):
     }
 
     function sendUserMessage(message) {
-        if (message.length === 0) return;
+        if (message.length === 0 && root.pendingFilePath.length === 0) return;
         root.addMessage(message, "user");
         requester.makeRequest();
     }
@@ -3158,7 +3176,10 @@ The shell (Quickshell config "ii"):
         }
 
         function send(message: string): string {
-            if (!message || message.trim().length === 0) return "nothing to send";
+            // An attachment on its own is a message; only nothing at all isn't.
+            if ((!message || message.trim().length === 0) && root.pendingFilePath.length === 0) {
+                return "nothing to send";
+            }
             // Route slash commands through the same handler the input box uses.
             // Without this, `ipc call ai send "/new"` posted the literal text to
             // the model — the one thing the caller definitely didn't mean.
