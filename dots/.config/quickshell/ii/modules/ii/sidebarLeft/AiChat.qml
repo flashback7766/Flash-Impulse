@@ -1150,7 +1150,25 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                             visible: Ai.tokenCount.total > 0
                             icon: "token"
                             statusText: Ai.tokenCount.total
-                            description: Translation.tr("Tokens used in last request\nInput: %1 (%2 cached)\nOutput: %3").arg(Ai.tokenCount.input).arg(Ai.tokenCount.cacheRead).arg(Ai.tokenCount.output)
+                            // Total is the API's whole-request figure, and it counts
+                            // things this breakdown used to leave out entirely — a
+                            // cache write (Claude Code can spend far more re-caching
+                            // context than on the actual input/output) or thinking
+                            // tokens (Gemini). Without them listed, a correct total
+                            // that simply outran input+output read as a broken counter
+                            // rather than as the cost of what it was actually spending
+                            // tokens on.
+                            description: {
+                                const lines = [Translation.tr("Tokens used in last request")];
+                                lines.push(Translation.tr("Input: %1 (%2 cached)").arg(Ai.tokenCount.input).arg(Ai.tokenCount.cacheRead));
+                                if (Ai.tokenCount.cacheWrite > 0) lines.push(Translation.tr("Cache write: %1").arg(Ai.tokenCount.cacheWrite));
+                                if (Ai.tokenCount.reasoningTokens > 0) lines.push(Translation.tr("Thinking: %1").arg(Ai.tokenCount.reasoningTokens));
+                                lines.push(Translation.tr("Output: %1").arg(Ai.tokenCount.output));
+                                if (Ai.tokenCount.cacheWrite > 0 || Ai.tokenCount.reasoningTokens > 0) {
+                                    lines.push(Translation.tr("Total: %1").arg(Ai.tokenCount.total));
+                                }
+                                return lines.join("\n");
+                            }
                         }
                     }
 

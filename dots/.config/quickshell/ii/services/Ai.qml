@@ -661,6 +661,7 @@ The shell (Quickshell config "ii"):
         property int total: -1
         property int cacheRead: 0
         property int cacheWrite: 0
+        property int reasoningTokens: 0
     }
 
     // Generation speed & cost tracking
@@ -2557,6 +2558,7 @@ The shell (Quickshell config "ii"):
                         root.tokenCount.total = result.tokenUsage.total;
                         root.tokenCount.cacheRead = result.tokenUsage.cacheRead ?? 0;
                         root.tokenCount.cacheWrite = result.tokenUsage.cacheWrite ?? 0;
+                        root.tokenCount.reasoningTokens = result.tokenUsage.reasoningTokens ?? 0;
                     }
                     if (result.functionCall) {
                         // Flush content immediately before function call

@@ -263,6 +263,7 @@ ApiStrategy {
                             input: usageMetadata.promptTokenCount ?? -1,
                             output: usageMetadata.candidatesTokenCount ?? -1,
                             total: usageMetadata.totalTokenCount ?? -1,
+                            reasoningTokens: usageMetadata.thoughtsTokenCount ?? 0,
                         }
                     };
                 }
@@ -323,6 +324,7 @@ ApiStrategy {
                         input: usageMetadata.promptTokenCount ?? -1,
                         output: usageMetadata.candidatesTokenCount ?? -1,
                         total: usageMetadata.totalTokenCount ?? -1,
+                        reasoningTokens: usageMetadata.thoughtsTokenCount ?? 0,
                     },
                     finished: finished
                 };

@@ -243,6 +243,11 @@ ApiStrategy {
                 const reasoningTokens = dataJson.usage.completion_tokens_details?.reasoning_tokens ?? 0;
                 if (reasoningTokens > 0) message.reasoningTokens = reasoningTokens;
                 return {
+                    // No reasoningTokens here: OpenAI already folds it into
+                    // completion_tokens, so it isn't a hidden addition to total the
+                    // way Gemini's thoughtsTokenCount or a cache write is — showing
+                    // it as its own line would just double-count what output already
+                    // includes.
                     tokenUsage: {
                         input: dataJson.usage.prompt_tokens ?? -1,
                         output: dataJson.usage.completion_tokens ?? -1,
