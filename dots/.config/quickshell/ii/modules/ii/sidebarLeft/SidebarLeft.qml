@@ -362,11 +362,10 @@ Scope { // Scope
 
     GlobalShortcut {
         name: "sidebarLeftOpenAi"
-        description: "Toggles left sidebar, landing on the AI tab (Copilot key)"
+        description: "Toggles left sidebar (Copilot key)"
 
         onPressed: {
             GlobalStates.sidebarLeftOpen = !GlobalStates.sidebarLeftOpen;
-            if (GlobalStates.sidebarLeftOpen) root.sidebarContent?.showAiTab();
         }
     }
 
