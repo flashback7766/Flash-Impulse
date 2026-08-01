@@ -20,10 +20,6 @@ Item {
     // Forwarded for SidebarLeft's unload check — see its contentBusy.
     readonly property bool composerBusy: aiChat.composerBusy
 
-    function focusActiveItem() {
-        aiChat.forceActiveFocus();
-    }
-
     // Quickshell's own rounded-clipping rectangle rather than the layer.effect
     // OpacityMask this replaces: same rounded corners, without rendering the
     // whole panel through an offscreen buffer to get them.
