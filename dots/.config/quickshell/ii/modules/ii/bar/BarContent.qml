@@ -138,7 +138,10 @@ Item { // Bar content region
         BarGroup {
             id: middleCenterGroup
             anchors.verticalCenter: parent.verticalCenter
-            padding: workspacesWidget.widgetPadding
+            // No padding override: Workspaces has never had a widgetPadding, so
+            // this read was always undefined and the group has always been
+            // drawing with BarGroup's default. Kept the behaviour, dropped the
+            // warning it logged once per monitor on every startup.
 
             Workspaces {
                 id: workspacesWidget
