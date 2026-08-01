@@ -425,15 +425,17 @@ ContentPage {
         icon: "side_navigation"
         title: Translation.tr("Sidebars")
 
-        ConfigSwitch {
-            buttonIcon: "memory"
-            text: Translation.tr('Keep right sidebar loaded')
-            checked: Config.options.sidebar.keepRightSidebarLoaded
-            onCheckedChanged: {
-                Config.options.sidebar.keepRightSidebarLoaded = checked;
+        ConfigSpinBox {
+            text: Translation.tr("Unload sidebars after (seconds)")
+            value: Config.options.sidebar.unloadDelaySeconds
+            from: 0
+            to: 3600
+            stepSize: 30
+            onValueChanged: {
+                Config.options.sidebar.unloadDelaySeconds = value;
             }
             StyledToolTip {
-                text: Translation.tr("When enabled keeps the content of the right sidebar loaded to reduce the delay when opening,\nat the cost of around 15MB of consistent RAM usage. Delay significance depends on your system's performance.\nUsing a custom kernel like linux-cachyos might help")
+                text: Translation.tr("How long a sidebar stays built after you close it. Holding it makes reopening instant;\nletting it go gives back a few hundred megabytes an idle shell has no use for.\nZero keeps both sidebars loaded for good.")
             }
         }
 

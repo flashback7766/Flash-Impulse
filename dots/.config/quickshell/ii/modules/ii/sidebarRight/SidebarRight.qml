@@ -45,9 +45,10 @@ Scope {
             }
         }
 
-        Loader {
+        DeferredLoader {
             id: sidebarContentLoader
-            active: GlobalStates.sidebarRightOpen || Config?.options.sidebar.keepRightSidebarLoaded
+            wanted: GlobalStates.sidebarRightOpen
+            unloadDelay: (Config?.options.sidebar.unloadDelaySeconds ?? 300) * 1000
             anchors {
                 fill: parent
                 margins: Appearance.sizes.hyprlandGapsOut

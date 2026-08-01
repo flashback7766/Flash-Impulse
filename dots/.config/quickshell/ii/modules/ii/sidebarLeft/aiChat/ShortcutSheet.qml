@@ -16,6 +16,9 @@ Item {
     id: root
 
     property bool shown: false
+    // Latches on the first open: see the Loader below.
+    property bool everShown: false
+    onShownChanged: if (root.shown) root.everShown = true
 
     visible: opacity > 0
     enabled: root.shown
@@ -82,120 +85,126 @@ Item {
         // hovered control underneath keeps its tooltip floating over the sheet.
         MouseArea { anchors.fill: parent; hoverEnabled: true }
 
-        ColumnLayout {
+        // Built on first open, like the settings sheet: a reference card nobody looks
+        // at twice should not be occupying memory for the whole session.
+        Loader {
+            id: contentLoader
             anchors.fill: parent
             anchors.margins: 12
-            spacing: 8
+            active: root.everShown
+            sourceComponent: ColumnLayout {
+                spacing: 8
 
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 4
-
-                StyledText {
+                RowLayout {
                     Layout.fillWidth: true
-                    font.pixelSize: Appearance.font.pixelSize.larger
-                    font.weight: Font.DemiBold
-                    color: Appearance.colors.colOnLayer1
-                    text: Translation.tr("Keyboard")
-                }
+                    spacing: 4
 
-                RippleButton {
-                    implicitWidth: 34
-                    implicitHeight: 34
-                    buttonRadius: Appearance.rounding.full
-                    onClicked: root.shown = false
-                    contentItem: MaterialSymbol {
-                        horizontalAlignment: Text.AlignHCenter
-                        text: "close"
-                        iconSize: Appearance.font.pixelSize.larger
+                    StyledText {
+                        Layout.fillWidth: true
+                        font.pixelSize: Appearance.font.pixelSize.larger
+                        font.weight: Font.DemiBold
                         color: Appearance.colors.colOnLayer1
+                        text: Translation.tr("Keyboard")
+                    }
+
+                    RippleButton {
+                        implicitWidth: 34
+                        implicitHeight: 34
+                        buttonRadius: Appearance.rounding.full
+                        onClicked: root.shown = false
+                        contentItem: MaterialSymbol {
+                            horizontalAlignment: Text.AlignHCenter
+                            text: "close"
+                            iconSize: Appearance.font.pixelSize.larger
+                            color: Appearance.colors.colOnLayer1
+                        }
                     }
                 }
-            }
 
-            // No Flickable: inside one, children are parented to contentItem,
-            // whose width is contentWidth — zero unless set — so `width:
-            // parent.width` collapsed the entire list to nothing. The list is
-            // short and fixed, and the sheet is full height, so it just fits.
-            ColumnLayout {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                Layout.alignment: Qt.AlignTop
-
+                // No Flickable: inside one, children are parented to contentItem,
+                // whose width is contentWidth — zero unless set — so `width:
+                // parent.width` collapsed the entire list to nothing. The list is
+                // short and fixed, and the sheet is full height, so it just fits.
                 ColumnLayout {
-                    id: shortcutColumn
                     Layout.fillWidth: true
+                    Layout.fillHeight: true
                     Layout.alignment: Qt.AlignTop
-                    spacing: 2
 
-                    Repeater {
-                        model: root.groups
+                    ColumnLayout {
+                        id: shortcutColumn
+                        Layout.fillWidth: true
+                        Layout.alignment: Qt.AlignTop
+                        spacing: 2
 
-                        delegate: ColumnLayout {
-                            id: group
-                            required property var modelData
-                            Layout.fillWidth: true
-                            spacing: 1
+                        Repeater {
+                            model: root.groups
 
-                            StyledText {
-                                Layout.topMargin: 8
-                                Layout.leftMargin: 4
-                                font.pixelSize: Appearance.font.pixelSize.smallest
-                                font.weight: Font.DemiBold
-                                font.capitalization: Font.AllUppercase
-                                color: Appearance.colors.colSubtext
-                                text: group.modelData.label
-                            }
+                            delegate: ColumnLayout {
+                                id: group
+                                required property var modelData
+                                Layout.fillWidth: true
+                                spacing: 1
 
-                            Repeater {
-                                model: group.modelData.items
+                                StyledText {
+                                    Layout.topMargin: 8
+                                    Layout.leftMargin: 4
+                                    font.pixelSize: Appearance.font.pixelSize.smallest
+                                    font.weight: Font.DemiBold
+                                    font.capitalization: Font.AllUppercase
+                                    color: Appearance.colors.colSubtext
+                                    text: group.modelData.label
+                                }
 
-                                delegate: RowLayout {
-                                    id: shortcut
-                                    required property var modelData
-                                    Layout.fillWidth: true
-                                    Layout.topMargin: 3
-                                    spacing: 10
+                                Repeater {
+                                    model: group.modelData.items
 
-                                    Rectangle {
-                                        Layout.alignment: Qt.AlignTop
-                                        // One column width for every chip, so the
-                                        // descriptions line up instead of stepping
-                                        // in and out with the length of each key.
-                                        implicitWidth: 110
-                                        implicitHeight: 22
-                                        radius: Appearance.rounding.verysmall
-                                        color: Appearance.colors.colLayer2
+                                    delegate: RowLayout {
+                                        id: shortcut
+                                        required property var modelData
+                                        Layout.fillWidth: true
+                                        Layout.topMargin: 3
+                                        spacing: 10
+
+                                        Rectangle {
+                                            Layout.alignment: Qt.AlignTop
+                                            // One column width for every chip, so the
+                                            // descriptions line up instead of stepping
+                                            // in and out with the length of each key.
+                                            implicitWidth: 110
+                                            implicitHeight: 22
+                                            radius: Appearance.rounding.verysmall
+                                            color: Appearance.colors.colLayer2
+
+                                            StyledText {
+                                                id: keyLabel
+                                                anchors.centerIn: parent
+                                                width: parent.width - 10
+                                                horizontalAlignment: Text.AlignHCenter
+                                                elide: Text.ElideRight
+                                                font.family: Appearance.font.family.monospace
+                                                font.pixelSize: Appearance.font.pixelSize.smaller
+                                                color: Appearance.colors.colOnLayer2
+                                                text: shortcut.modelData[0]
+                                            }
+                                        }
 
                                         StyledText {
-                                            id: keyLabel
-                                            anchors.centerIn: parent
-                                            width: parent.width - 10
-                                            horizontalAlignment: Text.AlignHCenter
-                                            elide: Text.ElideRight
-                                            font.family: Appearance.font.family.monospace
+                                            Layout.fillWidth: true
+                                            Layout.alignment: Qt.AlignVCenter
+                                            wrapMode: Text.Wrap
                                             font.pixelSize: Appearance.font.pixelSize.smaller
-                                            color: Appearance.colors.colOnLayer2
-                                            text: shortcut.modelData[0]
+                                            color: Appearance.colors.colOnLayer1
+                                            text: shortcut.modelData[1]
                                         }
-                                    }
-
-                                    StyledText {
-                                        Layout.fillWidth: true
-                                        Layout.alignment: Qt.AlignVCenter
-                                        wrapMode: Text.Wrap
-                                        font.pixelSize: Appearance.font.pixelSize.smaller
-                                        color: Appearance.colors.colOnLayer1
-                                        text: shortcut.modelData[1]
                                     }
                                 }
                             }
                         }
+
                     }
 
+                    Item { Layout.fillWidth: true; Layout.fillHeight: true }
                 }
-
-                Item { Layout.fillWidth: true; Layout.fillHeight: true }
             }
         }
     }

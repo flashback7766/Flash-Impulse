@@ -25,17 +25,20 @@ Item {
     id: root
 
     property bool shown: false
+    // Latches on the first open: see the Loader below.
+    property bool everShown: false
 
     signal requestClose
 
     function open(focusSearch) {
+        root.everShown = true;
         root.shown = true;
-        if (focusSearch) Qt.callLater(() => searchField.forceActiveFocus());
+        if (focusSearch) Qt.callLater(() => contentLoader.item?.focusSearch());
     }
 
     function close() {
         root.shown = false;
-        searchField.text = "";
+        contentLoader.item?.clearSearch();
         root.requestClose();
     }
 
@@ -58,7 +61,7 @@ Item {
 
     // ---- searching ---------------------------------------------------------
 
-    property string query: searchField.text.trim()
+    property string query: (contentLoader.item?.searchText ?? "").trim()
     // Ids whose message text matched, from the out-of-process search.
     property var contentMatches: []
 
@@ -173,269 +176,277 @@ print(json.dumps(hits))
         // hovered — its tooltip ends up floating over this panel.
         MouseArea { anchors.fill: parent; hoverEnabled: true }
 
-        ColumnLayout {
+        // Built on first open, like the settings sheet.
+        Loader {
+            id: contentLoader
             anchors.fill: parent
             anchors.margins: 12
-            spacing: 10
+            active: root.everShown
+            sourceComponent: ColumnLayout {
+                property alias searchText: searchField.text
+                function focusSearch() { searchField.forceActiveFocus(); }
+                function clearSearch() { searchField.text = ""; }
+                spacing: 10
 
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 4
-
-                StyledText {
+                RowLayout {
                     Layout.fillWidth: true
-                    font.pixelSize: Appearance.font.pixelSize.larger
-                    font.weight: Font.DemiBold
-                    color: Appearance.colors.colOnLayer1
-                    text: Translation.tr("Chats")
-                }
+                    spacing: 4
 
-                StyledText {
-                    Layout.rightMargin: 4
-                    font.pixelSize: Appearance.font.pixelSize.smaller
-                    color: Appearance.colors.colSubtext
-                    text: (Ai.chatIndex?.length ?? 0) > 0 ? String(Ai.chatIndex.length) : ""
-                }
-
-                RippleButton {
-                    implicitWidth: 34
-                    implicitHeight: 34
-                    buttonRadius: Appearance.rounding.full
-                    onClicked: {
-                        Ai.newChat();
-                        root.close();
-                    }
-                    contentItem: MaterialSymbol {
-                        horizontalAlignment: Text.AlignHCenter
-                        text: "add"
-                        iconSize: Appearance.font.pixelSize.larger
+                    StyledText {
+                        Layout.fillWidth: true
+                        font.pixelSize: Appearance.font.pixelSize.larger
+                        font.weight: Font.DemiBold
                         color: Appearance.colors.colOnLayer1
+                        text: Translation.tr("Chats")
                     }
-                    StyledToolTip { text: Translation.tr("New chat") }
-                }
 
-                RippleButton {
-                    implicitWidth: 34
-                    implicitHeight: 34
-                    buttonRadius: Appearance.rounding.full
-                    onClicked: root.close()
-                    contentItem: MaterialSymbol {
-                        horizontalAlignment: Text.AlignHCenter
-                        text: "close"
-                        iconSize: Appearance.font.pixelSize.larger
-                        color: Appearance.colors.colOnLayer1
+                    StyledText {
+                        Layout.rightMargin: 4
+                        font.pixelSize: Appearance.font.pixelSize.smaller
+                        color: Appearance.colors.colSubtext
+                        text: (Ai.chatIndex?.length ?? 0) > 0 ? String(Ai.chatIndex.length) : ""
                     }
-                    StyledToolTip { text: Translation.tr("Close (Esc)") }
-                }
-            }
 
-            MaterialTextField {
-                id: searchField
-                Layout.fillWidth: true
-                placeholderText: Translation.tr("Search chats")
-                wrapMode: TextEdit.NoWrap
+                    RippleButton {
+                        implicitWidth: 34
+                        implicitHeight: 34
+                        buttonRadius: Appearance.rounding.full
+                        onClicked: {
+                            Ai.newChat();
+                            root.close();
+                        }
+                        contentItem: MaterialSymbol {
+                            horizontalAlignment: Text.AlignHCenter
+                            text: "add"
+                            iconSize: Appearance.font.pixelSize.larger
+                            color: Appearance.colors.colOnLayer1
+                        }
+                        StyledToolTip { text: Translation.tr("New chat") }
+                    }
 
-                Keys.onPressed: event => {
-                    if (event.key === Qt.Key_Escape) {
-                        root.close();
-                        event.accepted = true;
-                    } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                        if (root.results.length > 0) root.openChat(root.results[0].id);
-                        event.accepted = true;
+                    RippleButton {
+                        implicitWidth: 34
+                        implicitHeight: 34
+                        buttonRadius: Appearance.rounding.full
+                        onClicked: root.close()
+                        contentItem: MaterialSymbol {
+                            horizontalAlignment: Text.AlignHCenter
+                            text: "close"
+                            iconSize: Appearance.font.pixelSize.larger
+                            color: Appearance.colors.colOnLayer1
+                        }
+                        StyledToolTip { text: Translation.tr("Close (Esc)") }
                     }
                 }
-            }
 
-            ColumnLayout { // Empty state
-                Layout.fillWidth: true
-                Layout.topMargin: 40
-                visible: root.rows.length === 0
-                spacing: 6
-
-                MaterialSymbol {
-                    Layout.alignment: Qt.AlignHCenter
-                    iconSize: 48
-                    color: Appearance.colors.colOnLayer1Inactive
-                    text: root.query.length > 0 ? "search_off" : "forum"
-                }
-                StyledText {
+                MaterialTextField {
+                    id: searchField
                     Layout.fillWidth: true
-                    horizontalAlignment: Text.AlignHCenter
-                    color: Appearance.colors.colSubtext
-                    font.pixelSize: Appearance.font.pixelSize.small
-                    text: root.query.length > 0 ? Translation.tr("Nothing matched") : Translation.tr("No chats yet")
-                }
-            }
+                    placeholderText: Translation.tr("Search chats")
+                    wrapMode: TextEdit.NoWrap
 
-            StyledListView {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                clip: true
-                spacing: 1
-
-                model: ScriptModel {
-                    values: root.rows
-                }
-
-                delegate: DelegateChooser {
-                    role: "kind"
-
-                    DelegateChoice {
-                        roleValue: "header"
-                        Item {
-                            id: sectionHeader
-                            required property var modelData
-                            width: ListView.view ? ListView.view.width : 0
-                            implicitHeight: 30
-
-                            StyledText {
-                                anchors.left: parent.left
-                                anchors.leftMargin: 12
-                                anchors.bottom: parent.bottom
-                                anchors.bottomMargin: 4
-                                font.pixelSize: Appearance.font.pixelSize.smallest
-                                font.weight: Font.DemiBold
-                                font.capitalization: Font.AllUppercase
-                                color: Appearance.colors.colSubtext
-                                text: sectionHeader.modelData.label
-                            }
+                    Keys.onPressed: event => {
+                        if (event.key === Qt.Key_Escape) {
+                            root.close();
+                            event.accepted = true;
+                        } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                            if (root.results.length > 0) root.openChat(root.results[0].id);
+                            event.accepted = true;
                         }
                     }
+                }
 
-                    DelegateChoice {
-                        roleValue: "chat"
-                        Rectangle {
-                            id: chatRow
-                            required property var modelData
+                ColumnLayout { // Empty state
+                    Layout.fillWidth: true
+                    Layout.topMargin: 40
+                    visible: root.rows.length === 0
+                    spacing: 6
 
-                            readonly property var entry: chatRow.modelData.entry
-                            readonly property bool isCurrent: chatRow.entry.id === Ai.currentChatId
+                    MaterialSymbol {
+                        Layout.alignment: Qt.AlignHCenter
+                        iconSize: 48
+                        color: Appearance.colors.colOnLayer1Inactive
+                        text: root.query.length > 0 ? "search_off" : "forum"
+                    }
+                    StyledText {
+                        Layout.fillWidth: true
+                        horizontalAlignment: Text.AlignHCenter
+                        color: Appearance.colors.colSubtext
+                        font.pixelSize: Appearance.font.pixelSize.small
+                        text: root.query.length > 0 ? Translation.tr("Nothing matched") : Translation.tr("No chats yet")
+                    }
+                }
 
-                            width: ListView.view ? ListView.view.width : 0
-                            implicitHeight: rowColumn.implicitHeight + 18
-                            radius: Appearance.rounding.small
-                            color: rowMouseArea.containsMouse ? Appearance.colors.colLayer2Hover
-                                : chatRow.isCurrent ? Appearance.colors.colLayer2
-                                : "transparent"
+                StyledListView {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    clip: true
+                    spacing: 1
 
-                            Behavior on color {
-                                animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
-                            }
+                    model: ScriptModel {
+                        values: root.rows
+                    }
 
-                            scale: rowMouseArea.pressed ? 0.98 : 1
-                            Behavior on scale {
-                                NumberAnimation { duration: 100; easing.type: Easing.OutCubic }
-                            }
+                    delegate: DelegateChooser {
+                        role: "kind"
 
-                            Rectangle { // Marks the conversation you're in
-                                anchors.left: parent.left
-                                anchors.leftMargin: 3
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: 3
-                                height: chatRow.isCurrent ? parent.height - 16 : 0
-                                radius: Appearance.rounding.full
-                                color: Appearance.colors.colPrimary
-                                Behavior on height {
-                                    animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+                        DelegateChoice {
+                            roleValue: "header"
+                            Item {
+                                id: sectionHeader
+                                required property var modelData
+                                width: ListView.view ? ListView.view.width : 0
+                                implicitHeight: 30
+
+                                StyledText {
+                                    anchors.left: parent.left
+                                    anchors.leftMargin: 12
+                                    anchors.bottom: parent.bottom
+                                    anchors.bottomMargin: 4
+                                    font.pixelSize: Appearance.font.pixelSize.smallest
+                                    font.weight: Font.DemiBold
+                                    font.capitalization: Font.AllUppercase
+                                    color: Appearance.colors.colSubtext
+                                    text: sectionHeader.modelData.label
                                 }
                             }
+                        }
 
-                            MouseArea {
-                                id: rowMouseArea
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: root.openChat(chatRow.entry.id)
-                            }
+                        DelegateChoice {
+                            roleValue: "chat"
+                            Rectangle {
+                                id: chatRow
+                                required property var modelData
 
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: 12
-                                anchors.rightMargin: 4
-                                anchors.topMargin: 9
-                                anchors.bottomMargin: 9
-                                spacing: 4
+                                readonly property var entry: chatRow.modelData.entry
+                                readonly property bool isCurrent: chatRow.entry.id === Ai.currentChatId
 
-                                ColumnLayout {
-                                    id: rowColumn
-                                    Layout.fillWidth: true
-                                    spacing: 2
+                                width: ListView.view ? ListView.view.width : 0
+                                implicitHeight: rowColumn.implicitHeight + 18
+                                radius: Appearance.rounding.small
+                                color: rowMouseArea.containsMouse ? Appearance.colors.colLayer2Hover
+                                    : chatRow.isCurrent ? Appearance.colors.colLayer2
+                                    : "transparent"
 
-                                    StyledText {
-                                        Layout.fillWidth: true
-                                        elide: Text.ElideRight
-                                        maximumLineCount: 1
-                                        font.pixelSize: Appearance.font.pixelSize.small
-                                        font.weight: chatRow.isCurrent ? Font.DemiBold : Font.Normal
-                                        color: chatRow.isCurrent ? Appearance.colors.colPrimary : Appearance.colors.colOnLayer1
-                                        // ?? only catches null, and both fields are
-                                        // empty strings on a chat with no user turn
-                                        // in it — which drew a row with a blank gap
-                                        // where the name should be.
-                                        text: (chatRow.entry.title ?? "").length > 0 ? chatRow.entry.title
-                                            : (chatRow.entry.preview ?? "").length > 0 ? chatRow.entry.preview
-                                            : Translation.tr("Untitled chat")
-                                    }
-
-                                    StyledText {
-                                        Layout.fillWidth: true
-                                        visible: text.length > 0
-                                        elide: Text.ElideRight
-                                        maximumLineCount: 1
-                                        font.pixelSize: Appearance.font.pixelSize.smaller
-                                        color: Appearance.colors.colOnLayer1Inactive
-                                        // Already shown as the name when there's no
-                                        // title; repeating it as the subtitle too
-                                        // printed the same line twice.
-                                        text: (chatRow.entry.title ?? "").length > 0
-                                            ? (chatRow.entry.preview ?? "") : ""
-                                    }
-
-                                    StyledText {
-                                        Layout.fillWidth: true
-                                        Layout.topMargin: 1
-                                        elide: Text.ElideRight
-                                        maximumLineCount: 1
-                                        font.pixelSize: Appearance.font.pixelSize.smallest
-                                        color: Appearance.colors.colSubtext
-                                        text: root.describeEntry(chatRow.entry)
-                                    }
+                                Behavior on color {
+                                    animation: Appearance.animation.elementMoveFast.colorAnimation.createObject(this)
                                 }
 
-                                RippleButton {
-                                    id: deleteButton
-                                    property bool armed: false
-                                    Layout.alignment: Qt.AlignVCenter
-                                    opacity: rowMouseArea.containsMouse || deleteButton.armed ? 1 : 0
-                                    visible: opacity > 0
-                                    implicitWidth: 30
-                                    implicitHeight: 30
-                                    buttonRadius: Appearance.rounding.full
-                                    onClicked: {
-                                        if (deleteButton.armed) {
-                                            Ai.deleteChat(chatRow.entry.id);
-                                        } else {
-                                            deleteButton.armed = true;
-                                            deleteConfirmTimer.restart();
-                                        }
-                                    }
-                                    Behavior on opacity {
+                                scale: rowMouseArea.pressed ? 0.98 : 1
+                                Behavior on scale {
+                                    NumberAnimation { duration: 100; easing.type: Easing.OutCubic }
+                                }
+
+                                Rectangle { // Marks the conversation you're in
+                                    anchors.left: parent.left
+                                    anchors.leftMargin: 3
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: 3
+                                    height: chatRow.isCurrent ? parent.height - 16 : 0
+                                    radius: Appearance.rounding.full
+                                    color: Appearance.colors.colPrimary
+                                    Behavior on height {
                                         animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
                                     }
-                                    Timer {
-                                        id: deleteConfirmTimer
-                                        interval: 2000
-                                        onTriggered: deleteButton.armed = false
+                                }
+
+                                MouseArea {
+                                    id: rowMouseArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: root.openChat(chatRow.entry.id)
+                                }
+
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 12
+                                    anchors.rightMargin: 4
+                                    anchors.topMargin: 9
+                                    anchors.bottomMargin: 9
+                                    spacing: 4
+
+                                    ColumnLayout {
+                                        id: rowColumn
+                                        Layout.fillWidth: true
+                                        spacing: 2
+
+                                        StyledText {
+                                            Layout.fillWidth: true
+                                            elide: Text.ElideRight
+                                            maximumLineCount: 1
+                                            font.pixelSize: Appearance.font.pixelSize.small
+                                            font.weight: chatRow.isCurrent ? Font.DemiBold : Font.Normal
+                                            color: chatRow.isCurrent ? Appearance.colors.colPrimary : Appearance.colors.colOnLayer1
+                                            // ?? only catches null, and both fields are
+                                            // empty strings on a chat with no user turn
+                                            // in it — which drew a row with a blank gap
+                                            // where the name should be.
+                                            text: (chatRow.entry.title ?? "").length > 0 ? chatRow.entry.title
+                                                : (chatRow.entry.preview ?? "").length > 0 ? chatRow.entry.preview
+                                                : Translation.tr("Untitled chat")
+                                        }
+
+                                        StyledText {
+                                            Layout.fillWidth: true
+                                            visible: text.length > 0
+                                            elide: Text.ElideRight
+                                            maximumLineCount: 1
+                                            font.pixelSize: Appearance.font.pixelSize.smaller
+                                            color: Appearance.colors.colOnLayer1Inactive
+                                            // Already shown as the name when there's no
+                                            // title; repeating it as the subtitle too
+                                            // printed the same line twice.
+                                            text: (chatRow.entry.title ?? "").length > 0
+                                                ? (chatRow.entry.preview ?? "") : ""
+                                        }
+
+                                        StyledText {
+                                            Layout.fillWidth: true
+                                            Layout.topMargin: 1
+                                            elide: Text.ElideRight
+                                            maximumLineCount: 1
+                                            font.pixelSize: Appearance.font.pixelSize.smallest
+                                            color: Appearance.colors.colSubtext
+                                            text: root.describeEntry(chatRow.entry)
+                                        }
                                     }
-                                    contentItem: MaterialSymbol {
-                                        horizontalAlignment: Text.AlignHCenter
-                                        text: deleteButton.armed ? "delete_forever" : "delete"
-                                        iconSize: Appearance.font.pixelSize.large
-                                        color: deleteButton.armed ? Appearance.m3colors.m3error : Appearance.colors.colSubtext
-                                    }
-                                    StyledToolTip {
-                                        text: deleteButton.armed ? Translation.tr("Click again to delete")
-                                            : Translation.tr("Delete chat")
+
+                                    RippleButton {
+                                        id: deleteButton
+                                        property bool armed: false
+                                        Layout.alignment: Qt.AlignVCenter
+                                        opacity: rowMouseArea.containsMouse || deleteButton.armed ? 1 : 0
+                                        visible: opacity > 0
+                                        implicitWidth: 30
+                                        implicitHeight: 30
+                                        buttonRadius: Appearance.rounding.full
+                                        onClicked: {
+                                            if (deleteButton.armed) {
+                                                Ai.deleteChat(chatRow.entry.id);
+                                            } else {
+                                                deleteButton.armed = true;
+                                                deleteConfirmTimer.restart();
+                                            }
+                                        }
+                                        Behavior on opacity {
+                                            animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+                                        }
+                                        Timer {
+                                            id: deleteConfirmTimer
+                                            interval: 2000
+                                            onTriggered: deleteButton.armed = false
+                                        }
+                                        contentItem: MaterialSymbol {
+                                            horizontalAlignment: Text.AlignHCenter
+                                            text: deleteButton.armed ? "delete_forever" : "delete"
+                                            iconSize: Appearance.font.pixelSize.large
+                                            color: deleteButton.armed ? Appearance.m3colors.m3error : Appearance.colors.colSubtext
+                                        }
+                                        StyledToolTip {
+                                            text: deleteButton.armed ? Translation.tr("Click again to delete")
+                                                : Translation.tr("Delete chat")
+                                        }
                                     }
                                 }
                             }

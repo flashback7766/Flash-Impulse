@@ -495,7 +495,12 @@ Singleton {
             }
 
             property JsonObject sidebar: JsonObject {
-                property bool keepRightSidebarLoaded: true
+                // Seconds a sidebar stays built after you close it. They are the
+                // most expensive thing here to construct, so holding them makes
+                // reopening instant — but holding them forever is how an idle
+                // shell ends up sitting on a few hundred megabytes it isn't
+                // using. Zero keeps them loaded for good, as before.
+                property int unloadDelaySeconds: 300
                 property JsonObject ai: JsonObject {
                     property bool textFadeIn: false
                 }

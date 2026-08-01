@@ -10,6 +10,9 @@ Item {
     property int sidebarPadding: 10
     anchors.fill: parent
 
+    // Forwarded for SidebarLeft's unload check — see its contentBusy.
+    readonly property bool composerBusy: aiChat.composerBusy
+
     function focusActiveItem() {
         aiChat.forceActiveFocus();
     }

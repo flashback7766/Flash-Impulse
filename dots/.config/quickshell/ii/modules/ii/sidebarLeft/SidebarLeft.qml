@@ -58,26 +58,87 @@ Scope { // Scope
         else root.pin = !root.pin;
     }
 
-    Component.onCompleted: {
+    // The chat is the most expensive thing this shell builds — a bit over a
+    // hundred megabytes of items, once it's actually been on screen. It used to
+    // be constructed at startup and kept for the life of the process, so a
+    // session that never opened the sidebar paid for it anyway. Now it's built
+    // the first time it's needed and let go again after a long enough stretch
+    // closed. It isn't a plain Loader because detaching hands the same instance
+    // between two windows, and a Loader would rebuild it instead.
+    function ensureContent() {
+        if (root.sidebarContent) return;
         root.sidebarContent = contentComponent.createObject(null, {
             "scopeRoot": root,
         });
-        sidebarLoader.item.contentParent.children = [root.sidebarContent];
+        root.attachContent();
+    }
+
+    function attachContent() {
+        if (!root.sidebarContent) return;
+        const host = root.detach ? detachedSidebarLoader.item : sidebarLoader.item;
+        if (host) host.contentParent.children = [root.sidebarContent];
+    }
+
+    function dropContent() {
+        if (!root.sidebarContent) return;
+        root.sidebarContent.parent = null;
+        root.sidebarContent.destroy();
+        root.sidebarContent = null;
+    }
+
+    // Anything mid-flight makes dropping it a bad idea, and all of it lives in
+    // the tree we'd be destroying: a half-written message, a queued one, an
+    // attachment picked but not sent, a command waiting for approval, an answer
+    // still streaming in. Detached or pinned means it's on screen regardless.
+    readonly property bool contentBusy: root.detach || root.pin
+        || !Ai.conversationIdle
+        || (Ai.queuedMessages?.length ?? 0) > 0
+        || Ai.pendingFilePath.length > 0
+        || (root.sidebarContent?.composerBusy ?? false)
+
+    readonly property int contentUnloadDelay: (Config?.options.sidebar.unloadDelaySeconds ?? 300) * 1000
+
+    Timer {
+        id: contentUnloadTimer
+        interval: root.contentUnloadDelay
+        onTriggered: {
+            // Re-checked here rather than in a binding: content that's busy when
+            // the timer fires should get the full delay over again, not be
+            // dropped the moment it goes quiet.
+            if (GlobalStates.sidebarLeftOpen || root.contentBusy) {
+                contentUnloadTimer.restart();
+                return;
+            }
+            root.dropContent();
+        }
+    }
+
+    Connections {
+        target: GlobalStates
+        function onSidebarLeftOpenChanged() {
+            if (GlobalStates.sidebarLeftOpen) {
+                contentUnloadTimer.stop();
+                root.ensureContent();
+            } else if (root.contentUnloadDelay > 0) {
+                contentUnloadTimer.restart();
+            }
+        }
     }
 
     onDetachChanged: {
+        root.ensureContent();
         if (root.detach) {
+            contentUnloadTimer.stop();
             GlobalFocusGrab.removeDismissable(sidebarLoader.item) // Remove sidebar from the focus grab system
             sidebarContent.parent = null; // Detach content from sidebar
             sidebarLoader.active = false; // Unload sidebar
             detachedSidebarLoader.active = true; // Load detached window
-            detachedSidebarLoader.item.contentParent.children = [sidebarContent];
         } else {
             sidebarContent.parent = null; // Detach content from window
             detachedSidebarLoader.active = false; // Unload detached window
             sidebarLoader.active = true; // Load sidebar
-            sidebarLoader.item.contentParent.children = [sidebarContent];
         }
+        root.attachContent();
     }
 
     Loader {

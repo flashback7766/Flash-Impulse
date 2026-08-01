@@ -21,6 +21,12 @@ Item {
     property var inputField: messageInputField
     property string commandPrefix: "/"
 
+    // Read by SidebarLeft before it drops this tree to reclaim the memory. What
+    // the Ai singleton knows about — a turn in flight, a queued message — it
+    // checks for itself; this is the part only the UI knows, which is whether
+    // there's something typed that hasn't been sent.
+    readonly property bool composerBusy: messageInputField.text.length > 0
+
     // A brand-new chat gets a different shape: the composer rises to the middle
     // with a greeting over it and a few things worth asking under it, instead of
     // sitting at the bottom of an empty box.
