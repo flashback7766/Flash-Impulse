@@ -17,6 +17,12 @@ Item {
         id: iconImage
         anchors.fill: parent
         source: {
+            // Nothing to show yet. Without this the folder and the empty name
+            // concatenate into the folder itself, which is a perfectly non-empty
+            // string, so the check below passed and IconImage was handed a
+            // directory to open — once per icon whose name hadn't arrived yet,
+            // which on this shell is most of them during startup.
+            if (root.source.length === 0) return "";
             const fullPathWhenSourceIsIconName = iconFolder + "/" + root.source;
             if (iconFolder && fullPathWhenSourceIsIconName) {
                 return fullPathWhenSourceIsIconName

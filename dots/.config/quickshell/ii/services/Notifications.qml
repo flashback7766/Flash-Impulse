@@ -66,7 +66,14 @@ Singleton {
         onTriggered: () => {
             const index = root.list.findIndex((notif) => notif.notificationId === notificationId);
             const notifObject = root.list[index];
-            print("[Notifications] Notification timer triggered for ID: " + notificationId + ", transient: " + notifObject?.isTransient);
+            // Already gone — dismissed by hand, or replaced by the same app,
+            // while this timer was still counting. findIndex returns -1 there
+            // and list[-1] is undefined, which threw on the read below every
+            // time a notification was closed before it expired.
+            if (!notifObject) {
+                destroy();
+                return;
+            }
             if (notifObject.isTransient) root.discardNotification(notificationId);
             else root.timeoutNotification(notificationId);
             destroy()

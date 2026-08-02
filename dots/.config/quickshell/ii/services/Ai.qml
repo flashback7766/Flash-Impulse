@@ -2399,6 +2399,11 @@ The shell (Quickshell config "ii"):
         id: chatSummaryLoader
         watchChanges: false
         blockLoading: true
+        // A chat that hasn't been summarised yet simply has no summary file, and
+        // loadRecentChatSummaries already falls back to its title and opening
+        // line. Absence is the normal case here, not an error worth a line per
+        // chat every time the corpus is rebuilt.
+        printErrors: false
     }
 
 

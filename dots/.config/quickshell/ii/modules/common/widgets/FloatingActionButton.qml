@@ -46,6 +46,12 @@ RippleButton {
                 visible: root.expanded || implicitWidth > 0
                 reveal: root.expanded
                 implicitWidth: reveal ? (buttonText.implicitWidth + root.elementSpacing + contentRowLayout.horizontalMargins) : 0
+                // Stated rather than left to Revealer's childrenRect default:
+                // the label centres itself vertically in here, so a height read
+                // off the children is a height that depends on where the child
+                // sits, which depends on the height. This one only ever reveals
+                // sideways, so the label's own height is the whole answer.
+                implicitHeight: buttonText.implicitHeight
                 StyledText {
                     id: buttonText
                     anchors {
