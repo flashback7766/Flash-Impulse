@@ -20,17 +20,22 @@ Singleton {
     property string bugReportUrl: ""
     property string privacyPolicyUrl: ""
     property string logo: ""
-    property string desktopEnvironment: ""
-    property string windowingSystem: ""
+    // Straight from the environment rather than through a shell round-trip. The
+    // process that used to fill these reported back after the first requests had
+    // already been built, so the model was told it was on no desktop at all.
+    property string desktopEnvironment: Quickshell.env("XDG_CURRENT_DESKTOP") ?? ""
+    property string windowingSystem: (Quickshell.env("WAYLAND_DISPLAY") ?? "").length > 0 ? "Wayland" : "X11"
 
-    Timer {
-        triggeredOnStart: true
-        interval: 1
-        running: true
-        repeat: false
-        onTriggered: {
-            getUsername.running = true
-            fileOsRelease.reload()
+    /**
+     * Parse /etc/os-release.
+     *
+     * Driven by the FileView's own onLoaded rather than by a timer that fired
+     * one millisecond after startup and read the file before it had loaded —
+     * which matched nothing, so the distro stayed "Unknown" for the life of the
+     * process and every model was told it was on an unidentified system.
+     */
+    function parseOsRelease() {
+        {
             const textOsRelease = fileOsRelease.text()
 
             // Extract the friendly name (PRETTY_NAME field, fallback to NAME)
@@ -38,9 +43,12 @@ Singleton {
             const nameMatch = textOsRelease.match(/^NAME="(.+?)"/m)
             distroName = prettyNameMatch ? prettyNameMatch[1] : (nameMatch ? nameMatch[1].replace(/Linux/i, "").trim() : "Unknown")
 
-            // Extract the ID
-            const idMatch = textOsRelease.match(/^ID="?(.+?)"?$/m)
-            distroId = idMatch ? idMatch[1] : "unknown"
+            // Extract the ID. Trimmed because os-release is not always tidy —
+            // this machine ships `ID=arch  `, and the trailing spaces rode
+            // through into the switch below, so no case matched and the bar
+            // showed the generic Linux icon instead of the distro's own.
+            const idMatch = textOsRelease.match(/^ID="?(.+?)"?\s*$/m)
+            distroId = idMatch ? idMatch[1].trim() : "unknown"
 
             // Extract additional URLs and logo
             const homeUrlMatch = textOsRelease.match(/^HOME_URL="(.+?)"/m)
@@ -82,9 +90,10 @@ Singleton {
             if (logo.trim().length === 0) {
                 logo = distroIcon
             }
-
         }
     }
+
+    Component.onCompleted: getUsername.running = true
 
     Process {
         id: getUsername
@@ -96,22 +105,9 @@ Singleton {
         }
     }
 
-    Process {
-        id: getDesktopEnvironment
-        running: true
-        command: ["bash", "-c", "echo $XDG_CURRENT_DESKTOP,$WAYLAND_DISPLAY"]
-        stdout: StdioCollector {
-            id: deCollector
-            onStreamFinished: {
-                const [desktop, wayland] = deCollector.text.split(",")
-                root.desktopEnvironment = desktop.trim()
-                root.windowingSystem = wayland.trim().length > 0 ? "Wayland" : "X11" // Are there others? 🤔
-            }
-        }
-    }
-
     FileView {
         id: fileOsRelease
         path: "/etc/os-release"
+        onLoaded: root.parseOsRelease()
     }
 }
