@@ -479,7 +479,7 @@ Singleton {
         root.savePersistentState("promptProfile", id);
     }
 
-    property string systemPrompt: {
+    readonly property string profilePrompt: {
         // The custom profile is the config file's prompt; every other profile
         // replaces it outright rather than appending, or the two would argue.
         let prompt = root.promptProfile === "custom"
@@ -489,11 +489,30 @@ Singleton {
             // QML/JS doesn't support replaceAll, so use split/join
             prompt = prompt.split(key).join(root.promptSubstitutions[key]);
         }
+        return prompt;
+    }
+
+    /**
+     * Who to be, where that is, and what we were told to remember.
+     *
+     * Split out from systemPrompt because a provider that brings its own tools
+     * needs exactly this much and no more. Claude Code runs through its own CLI
+     * with its own Read/Bash/Edit and its own permission modes, so the parts
+     * below that describe *this* sidebar's command layer would be telling it
+     * about machinery it doesn't have — get_shell_config, the approval prompt,
+     * the run_shell_command loop. It used to get none of this at all, persona
+     * included, which is why every Claude Code answer sounded the same no
+     * matter which style was selected.
+     */
+    readonly property string personaPrompt: [root.profilePrompt, root.personaRules,
+        root.contextBlock, root.memory.promptBlock].filter(part => part.length > 0).join("\n\n")
+
+    property string systemPrompt: {
         // Appended by the shell rather than living in the editable prompt: these
         // are facts about *this* machine, and they have to survive the user
         // rewriting their prompt — getting them wrong costs a round of commands
         // that edit the wrong file or change something already set.
-        return [prompt, root.personaRules, root.contextBlock, root.memory.promptBlock, root.desktopRules, root.modeRules]
+        return [root.personaPrompt, root.desktopRules, root.modeRules]
             .filter(part => part.length > 0).join("\n\n");
     }
 
@@ -1263,36 +1282,36 @@ The shell (Quickshell config "ii"):
             "api_format": "openai",
         }),
         "cc-haiku": aiModelComponent.createObject(this, {
-            "name": "Haiku · Claude Code",
+            "name": "Claude Haiku · CLI",
             "icon": "anthropic-symbolic",
-            "description": Translation.tr("Local claude CLI | Uses your Claude subscription, no API key\nFastest Claude. Runs with Claude Code's own tools and permission system."),
+            "description": Translation.tr("Local CLI | Anthropic's model, no API key\nFastest Claude model. Great for quick tasks and high-volume use."),
             "homepage": "https://claude.com/claude-code",
             "model": "haiku",
             "requires_key": false,
             "api_format": "claude-code",
         }),
         "cc-sonnet": aiModelComponent.createObject(this, {
-            "name": "Sonnet · Claude Code",
+            "name": "Claude Sonnet · CLI",
             "icon": "anthropic-symbolic",
-            "description": Translation.tr("Local claude CLI | Uses your Claude subscription, no API key\nBalanced Claude. Runs with Claude Code's own tools and permission system."),
+            "description": Translation.tr("Local CLI | Anthropic's model, no API key\nSmart, efficient. Great at coding, analysis and writing."),
             "homepage": "https://claude.com/claude-code",
             "model": "sonnet",
             "requires_key": false,
             "api_format": "claude-code",
         }),
         "cc-opus": aiModelComponent.createObject(this, {
-            "name": "Opus · Claude Code",
+            "name": "Claude Opus · CLI",
             "icon": "anthropic-symbolic",
-            "description": Translation.tr("Local claude CLI | Uses your Claude subscription, no API key\nMost capable Opus. Runs with Claude Code's own tools and permission system."),
+            "description": Translation.tr("Local CLI | Anthropic's model, no API key\nMost intelligent generally-available Opus. Best for complex reasoning and coding."),
             "homepage": "https://claude.com/claude-code",
             "model": "opus",
             "requires_key": false,
             "api_format": "claude-code",
         }),
         "cc-fable": aiModelComponent.createObject(this, {
-            "name": "Fable · Claude Code",
+            "name": "Claude Fable · CLI",
             "icon": "anthropic-symbolic",
-            "description": Translation.tr("Local claude CLI | Uses your Claude subscription, no API key\nAnthropic's frontier Mythos-class model. Availability depends on your plan."),
+            "description": Translation.tr("Local CLI | Anthropic's model, no API key\nFrontier Mythos-class model above Opus. Best for the hardest reasoning tasks."),
             "homepage": "https://claude.com/claude-code",
             "model": "fable",
             "requires_key": false,
@@ -2525,7 +2544,9 @@ The shell (Quickshell config "ii"):
 
             const toolsForFormat = root.tools[model.api_format] ?? root.tools["openai"];
             const toolSet = root.withMcpTools(toolsForFormat[root.currentTool] ?? [], model.api_format);
-            const data = root.currentApiStrategy.buildRequestData(model, filteredMessageArray, root.systemPrompt, root.temperature, toolSet, root.pendingFilePath);
+            const promptForStrategy = root.currentApiStrategy.bringsOwnTools
+                ? root.personaPrompt : root.systemPrompt;
+            const data = root.currentApiStrategy.buildRequestData(model, filteredMessageArray, promptForStrategy, root.temperature, toolSet, root.pendingFilePath);
             // console.log("[Ai] Request data: ", JSON.stringify(data, null, 2));
 
             let requestHeaders = {

@@ -1,6 +1,14 @@
 import QtQuick
 
 QtObject {
+    /**
+     * True when the provider runs its own tools and its own approval flow
+     * instead of the sidebar's. Those get Ai.personaPrompt — persona, machine,
+     * memory — rather than the full systemPrompt, whose remaining sections
+     * describe a command layer they aren't using.
+     */
+    property bool bringsOwnTools: false
+
     function buildEndpoint(model: AiModel): string { throw new Error("Not implemented") }
     function buildRequestData(model: AiModel, messages, systemPrompt: string, temperature: real, tools: list<var>, filePath: string) { throw new Error("Not implemented") }
     function buildAuthorizationHeader(apiKeyEnvVarName: string): string { throw new Error("Not implemented") }

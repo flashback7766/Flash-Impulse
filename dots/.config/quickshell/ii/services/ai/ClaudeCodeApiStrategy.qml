@@ -30,7 +30,17 @@ ApiStrategy {
     property string sessionCwd: Quickshell.env("HOME")
     property string pendingPrompt: ""
     property string pendingModel: ""
+    // The sidebar's persona block, handed over on every turn and passed to the
+    // CLI alongside the bridge prompt. Kept here rather than read straight off
+    // Ai at script-build time so a style switch mid-request can't retune the
+    // request already going out.
+    property string pendingSystemPrompt: ""
     property bool sawResult: false
+
+    // Claude Code has Read, Bash, Edit and its own permission modes; the
+    // sidebar's command layer isn't in play, so it gets the persona half of the
+    // prompt rather than the whole thing. See Ai.personaPrompt.
+    bringsOwnTools: true
 
     // Stderr goes here instead of polluting the JSON stdout stream.
     readonly property string logDir: Quickshell.env("HOME") + "/.local/share/flash-impulse/logs"
@@ -61,6 +71,7 @@ ApiStrategy {
 
     function buildRequestData(model: AiModel, messages, systemPrompt: string, temperature: real, tools, filePath: string) {
         pendingModel = model.model;
+        pendingSystemPrompt = systemPrompt ?? "";
 
         // Latest user message is the new turn.
         let lastUser = null;
@@ -105,13 +116,18 @@ ApiStrategy {
         const override = Config?.options.ai?.claudeCodePermissionMode ?? "";
         const permissionMode = override.length > 0 ? override : root.permissionMode;
         const heredoc = "FI_CLAUDE_PROMPT_EOF";
+        // The bridge prompt says where it's rendering; the persona block says
+        // who's speaking. Both go in one --append-system-prompt because the CLI
+        // takes the flag once — a second one silently replaces the first.
+        const appendedPrompt = [root.bridgeSystemPrompt, root.pendingSystemPrompt]
+            .filter(part => part.length > 0).join("\n\n");
         const args = [
             "-p",
             "--output-format stream-json",
             "--verbose",
             `--model '${root.pendingModel}'`,
             `--permission-mode '${permissionMode}'`,
-            `--append-system-prompt '${CF.StringUtils.shellSingleQuoteEscape(root.bridgeSystemPrompt)}'`,
+            `--append-system-prompt '${CF.StringUtils.shellSingleQuoteEscape(appendedPrompt)}'`,
         ];
         if (root.sessionId.length > 0) args.push(`--resume '${root.sessionId}'`);
 
