@@ -229,6 +229,17 @@ Singleton {
                 property string wallpaperPath: ""
                 property string thumbnailPath: ""
                 property bool hideWhenFullscreen: true
+                // A light and a dark cut of the same wallpaper, swapped when the
+                // theme flips. `enable` turns itself off the moment a wallpaper
+                // is applied that isn't one of these two — picking your own
+                // wallpaper is a clear statement that you want that one, and
+                // having the shell quietly replace it at the next theme change
+                // would be the shell arguing with you.
+                property JsonObject themeWallpaper: JsonObject {
+                    property bool enable: true
+                    property string light: ""
+                    property string dark: ""
+                }
                 property JsonObject parallax: JsonObject {
                     property bool vertical: false
                     property bool autoVertical: false

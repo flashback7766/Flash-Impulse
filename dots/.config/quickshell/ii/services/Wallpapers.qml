@@ -177,4 +177,73 @@ Singleton {
             root.apply(path);
         }
     }
+
+    // ---- light/dark wallpaper pair -----------------------------------------
+
+    // Empty means "the pair we ship". Resolved here rather than as a config
+    // default so an existing config.json doesn't have to be edited to get them,
+    // and so the paths follow the shell wherever it's installed.
+    readonly property string themeWallpaperLight: {
+        const set = Config.options?.background.themeWallpaper.light ?? "";
+        return set.length > 0 ? FileUtils.trimFileProtocol(set)
+            : FileUtils.trimFileProtocol(`${Directories.assetsPath}/images/default_wallpaper.png`);
+    }
+    readonly property string themeWallpaperDark: {
+        const set = Config.options?.background.themeWallpaper.dark ?? "";
+        return set.length > 0 ? FileUtils.trimFileProtocol(set)
+            : FileUtils.trimFileProtocol(`${Directories.assetsPath}/images/default_wallpaper_dark.png`);
+    }
+    readonly property bool themeWallpaperEnabled: Config.options?.background.themeWallpaper.enable ?? false
+
+    function themeWallpaperFor(darkMode) {
+        return darkMode ? root.themeWallpaperDark : root.themeWallpaperLight;
+    }
+
+    function isThemeWallpaper(path) {
+        const p = FileUtils.trimFileProtocol(path ?? "");
+        if (p.length === 0) return false;
+        return p === FileUtils.trimFileProtocol(root.themeWallpaperLight)
+            || p === FileUtils.trimFileProtocol(root.themeWallpaperDark);
+    }
+
+    /**
+     * Swap to the cut that matches the theme.
+     *
+     * Applied through the same switchwall.sh every other path uses, so the
+     * colour scheme is regenerated from whichever image actually ends up on
+     * screen. Passing the mode explicitly matters: the script would otherwise
+     * re-derive it from gsettings, which at this moment may still be reporting
+     * the mode we're in the middle of leaving.
+     */
+    function applyThemeWallpaper(darkMode) {
+        if (!root.themeWallpaperEnabled) return;
+        const current = FileUtils.trimFileProtocol(Config.options?.background.wallpaperPath ?? "");
+        // The opt-out, and it's derived rather than remembered: swapping only
+        // happens while one of the pair is actually on screen. Set a wallpaper
+        // of your own and there is nothing here to swap, so the theme stops
+        // touching it; go back to one of the pair and it picks up again.
+        //
+        // A stored "the user went custom" flag would have to be written at the
+        // exact moment an external change lands, which is mid-reload of the
+        // config file — the write is lost there, and a flag that silently fails
+        // to save is a flag that lets the shell overwrite a chosen wallpaper on
+        // the next restart. wallpaperPath is already persisted; ask it instead.
+        if (!root.isThemeWallpaper(current)) return;
+        const wanted = root.themeWallpaperFor(darkMode);
+        if (!wanted || wanted.length === 0) return;
+        if (current === FileUtils.trimFileProtocol(wanted)) return;
+        Quickshell.execDetached([Directories.wallpaperSwitchScriptPath,
+            "--mode", darkMode ? "dark" : "light", "--image", FileUtils.trimFileProtocol(wanted)]);
+    }
+
+    Connections {
+        target: Appearance.m3colors
+        function onDarkmodeChanged() {
+            root.applyThemeWallpaper(Appearance.m3colors.darkmode);
+        }
+    }
+
+    /** Whether the theme is currently allowed to swap the wallpaper. */
+    readonly property bool themeWallpaperActive: root.themeWallpaperEnabled
+        && root.isThemeWallpaper(Config.options?.background.wallpaperPath ?? "")
 }

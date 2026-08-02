@@ -8,6 +8,28 @@ ContentPage {
     forceWidth: true
 
     ContentSection {
+        icon: "wallpaper"
+        title: Translation.tr("Wallpaper")
+
+        ConfigSwitch {
+            buttonIcon: "brightness_6"
+            text: Translation.tr('Match wallpaper to light/dark theme')
+            checked: Config.options.background.themeWallpaper.enable
+            onCheckedChanged: {
+                Config.options.background.themeWallpaper.enable = checked;
+            }
+            StyledToolTip {
+                text: Translation.tr("Swaps between a light and a dark cut of the same wallpaper whenever the theme changes.\nOnly applies while one of the pair is set — pick a wallpaper of your own and the theme leaves it alone.")
+            }
+        }
+
+        ContentSubsectionLabel {
+            visible: Config.options.background.themeWallpaper.enable && !Wallpapers.themeWallpaperActive
+            text: Translation.tr("Currently on a wallpaper of your own, so the theme isn't changing it.")
+        }
+    }
+
+    ContentSection {
         icon: "sync_alt"
         title: Translation.tr("Parallax")
 
