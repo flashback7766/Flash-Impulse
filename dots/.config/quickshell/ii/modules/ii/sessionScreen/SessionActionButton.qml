@@ -11,6 +11,17 @@ RippleButton {
     property bool keyboardDown: false
     property real size: 120
 
+    // 0 while the menu is still opening, 1 once this button has arrived. Driven
+    // from the session screen's single reveal value, offset per button.
+    property real appear: 1
+    opacity: button.appear
+    transform: Scale {
+        origin.x: button.width / 2
+        origin.y: button.height / 2
+        xScale: 0.8 + 0.2 * button.appear
+        yScale: 0.8 + 0.2 * button.appear
+    }
+
     buttonRadius: (button.focus || button.down) ? size / 2 : Appearance.rounding.verylarge
     colBackground: button.keyboardDown ? Appearance.colors.colSecondaryContainerActive : 
         button.focus ? Appearance.colors.colPrimary : 

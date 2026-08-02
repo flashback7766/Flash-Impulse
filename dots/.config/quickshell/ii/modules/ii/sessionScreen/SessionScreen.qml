@@ -15,9 +15,32 @@ Scope {
     id: root
     property var focusedScreen: Quickshell.screens.find(s => s.name === Hyprland.focusedMonitor?.name)
 
+    /**
+     * 0 shut, 1 open, and everything in between while it moves.
+     *
+     * Lives out here rather than inside the window so the window can stay
+     * mapped for the whole of the closing animation — the menu used to blink
+     * out of existence the instant it was dismissed, because the Loader tracked
+     * sessionOpen directly. Coming in it decelerates, going out it accelerates,
+     * which is the usual pair: entering wants to settle, leaving wants to get
+     * out of the way.
+     */
+    property real reveal: GlobalStates.sessionOpen ? 1 : 0
+    Behavior on reveal {
+        NumberAnimation {
+            duration: GlobalStates.sessionOpen
+                ? Appearance.animation.elementMoveEnter.duration
+                : Appearance.animation.elementMoveExit.duration
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: GlobalStates.sessionOpen
+                ? Appearance.animation.elementMoveEnter.bezierCurve
+                : Appearance.animation.elementMoveExit.bezierCurve
+        }
+    }
+
     Loader {
         id: sessionLoader
-        active: GlobalStates.sessionOpen
+        active: root.reveal > 0.001
         onActiveChanged: {
             if (sessionLoader.active)
                 SessionWarnings.refresh();
@@ -45,7 +68,24 @@ Scope {
             WlrLayershell.namespace: "quickshell:session"
             WlrLayershell.layer: WlrLayer.Overlay
             WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
-            color: ColorUtils.transparentize(Appearance.m3colors.m3background, Appearance.m3colors.darkmode ? 0.05 : 0.12)
+            // The backdrop dims in with everything else rather than being there
+            // in full the moment the window maps.
+            color: ColorUtils.transparentize(Appearance.m3colors.m3background,
+                1 - (1 - (Appearance.m3colors.darkmode ? 0.05 : 0.12)) * root.reveal)
+
+            /**
+             * Where each button is in the cascade.
+             *
+             * One shared progress value read at eight offsets, rather than eight
+             * timers: the grid fills in from the top-left instead of every
+             * button landing on the same frame. The divisor keeps the last one
+             * arriving exactly at 1, so nothing is left part-faded when the
+             * animation settles.
+             */
+            function appearAt(index) {
+                const start = index * 0.055;
+                return Math.max(0, Math.min(1, (root.reveal - start) / (1 - start)));
+            }
 
             anchors {
                 top: true
@@ -68,6 +108,22 @@ Scope {
                 id: contentColumn
                 anchors.centerIn: parent
                 spacing: 15
+
+                opacity: root.reveal
+                // Rises a little as it settles, and the whole block eases up from
+                // slightly under size. Transform rather than layout properties so
+                // none of this triggers a relayout per frame.
+                transform: [
+                    Scale {
+                        origin.x: contentColumn.width / 2
+                        origin.y: contentColumn.height / 2
+                        xScale: 0.94 + 0.06 * root.reveal
+                        yScale: 0.94 + 0.06 * root.reveal
+                    },
+                    Translate {
+                        y: (1 - root.reveal) * 24
+                    }
+                ]
 
                 Keys.onPressed: event => {
                     if (event.key === Qt.Key_Escape) {
@@ -106,6 +162,7 @@ Scope {
 
                     SessionActionButton {
                         id: sessionLock
+                        appear: sessionRoot.appearAt(0)
                         focus: sessionRoot.visible
                         buttonIcon: "lock"
                         buttonText: Translation.tr("Lock")
@@ -122,6 +179,7 @@ Scope {
                     }
                     SessionActionButton {
                         id: sessionSleep
+                        appear: sessionRoot.appearAt(1)
                         buttonIcon: "dark_mode"
                         buttonText: Translation.tr("Sleep")
                         onClicked: {
@@ -138,6 +196,7 @@ Scope {
                     }
                     SessionActionButton {
                         id: sessionLogout
+                        appear: sessionRoot.appearAt(2)
                         buttonIcon: "logout"
                         buttonText: Translation.tr("Logout")
                         onClicked: {
@@ -154,6 +213,7 @@ Scope {
                     }
                     SessionActionButton {
                         id: sessionTaskManager
+                        appear: sessionRoot.appearAt(3)
                         buttonIcon: "browse_activity"
                         buttonText: Translation.tr("Task Manager")
                         onClicked: {
@@ -170,6 +230,7 @@ Scope {
 
                     SessionActionButton {
                         id: sessionHibernate
+                        appear: sessionRoot.appearAt(4)
                         buttonIcon: "downloading"
                         buttonText: Translation.tr("Hibernate")
                         onClicked: {
@@ -185,6 +246,7 @@ Scope {
                     }
                     SessionActionButton {
                         id: sessionShutdown
+                        appear: sessionRoot.appearAt(5)
                         buttonIcon: "power_settings_new"
                         buttonText: Translation.tr("Shutdown")
                         onClicked: {
@@ -201,6 +263,7 @@ Scope {
                     }
                     SessionActionButton {
                         id: sessionReboot
+                        appear: sessionRoot.appearAt(6)
                         buttonIcon: "restart_alt"
                         buttonText: Translation.tr("Reboot")
                         onClicked: {
@@ -217,6 +280,7 @@ Scope {
                     }
                     SessionActionButton {
                         id: sessionFirmwareReboot
+                        appear: sessionRoot.appearAt(7)
                         buttonIcon: "settings_applications"
                         buttonText: Translation.tr("Reboot to firmware settings")
                         onClicked: {
