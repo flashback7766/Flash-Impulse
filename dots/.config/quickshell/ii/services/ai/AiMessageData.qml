@@ -92,8 +92,21 @@ QtObject {
     // A multiple-choice question the model asked instead of guessing. Same
     // "pending until the user acts" idea as a command, but there's nothing to
     // approve or reject — just an option to pick.
+    // One to four of them, each { question, header, multiSelect, options:[{label,
+    // description}] } — the shape Claude Code's AskUserQuestion uses, so a
+    // question from the CLI and a question from any other model are the same
+    // object and draw as the same block.
+    property var askQuestions: []
+    property bool askPending: false
+    // Question index -> array of chosen labels. An array even for single-select,
+    // so the block and the answer-formatting don't need two code paths.
+    property var askAnswers: ({})
+    // Claude Code can't be answered through its own tool call from here, so its
+    // questions are answered by sending the choice as the next message instead.
+    property bool askByReply: false
+
+    // Superseded by askQuestions; still read when loading older chats.
     property string askQuestion
     property var askOptions: []
-    property bool askPending: false
     property string askAnswer
 }

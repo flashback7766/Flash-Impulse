@@ -147,18 +147,23 @@ ApiStrategy {
             + heredoc + "\n";
     }
 
-    function formatAskUserQuestion(input): string {
-        let out = "";
-        const questions = input?.questions ?? [];
-        for (const q of questions) {
-            out += `\n\n❓ **${q.question}**\n`;
-            const opts = q.options ?? [];
-            for (let i = 0; i < opts.length; i++) {
-                out += `\n${i + 1}. **${opts[i].label}**${opts[i].description ? " — " + opts[i].description : ""}`;
-            }
-            out += `\n\n*${q.multiSelect ? "Reply with the numbers of your choices." : "Reply with a number or your own answer."}*`;
-        }
-        return out;
+    /**
+     * Hand AskUserQuestion to the same block every other model's questions use.
+     *
+     * It used to render as a numbered markdown list ending in "reply with a
+     * number", which is the one place a Claude Code turn looked like a
+     * different program. The tool call itself still can't be answered from
+     * here — the CLI owns it — so the block sends the choice as the next
+     * message instead, which is what the numbered list was asking for anyway.
+     */
+    function applyAskUserQuestion(message: AiMessageData, input): bool {
+        const parsed = Ai.normaliseAskQuestions(input ?? {});
+        if (parsed.length === 0) return false;
+        message.askQuestions = parsed;
+        message.askAnswers = ({});
+        message.askPending = true;
+        message.askByReply = true;
+        return true;
     }
 
     /**
@@ -230,7 +235,9 @@ ApiStrategy {
                     message.rawContent += block.text;
                 } else if (block.type === "tool_use") {
                     if (block.name === "AskUserQuestion") {
-                        message.rawContent += root.formatAskUserQuestion(block.input);
+                        if (!root.applyAskUserQuestion(message, block.input)) {
+                            root.addToolCall(message, block.id, block.name, block.input);
+                        }
                     } else {
                         root.addToolCall(message, block.id, block.name, block.input);
                     }

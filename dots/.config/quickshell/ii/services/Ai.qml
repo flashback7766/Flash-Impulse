@@ -1790,7 +1790,7 @@ The shell (Quickshell config "ii"):
         if ((message.dividerText ?? "").length > 0) return;
         if ((message.commandState ?? "").length > 0) return;
         if ((message.localFilePath ?? "").length > 0) return;
-        if ((message.askQuestion ?? "").length > 0) return;
+        if ((message.askQuestions?.length ?? 0) > 0) return;
         if ((message.toolCalls?.length ?? 0) > 0) return;
         message.visibleToUser = false;
     }
@@ -2882,7 +2882,7 @@ The shell (Quickshell config "ii"):
      * model output inside `bash -c` is an injection waiting to happen. Only the
      * heredoc delimiter has to be kept out of the payload.
      */
-    function _pyScript(body, argsObject) {
+    function _pyScript(body: string, argsObject: var): string {
         const payload = JSON.stringify(argsObject).split("FI_PY_EOF").join("FI_PY_");
         return "python3 - <<'FI_PY_EOF'\n"
             + "import json,sys,os,re,glob,subprocess\n"
@@ -2890,7 +2890,7 @@ The shell (Quickshell config "ii"):
             + body + "\nFI_PY_EOF\n";
     }
 
-    function buildReadOnlyToolCommand(name, args) {
+    function buildReadOnlyToolCommand(name: string, args: var): var {
         if (name === "read_file") {
             const path = args.path ?? "";
             if (path.length === 0) return { error: Translation.tr("Must provide `path`.") };
@@ -2943,7 +2943,7 @@ The shell (Quickshell config "ii"):
         return { error: Translation.tr("Unknown read tool: %1").arg(name) };
     }
 
-    function buildWriteToolCommand(name, args) {
+    function buildWriteToolCommand(name: string, args: var): var {
         const path = args.path ?? "";
         if (path.length === 0) return { error: Translation.tr("Must provide `path`.") };
         if (name === "write_file") {
@@ -3311,16 +3311,16 @@ The shell (Quickshell config "ii"):
                     message.commandAutoApproved = false;
                 });
         } else if (name === "ask_user_question") {
-            const question = args?.question ?? "";
-            const options = Array.isArray(args?.options) ? args.options.filter(o => (o ?? "").length > 0).slice(0, 4) : [];
-            if (question.length === 0 || options.length < 2) {
-                addFunctionOutputMessage(name, Translation.tr("Invalid arguments. Must provide `question` and at least 2 `options`."));
+            const parsed = root.normaliseAskQuestions(args);
+            if (parsed.length === 0) {
+                addFunctionOutputMessage(name, Translation.tr(
+                    "Invalid arguments. Provide `questions`: a list of objects, each with `question` and 2 to 4 `options`."));
                 requester.makeRequest();
                 return;
             }
-            message.askQuestion = question;
-            message.askOptions = options;
+            message.askQuestions = parsed;
             message.askPending = true;
+            message.askByReply = false;
             message.functionName = name;
             // No requester.makeRequest() here — answerQuestion() resumes the
             // turn once the user actually picks something.
@@ -3329,12 +3329,110 @@ The shell (Quickshell config "ii"):
         }
     }
 
-    function answerQuestion(message: AiMessageData, choice: string) {
+    /**
+     * Accept whatever shape the model sent and return a clean question list.
+     *
+     * Models get this wrong in predictable ways — a bare `question`/`options`
+     * pair instead of a list, options as plain strings instead of objects — and
+     * refusing those costs a whole turn to say so. They're all unambiguous, so
+     * they're accepted and normalised rather than rejected.
+     */
+    function normaliseAskQuestions(args): var {
+        let raw = args?.questions;
+        if (!Array.isArray(raw)) {
+            raw = (args?.question ?? "").length > 0
+                ? [{ question: args.question, options: args.options, multiSelect: args.multiSelect }]
+                : [];
+        }
+        const out = [];
+        for (const q of raw.slice(0, 4)) {
+            if (!q) continue;
+            const text = typeof q === "string" ? q : (q.question ?? "");
+            if (text.length === 0) continue;
+            const opts = [];
+            for (const o of (Array.isArray(q.options) ? q.options : []).slice(0, 4)) {
+                if (typeof o === "string") {
+                    if (o.length > 0) opts.push({ label: o, description: "" });
+                } else if (o && (o.label ?? "").length > 0) {
+                    opts.push({ label: o.label, description: o.description ?? "" });
+                }
+            }
+            if (opts.length < 2) continue;
+            out.push({
+                question: text,
+                header: (q.header ?? "").slice(0, 16),
+                multiSelect: q.multiSelect === true,
+                options: opts
+            });
+        }
+        return out;
+    }
+
+    /** Every question answered? */
+    function askIsComplete(message: AiMessageData): bool {
+        const qs = message.askQuestions ?? [];
+        const answers = message.askAnswers ?? ({});
+        for (let i = 0; i < qs.length; i++) {
+            if ((answers[i] ?? []).length === 0) return false;
+        }
+        return qs.length > 0;
+    }
+
+    /** Toggle one option. Single-select replaces, multi-select adds or removes. */
+    function toggleAskOption(message: AiMessageData, questionIndex: int, label: string): void {
         if (!message.askPending) return;
+        const qs = message.askQuestions ?? [];
+        const multi = qs[questionIndex]?.multiSelect === true;
+        const answers = Object.assign({}, message.askAnswers ?? ({}));
+        const current = (answers[questionIndex] ?? []).slice();
+        const at = current.indexOf(label);
+        if (multi) {
+            if (at === -1) current.push(label);
+            else current.splice(at, 1);
+            answers[questionIndex] = current;
+        } else {
+            answers[questionIndex] = at === -1 ? [label] : [];
+        }
+        message.askAnswers = answers;
+        // A single question with one answer needs no confirm step — picking it
+        // is the whole interaction. Anything else waits for the button.
+        if (!multi && qs.length === 1 && (answers[questionIndex] ?? []).length > 0) {
+            root.submitAskAnswers(message);
+        }
+    }
+
+    function formatAskAnswers(message: AiMessageData): string {
+        const qs = message.askQuestions ?? [];
+        const answers = message.askAnswers ?? ({});
+        return qs.map((q, i) => `${q.question}\n→ ${(answers[i] ?? []).join(", ")}`).join("\n\n");
+    }
+
+    function submitAskAnswers(message: AiMessageData): void {
+        if (!message.askPending) return;
+        if (!root.askIsComplete(message)) return;
         message.askPending = false;
-        message.askAnswer = choice;
-        addFunctionOutputMessage(message.functionName, Translation.tr("The user chose: %1").arg(choice));
+        const summary = root.formatAskAnswers(message);
+        if (message.askByReply) {
+            // Claude Code owns the tool call; there is no result to hand back to
+            // it, so the answer goes in as the next thing the user says.
+            root.sendUserMessage(summary);
+            return;
+        }
+        addFunctionOutputMessage(message.functionName, summary);
         requester.makeRequest();
+    }
+
+    /** Old chats stored a single question and a single answer. */
+    function migrateLegacyAsk(message: AiMessageData): void {
+        if ((message.askQuestions?.length ?? 0) > 0) return;
+        if ((message.askQuestion ?? "").length === 0) return;
+        message.askQuestions = [{
+            question: message.askQuestion,
+            header: "",
+            multiSelect: false,
+            options: (message.askOptions ?? []).map(o => ({ label: o, description: "" }))
+        }];
+        if ((message.askAnswer ?? "").length > 0) message.askAnswers = { 0: [message.askAnswer] };
     }
 
     function chatToJson() {
@@ -3376,6 +3474,8 @@ The shell (Quickshell config "ii"):
                     "variants": message.variants,
                     "toolCalls": message.toolCalls,
                     "variantIndex": message.variantIndex,
+                    "askQuestions": message.askQuestions,
+                    "askAnswers": message.askAnswers,
                     "askQuestion": message.askQuestion,
                     "askOptions": message.askOptions,
                     "askAnswer": message.askAnswer,
@@ -3540,6 +3640,8 @@ The shell (Quickshell config "ii"):
                 "variants": message.variants ?? [],
                 "toolCalls": message.toolCalls ?? [],
                 "variantIndex": message.variantIndex ?? 0,
+                "askQuestions": message.askQuestions ?? [],
+                "askAnswers": message.askAnswers ?? ({}),
                 "askQuestion": message.askQuestion ?? "",
                 "askOptions": message.askOptions ?? [],
                 // Never restored as pending: there's no live request left to
@@ -3550,6 +3652,8 @@ The shell (Quickshell config "ii"):
             });
             // Restore Gemini thought signature data (dynamic props, set after creation)
             if (message.functionCallParts) root.messageByID[saveIds[i]].functionCallParts = message.functionCallParts;
+            // Chats saved before questions could have more than one part.
+            root.migrateLegacyAsk(root.messageByID[saveIds[i]]);
             // Chats saved before hideIfEmpty existed still carry tool-call turns
             // marked visible with nothing in them.
             root.hideIfEmpty(root.messageByID[saveIds[i]]);

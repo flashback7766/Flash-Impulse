@@ -452,7 +452,7 @@ Item {
             Layout.fillWidth: true
             Layout.maximumWidth: root.textColumnWidth
             Layout.topMargin: root.isMechanical ? 0 : 4
-            active: (root.messageData?.askQuestion ?? "").length > 0
+            active: (root.messageData?.askQuestions?.length ?? 0) > 0
             visible: active
             sourceComponent: MessageQuestionBlock {
                 messageData: root.messageData
