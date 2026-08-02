@@ -443,6 +443,8 @@ Item {
             visible: active
             sourceComponent: MessageCommandBlock {
                 messageData: root.messageData
+                title: root.messageData?.commandTitle ?? ""
+                showPrompt: root.messageData?.commandShowPrompt ?? true
             }
         }
 

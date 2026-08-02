@@ -823,313 +823,177 @@ The shell (Quickshell config "ii"):
     // Gemini: https://ai.google.dev/gemini-api/docs/function-calling
     // OpenAI: https://platform.openai.com/docs/guides/function-calling
     property string currentTool: Config?.options.ai.tool ?? "search"
-    property var tools: {
-        "gemini": {
-            "functions": [{"functionDeclarations": [
-                {
-                    "name": "switch_to_search_mode",
-                    "description": "Search the web",
-                },
-                {
-                    "name": "get_shell_config",
-                    "description": "Get the desktop shell config file contents",
-                },
-                {
-                    "name": "set_shell_config",
-                    "description": "Set a field in the desktop graphical shell config file. Must only be used after `get_shell_config`.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "key": {
-                                "type": "string",
-                                "description": "The key to set, e.g. `bar.borderless`. MUST NOT BE GUESSED, use `get_shell_config` to see what keys are available before setting.",
-                            },
-                            "value": {
-                                "type": "string",
-                                "description": "The value to set, e.g. `true`"
-                            }
-                        },
-                        "required": ["key", "value"]
-                    }
-                },
-                {
-                    "name": "remember",
-                    "description": "Store one durable fact about the user or their machine so it is available in future chats. Use for settled preferences, hardware, and decisions — not for anything specific to the current task, and not for what you can read live from the system.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "fact": {
-                                "type": "string",
-                                "description": "One short sentence, written so it still makes sense with no other context."
-                            }
-                        },
-                        "required": ["fact"]
-                    }
-                },
-                {
-                    "name": "run_shell_command",
-                    "description": "Run a shell command in bash and get its output. Use this only for quick commands that don't require user interaction. For commands that require interaction, ask the user to run manually instead.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "command": {
-                                "type": "string",
-                                "description": "The bash command to run",
-                            },
-                        },
-                        "required": ["command"]
-                    }
-                },
-                {
-                    "name": "ask_user_question",
-                    "description": "Ask the user a genuine multiple-choice question and wait for them to pick before continuing. Use this instead of guessing when a real decision is theirs to make — not for anything you could work out yourself by reading the system, and not for routine confirmations.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "question": {
-                                "type": "string",
-                                "description": "The question, phrased so any of the options is a complete answer."
-                            },
-                            "options": {
-                                "type": "array",
-                                "items": {"type": "string"},
-                                "description": "2 to 4 short, mutually exclusive answers."
-                            }
-                        },
-                        "required": ["question", "options"]
-                    }
-                },
-            ]}],
-            "search": [{
-                "google_search": {}
-            }],
-            "none": []
+    /**
+     * Every tool the sidebar offers, described once.
+     *
+     * The three providers want the same information in three shapes, and three
+     * hand-written copies had already drifted apart — web_search_preview existed
+     * for OpenAI and Anthropic but not Gemini, so the same question answered by
+     * two models could take visibly different routes. One list, three renderers.
+     *
+     * `label` is what the step is called in the transcript. They match Claude
+     * Code's tool names on purpose: the same action reads the same way whether
+     * the CLI ran it or the sidebar did.
+     */
+    readonly property var toolSpecs: [
+        {
+            "name": "switch_to_search_mode", "label": "Search",
+            "description": "Switch to web search mode to look up current information, recent events, prices, documentation, etc. Use whenever the answer might require up-to-date data.",
+            "properties": {}, "required": []
         },
-        "openai": {
-            "functions": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "switch_to_search_mode",
-                        "description": "Switch to web search mode to look up current information, recent events, prices, documentation, etc. Use whenever the answer might require up-to-date data.",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {}
-                        }
-                    }
-                },
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "get_shell_config",
-                        "description": "Get the desktop shell config file contents",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {}
-                        }
-                    },
-                },
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "set_shell_config",
-                        "description": "Set a field in the desktop graphical shell config file. Must only be used after `get_shell_config`.",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                "key": {
-                                    "type": "string",
-                                    "description": "The key to set, e.g. `bar.borderless`. MUST NOT BE GUESSED, use `get_shell_config` to see what keys are available before setting.",
-                                },
-                                "value": {
-                                    "type": "string",
-                                    "description": "The value to set, e.g. `true`"
-                                }
-                            },
-                            "required": ["key", "value"]
-                        }
-                    }
-                },
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "remember",
-                        "description": "Store one durable fact about the user or their machine so it is available in future chats. Use for settled preferences, hardware, and decisions — not for anything specific to the current task, and not for what you can read live from the system.",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                "fact": {
-                                    "type": "string",
-                                    "description": "One short sentence, written so it still makes sense with no other context."
-                                }
-                            },
-                            "required": ["fact"]
-                        }
-                    }
-                },
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "run_shell_command",
-                        "description": "Run a shell command in bash and get its output. Use this only for quick commands that don't require user interaction. For commands that require interaction, ask the user to run manually instead.",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                "command": {
-                                    "type": "string",
-                                    "description": "The bash command to run",
-                                },
-                            },
-                            "required": ["command"]
-                        }
-                    },
-                },
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "ask_user_question",
-                        "description": "Ask the user a genuine multiple-choice question and wait for them to pick before continuing. Use this instead of guessing when a real decision is theirs to make — not for anything you could work out yourself by reading the system, and not for routine confirmations.",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                "question": {
-                                    "type": "string",
-                                    "description": "The question, phrased so any of the options is a complete answer."
-                                },
-                                "options": {
-                                    "type": "array",
-                                    "items": {"type": "string"},
-                                    "description": "2 to 4 short, mutually exclusive answers."
-                                }
-                            },
-                            "required": ["question", "options"]
-                        }
-                    },
-                },
-            ],
-            "search": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "web_search_preview",
-                        "description": "Search the web for current information. Use for factual queries, recent events, prices, docs, etc.",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                "query": {
-                                    "type": "string",
-                                    "description": "The search query"
-                                }
-                            },
-                            "required": ["query"]
-                        }
-                    }
-                }
-            ],
-            "none": [],
+        {
+            "name": "get_shell_config", "label": "Config",
+            "description": "Get the desktop shell config file contents",
+            "properties": {}, "required": []
         },
-        "anthropic": {
-            "functions": [
-                {
-                    "name": "switch_to_search_mode",
-                    "description": "Switch to web search mode to look up current information, recent events, prices, documentation, etc. Use whenever the answer might require up-to-date data.",
-                    "input_schema": {
-                        "type": "object",
-                        "properties": {}
-                    }
-                },
-                {
-                    "name": "get_shell_config",
-                    "description": "Get the desktop shell config file contents",
-                    "input_schema": {
-                        "type": "object",
-                        "properties": {}
-                    }
-                },
-                {
-                    "name": "set_shell_config",
-                    "description": "Set a field in the desktop graphical shell config file. Must only be used after `get_shell_config`.",
-                    "input_schema": {
-                        "type": "object",
-                        "properties": {
-                            "key": {
-                                "type": "string",
-                                "description": "The key to set, e.g. `bar.borderless`. MUST NOT BE GUESSED, use `get_shell_config` to see what keys are available before setting."
-                            },
-                            "value": {
-                                "type": "string",
-                                "description": "The value to set, e.g. `true`"
-                            }
-                        },
-                        "required": ["key", "value"]
-                    }
-                },
-                {
-                    "name": "remember",
-                    "description": "Store one durable fact about the user or their machine so it is available in future chats. Use for settled preferences, hardware, and decisions — not for anything specific to the current task, and not for what you can read live from the system.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "fact": {
-                                "type": "string",
-                                "description": "One short sentence, written so it still makes sense with no other context."
-                            }
-                        },
-                        "required": ["fact"]
-                    }
-                },
-                {
-                    "name": "run_shell_command",
-                    "description": "Run a shell command in bash and get its output. Use this only for quick commands that don't require user interaction. For commands that require interaction, ask the user to run manually instead.",
-                    "input_schema": {
-                        "type": "object",
-                        "properties": {
-                            "command": {
-                                "type": "string",
-                                "description": "The bash command to run"
-                            }
-                        },
-                        "required": ["command"]
-                    }
-                },
-                {
-                    "name": "ask_user_question",
-                    "description": "Ask the user a genuine multiple-choice question and wait for them to pick before continuing. Use this instead of guessing when a real decision is theirs to make — not for anything you could work out yourself by reading the system, and not for routine confirmations.",
-                    "input_schema": {
-                        "type": "object",
-                        "properties": {
-                            "question": {
-                                "type": "string",
-                                "description": "The question, phrased so any of the options is a complete answer."
-                            },
-                            "options": {
-                                "type": "array",
-                                "items": {"type": "string"},
-                                "description": "2 to 4 short, mutually exclusive answers."
-                            }
-                        },
-                        "required": ["question", "options"]
-                    }
+        {
+            "name": "set_shell_config", "label": "Config",
+            "description": "Set a field in the desktop graphical shell config file. Must only be used after `get_shell_config`.",
+            "properties": {
+                "key": {"type": "string", "description": "The key to set, e.g. `bar.borderless`. MUST NOT BE GUESSED, use `get_shell_config` to see what keys are available before setting."},
+                "value": {"type": "string", "description": "The value to set it to."}
+            },
+            "required": ["key", "value"]
+        },
+        {
+            "name": "remember", "label": "Remember",
+            "description": "Store one durable fact about the user or their machine so it is available in future chats. Use for settled preferences, hardware, and decisions — not for anything specific to the current task, and not for what you can read live from the system.",
+            "properties": {
+                "fact": {"type": "string", "description": "One short sentence, written so it still makes sense with no other context."}
+            },
+            "required": ["fact"]
+        },
+        {
+            "name": "recall_memory", "label": "Memory",
+            "description": "List everything currently remembered about the user, with the id of each entry. Use before forgetting something, or when you need to check what is already known rather than asking again.",
+            "properties": {}, "required": []
+        },
+        {
+            "name": "forget_memory", "label": "Memory",
+            "description": "Delete one remembered fact by id. Use when the user says something previously remembered is wrong or no longer true. Call `recall_memory` first to get the id.",
+            "properties": {
+                "id": {"type": "string", "description": "The id of the entry to delete, as given by `recall_memory`."}
+            },
+            "required": ["id"]
+        },
+        {
+            "name": "read_file", "label": "Read",
+            "description": "Read a text file from disk and return its contents with line numbers. Prefer this over `cat` — it is faster, it does not need approval, and the numbering is what `edit_file` refers to. Read a file before editing it.",
+            "properties": {
+                "path": {"type": "string", "description": "Absolute path to the file."},
+                "offset": {"type": "integer", "description": "First line to return, 1-based. Omit to start at the beginning."},
+                "limit": {"type": "integer", "description": "How many lines to return. Omit for up to 2000."}
+            },
+            "required": ["path"]
+        },
+        {
+            "name": "list_files", "label": "Glob",
+            "description": "List files matching a glob pattern, newest first. Use to find where something lives before reading it.",
+            "properties": {
+                "pattern": {"type": "string", "description": "Glob pattern, e.g. `**/*.qml` or `*.conf`."},
+                "path": {"type": "string", "description": "Absolute directory to search in. Defaults to the home directory."}
+            },
+            "required": ["pattern"]
+        },
+        {
+            "name": "search_files", "label": "Grep",
+            "description": "Search file contents with a regular expression and return matching lines with their file and line number. Use to find a symbol or a string across a tree.",
+            "properties": {
+                "pattern": {"type": "string", "description": "Extended regular expression to search for."},
+                "path": {"type": "string", "description": "Absolute file or directory to search. Defaults to the home directory."},
+                "glob": {"type": "string", "description": "Only search files matching this glob, e.g. `*.qml`."}
+            },
+            "required": ["pattern"]
+        },
+        {
+            "name": "write_file", "label": "Write",
+            "description": "Write a file, replacing it entirely if it exists. Needs the user's approval, like a shell command. For a change to part of an existing file use `edit_file` instead — it is safer and shows a smaller diff.",
+            "properties": {
+                "path": {"type": "string", "description": "Absolute path to the file."},
+                "content": {"type": "string", "description": "The complete new contents of the file."}
+            },
+            "required": ["path", "content"]
+        },
+        {
+            "name": "edit_file", "label": "Edit",
+            "description": "Replace an exact string in a file. Needs the user's approval, like a shell command. Read the file first; `old_string` must match exactly, including indentation, and must be unique unless `replace_all` is set.",
+            "properties": {
+                "path": {"type": "string", "description": "Absolute path to the file."},
+                "old_string": {"type": "string", "description": "The exact text to replace."},
+                "new_string": {"type": "string", "description": "The text to put in its place."},
+                "replace_all": {"type": "boolean", "description": "Replace every occurrence instead of requiring a unique match."}
+            },
+            "required": ["path", "old_string", "new_string"]
+        },
+        {
+            "name": "run_shell_command", "label": "Bash",
+            "description": "Run a shell command in bash and get its output. Use this only for quick commands that don't require user interaction. For commands that require interaction, ask the user to run manually instead. Prefer `read_file`, `list_files` and `search_files` over cat, find and grep.",
+            "properties": {
+                "command": {"type": "string", "description": "The bash command to run"}
+            },
+            "required": ["command"]
+        },
+        {
+            "name": "web_search_preview", "label": "Search",
+            "description": "Search the web and get a short summary of the top results.",
+            "properties": {
+                "query": {"type": "string", "description": "The search query"}
+            },
+            "required": ["query"]
+        },
+        {
+            "name": "ask_user_question", "label": "Question",
+            "description": "Ask the user one or more genuine questions and wait for their answers before continuing. Use this instead of guessing when a real decision is theirs to make — not for anything you could work out yourself by reading the system, and not for routine confirmations. Each question can take one answer or several.",
+            "properties": {
+                "questions": {
+                    "type": "array",
+                    "description": "1 to 4 questions. Each is an object with `question` (the full question), `header` (a 1-2 word label), `options` (2 to 4 objects with `label` and an optional one-line `description`), and optional `multiSelect` when more than one answer may be picked.",
+                    "items": {"type": "object"}
                 }
-            ],
-            "search": [
-                {
-                    "name": "web_search_preview",
-                    "description": "Search the web for current information. Use for factual queries, recent events, prices, docs, etc.",
-                    "input_schema": {
-                        "type": "object",
-                        "properties": {
-                            "query": {
-                                "type": "string",
-                                "description": "The search query"
-                            }
-                        },
-                        "required": ["query"]
-                    }
-                }
-            ],
-            "none": [],
+            },
+            "required": ["questions"]
         }
+    ]
+
+    property var tools: {
+        const specs = root.toolSpecs;
+        const render = {
+            "gemini": s => ({
+                "name": s.name, "description": s.description,
+                "parameters": {"type": "object", "properties": s.properties ?? {}, "required": s.required ?? []}
+            }),
+            "openai": s => ({
+                "type": "function",
+                "function": {
+                    "name": s.name, "description": s.description,
+                    "parameters": {"type": "object", "properties": s.properties ?? {}, "required": s.required ?? []}
+                }
+            }),
+            "anthropic": s => ({
+                "name": s.name, "description": s.description,
+                "input_schema": {"type": "object", "properties": s.properties ?? {}, "required": s.required ?? []}
+            })
+        };
+        const searchOnly = specs.filter(s => s.name === "web_search_preview");
+        return {
+            "gemini": {
+                "functions": [{"functionDeclarations": specs.map(render["gemini"])}],
+                // Gemini has search built in, so search mode hands the job to the
+                // provider rather than to our own curl.
+                "search": [{"google_search": {}}],
+                "none": []
+            },
+            "openai": {
+                "functions": specs.map(render["openai"]),
+                "search": searchOnly.map(render["openai"]),
+                "none": []
+            },
+            "anthropic": {
+                "functions": specs.map(render["anthropic"]),
+                "search": searchOnly.map(render["anthropic"]),
+                "none": []
+            }
+        };
     }
     property list<var> availableTools: Object.keys(root.tools[models[currentModelId]?.api_format] ?? root.tools["openai"])
     property var toolDescriptions: {
@@ -3001,8 +2865,145 @@ The shell (Quickshell config "ii"):
         root.messageByID[id] = commandExecutionProc.outputMessage; // Set object FIRST
         root.messageIDs = [...root.messageIDs, id]; // Then trigger the list update
 
-        commandExecutionProc.shellCommand = message.functionCall.args.command;
+        // A file tool has already turned its arguments into the script that will
+        // carry them out; a shell command is its own script.
+        commandExecutionProc.shellCommand = (message.commandRunScript ?? "").length > 0
+            ? message.commandRunScript
+            : message.functionCall.args.command;
         commandExecutionProc.running = true;
+    }
+
+    /**
+     * Turn a file tool's arguments into a command, plus the one-liner the
+     * transcript shows for it.
+     *
+     * Arguments reach the shell through a python heredoc rather than being
+     * pasted into a command line — a path or a pattern is model output, and
+     * model output inside `bash -c` is an injection waiting to happen. Only the
+     * heredoc delimiter has to be kept out of the payload.
+     */
+    function _pyScript(body, argsObject) {
+        const payload = JSON.stringify(argsObject).split("FI_PY_EOF").join("FI_PY_");
+        return "python3 - <<'FI_PY_EOF'\n"
+            + "import json,sys,os,re,glob,subprocess\n"
+            + `A = json.loads(r'''${payload.split("'''").join("")}''')\n`
+            + body + "\nFI_PY_EOF\n";
+    }
+
+    function buildReadOnlyToolCommand(name, args) {
+        if (name === "read_file") {
+            const path = args.path ?? "";
+            if (path.length === 0) return { error: Translation.tr("Must provide `path`.") };
+            const offset = Math.max(1, parseInt(args.offset ?? 1) || 1);
+            const limit = Math.max(1, Math.min(2000, parseInt(args.limit ?? 2000) || 2000));
+            return {
+                display: path + (args.offset ? ` (from line ${offset})` : ""),
+                command: root._pyScript(
+                    "p = os.path.expanduser(A['path'])\n"
+                    + "if not os.path.isfile(p): print('No such file: ' + p); sys.exit(0)\n"
+                    + "with open(p, errors='replace') as f: lines = f.readlines()\n"
+                    + "start = A['offset'] - 1\n"
+                    + "sel = lines[start:start + A['limit']]\n"
+                    + "if not sel: print('(no lines in that range; file has %d)' % len(lines))\n"
+                    + "for i, l in enumerate(sel, start + 1): print('%6d\\t%s' % (i, l.rstrip('\\n')))\n"
+                    + "if start + A['limit'] < len(lines): print('... %d more lines' % (len(lines) - start - A['limit']))",
+                    { path: path, offset: offset, limit: limit })
+            };
+        }
+        if (name === "list_files") {
+            const pattern = args.pattern ?? "";
+            if (pattern.length === 0) return { error: Translation.tr("Must provide `pattern`.") };
+            return {
+                display: pattern + (args.path ? ` in ${args.path}` : ""),
+                command: root._pyScript(
+                    "base = os.path.expanduser(A['path'])\n"
+                    + "hits = glob.glob(os.path.join(base, A['pattern']), recursive=True)\n"
+                    + "hits = [h for h in hits if os.path.isfile(h)]\n"
+                    + "hits.sort(key=lambda h: -os.path.getmtime(h))\n"
+                    + "print('\\n'.join(hits[:200]) if hits else 'No files matched.')\n"
+                    + "if len(hits) > 200: print('... %d more' % (len(hits) - 200))",
+                    { pattern: pattern, path: args.path ?? Quickshell.env("HOME") })
+            };
+        }
+        if (name === "search_files") {
+            const pattern = args.pattern ?? "";
+            if (pattern.length === 0) return { error: Translation.tr("Must provide `pattern`.") };
+            return {
+                display: pattern + (args.path ? ` in ${args.path}` : ""),
+                command: root._pyScript(
+                    "cmd = ['grep','-rnE','--',A['pattern'],os.path.expanduser(A['path'])]\n"
+                    + "if A['glob']: cmd[1:2] = ['-rnE','--include=' + A['glob']]\n"
+                    + "r = subprocess.run(cmd, capture_output=True, text=True)\n"
+                    + "out = r.stdout.splitlines()\n"
+                    + "print('\\n'.join(out[:200]) if out else 'No matches.')\n"
+                    + "if len(out) > 200: print('... %d more matches' % (len(out) - 200))",
+                    { pattern: pattern, path: args.path ?? Quickshell.env("HOME"), glob: args.glob ?? "" })
+            };
+        }
+        return { error: Translation.tr("Unknown read tool: %1").arg(name) };
+    }
+
+    function buildWriteToolCommand(name, args) {
+        const path = args.path ?? "";
+        if (path.length === 0) return { error: Translation.tr("Must provide `path`.") };
+        if (name === "write_file") {
+            const content = args.content ?? "";
+            const lineCount = content.split("\n").length;
+            return {
+                display: path,
+                judgeText: `write ${lineCount} lines to ${path}`,
+                preview: content.length > 1200 ? content.slice(0, 1200) + "\n…" : content,
+                command: root._pyScript(
+                    "p = os.path.expanduser(A['path'])\n"
+                    + "os.makedirs(os.path.dirname(p) or '.', exist_ok=True)\n"
+                    + "existed = os.path.isfile(p)\n"
+                    + "open(p,'w').write(A['content'])\n"
+                    + "print(('Overwrote ' if existed else 'Created ') + p + ' (%d lines)' % A['content'].count(chr(10)))",
+                    { path: path, content: content })
+            };
+        }
+        const oldStr = args.old_string ?? "";
+        const newStr = args.new_string ?? "";
+        if (oldStr.length === 0) return { error: Translation.tr("Must provide `old_string`.") };
+        return {
+            display: path,
+            judgeText: `edit ${path}`,
+            preview: `- ${oldStr.split("\n")[0]}\n+ ${newStr.split("\n")[0]}`,
+            command: root._pyScript(
+                "p = os.path.expanduser(A['path'])\n"
+                + "if not os.path.isfile(p): print('No such file: ' + p); sys.exit(1)\n"
+                + "s = open(p, errors='replace').read()\n"
+                + "n = s.count(A['old'])\n"
+                + "if n == 0: print('old_string not found in ' + p); sys.exit(1)\n"
+                + "if n > 1 and not A['all']: print('old_string appears %d times; pass replace_all or make it unique' % n); sys.exit(1)\n"
+                + "s = s.replace(A['old'], A['new']) if A['all'] else s.replace(A['old'], A['new'], 1)\n"
+                + "open(p,'w').write(s)\n"
+                + "print('Replaced %d occurrence(s) in %s' % (n if A['all'] else 1, p))",
+                { path: path, old: oldStr, new: newStr, all: args.replace_all === true })
+        };
+    }
+
+    Process {
+        id: readToolProc
+        property AiMessageData message
+        property string functionName: ""
+        property string collected: ""
+        stdout: SplitParser {
+            onRead: (line) => { readToolProc.collected += line + "\n"; }
+        }
+        onExited: (exitCode, exitStatus) => {
+            const out = readToolProc.collected.trim();
+            if (readToolProc.message) {
+                readToolProc.message.commandOutput = out.length > 4000 ? out.slice(0, 4000) + "\n…" : out;
+                readToolProc.message.commandExitCode = exitCode;
+                readToolProc.message.commandState = exitCode === 0 ? "done" : "failed";
+            }
+            root.addFunctionOutputMessage(readToolProc.functionName,
+                out.length > 0 ? out : Translation.tr("(no output)"));
+            readToolProc.collected = "";
+            if (root.aborted) { root.aborted = false; return; }
+            requester.makeRequest();
+        }
     }
 
     // Command safety pipeline (whitelist / blacklist / Gemini judge / YOLO + audit log)
@@ -3192,6 +3193,84 @@ The shell (Quickshell config "ii"):
                     "bookmark_added", false, "");
             }
             requester.makeRequest();
+        } else if (name === "recall_memory") {
+            const entries = root.memory.entries ?? [];
+            addFunctionOutputMessage(name, entries.length === 0
+                ? Translation.tr("Nothing remembered yet.")
+                : entries.map(e => `${e.id}: ${e.text}`).join("\n"));
+            requester.makeRequest();
+        } else if (name === "forget_memory") {
+            const id = args?.id ?? "";
+            const gone = id.length > 0 && root.memory.forget(id);
+            addFunctionOutputMessage(name, gone
+                ? Translation.tr("Forgotten.")
+                : Translation.tr("No entry with that id. Call `recall_memory` for the current list."));
+            requester.makeRequest();
+        } else if (name === "read_file" || name === "list_files" || name === "search_files") {
+            // Read-only, so they run without asking — the same way Claude Code's
+            // Read, Glob and Grep don't stop to ask. They still show up as steps.
+            const spec = root.toolSpecs.find(s => s.name === name);
+            const built = root.buildReadOnlyToolCommand(name, args ?? {});
+            if (built.error) {
+                addFunctionOutputMessage(name, built.error);
+                requester.makeRequest();
+                return;
+            }
+            message.commandTitle = spec?.label ?? name;
+            message.commandShowPrompt = false;
+            message.commandText = built.display;
+            message.commandOutput = "";
+            message.commandExitCode = 0;
+            message.commandVerdict = "";
+            message.commandState = "running";
+            message.functionName = name;
+            readToolProc.message = message;
+            readToolProc.functionName = name;
+            readToolProc.collected = "";
+            readToolProc.command = ["bash", "-c", built.command];
+            readToolProc.running = true;
+        } else if (name === "write_file" || name === "edit_file") {
+            const spec = root.toolSpecs.find(s => s.name === name);
+            const built = root.buildWriteToolCommand(name, args ?? {});
+            if (built.error) {
+                addFunctionOutputMessage(name, built.error);
+                requester.makeRequest();
+                return;
+            }
+            message.commandTitle = spec?.label ?? name;
+            message.commandShowPrompt = false;
+            message.commandText = built.display;
+            message.commandOutput = built.preview;
+            message.commandExitCode = 0;
+            message.commandState = "pending";
+            message.functionPending = true;
+            message.functionName = name;
+            message.commandRunScript = built.command;
+
+            if (root.planMode) {
+                message.commandState = "rejected";
+                message.commandVerdict = Translation.tr("Plan mode — nothing is written");
+                message.functionPending = false;
+                addFunctionOutputMessage(name, Translation.tr(
+                    "Plan mode is on, so nothing was written. Do not try again. "
+                    + "Describe the change instead."));
+                requester.makeRequest();
+                return;
+            }
+
+            // Changing a file on disk is as consequential as a shell command, so
+            // it goes through the same gate rather than around it.
+            const geminiKey = root.apiKeys ? (root.apiKeys["gemini"] ?? "") : "";
+            commandSafety.evaluate(built.judgeText, geminiKey,
+                reason => {
+                    message.commandVerdict = reason;
+                    message.commandAutoApproved = true;
+                    root.approveCommand(message);
+                },
+                reason => {
+                    message.commandVerdict = reason;
+                    message.commandAutoApproved = false;
+                });
         } else if (name === "run_shell_command") {
             if (!args.command || args.command.length === 0) {
                 addFunctionOutputMessage(name, Translation.tr("Invalid arguments. Must provide `command`."));

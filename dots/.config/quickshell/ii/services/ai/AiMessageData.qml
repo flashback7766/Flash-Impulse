@@ -73,6 +73,14 @@ QtObject {
     property int commandExitCode: 0
     property string commandVerdict   // why the safety pipeline allowed it or asked for review
     property bool commandAutoApproved: false
+    // What the step is called, and whether its text is a shell command. A file
+    // write is not a `$` line, and labelling it "Write /path" the way Claude
+    // Code does is what makes the two look like the same product.
+    property string commandTitle
+    property bool commandShowPrompt: true
+    // Set by the file tools: the script that carries out what commandText
+    // describes. Empty for run_shell_command, where the two are the same thing.
+    property string commandRunScript
 
     // Claude Code runs many tools in one turn under its own permission system,
     // so the single command above can't describe it. Each entry is
