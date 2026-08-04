@@ -22,7 +22,20 @@ Rectangle {
         ? Math.min(root.maxHeight / imageHeight, root.width / imageWidth)
         : 1
     onFilePathChanged: refresh()
-    visible: filePath !== ""
+
+    readonly property bool shown: filePath !== ""
+    // Attaching and detaching happen right under your eyes, at the moment you
+    // are looking at the composer, so the chip fades and lifts into place. It
+    // stays mapped until the fade finishes, which also means the input area
+    // shrinks after the chip has gone rather than pulling it out from under it.
+    visible: opacity > 0
+    opacity: shown ? 1 : 0
+    Behavior on opacity {
+        animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+    }
+    transform: Translate {
+        y: (1 - root.opacity) * -6
+    }
 
     function refresh() {
         root.mimeType = "";
@@ -60,7 +73,7 @@ Rectangle {
     property real verticalPadding: 10
     radius: Appearance.rounding.small - anchors.margins
     color: Appearance.colors.colLayer2
-    implicitHeight: visible ? (contentItem.implicitHeight + verticalPadding * 2) : 0
+    implicitHeight: shown ? (contentItem.implicitHeight + verticalPadding * 2) : 0
 
     ColumnLayout {
         id: contentItem

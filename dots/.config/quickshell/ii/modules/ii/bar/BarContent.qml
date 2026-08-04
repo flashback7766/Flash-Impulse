@@ -332,30 +332,42 @@ Item { // Bar content region
                 }
             }
 
-            SysTray {
-                id: sysTray
-                // Nothing in the tray means no tray, rather than an empty capsule
-                // parked next to the indicators.
-                visible: root.useShortenedForm === 0 && sysTray.hasItems
-                Layout.fillWidth: false
+            // Nothing in the tray means no tray, rather than an empty capsule
+            // parked next to the indicators — and it widens and narrows into
+            // place instead of blinking, since apps come and go from the tray
+            // while you are looking at the bar.
+            Revealer {
+                id: sysTrayRevealer
+                reveal: root.useShortenedForm === 0 && sysTray.hasItems
                 Layout.fillHeight: true
-                // The tray and the indicators already sit in separate capsules;
-                // upstream's dot only made sense on a single flat surface.
-                showSeparator: false
-                // The capsule below bleeds 8px past the item on each side, so the
-                // layout has to reserve that space or the row's 5px spacing is not
-                // enough to keep it off the indicators capsule.
-                Layout.leftMargin: 8
-                Layout.rightMargin: 8
-                invertSide: Config?.options.bar.bottom
+                // Sized explicitly rather than from childrenRect: the tray keeps
+                // its own width throughout and is clipped, so the icons slide
+                // out of view instead of being squeezed into nothing. The extra
+                // 16 and 8 are the capsule's bleed past the icons — inside the
+                // clip now, where before they were layout margins.
+                implicitWidth: reveal ? sysTray.implicitWidth + 16 : 0
+                implicitHeight: sysTray.implicitHeight + 8
 
-                // Sized off the tray's own implicit content size, not the
-                // Layout.fillHeight-stretched item — anchoring to the full bar
-                // height puffed the capsule up into its neighbour.
-                StandaloneBackdrop {
+                SysTray {
+                    id: sysTray
                     anchors.centerIn: parent
-                    width: sysTray.implicitWidth + 16
-                    height: sysTray.implicitHeight + 8
+                    // The tray and the indicators already sit in separate capsules;
+                    // upstream's dot only made sense on a single flat surface.
+                    showSeparator: false
+                    invertSide: Config?.options.bar.bottom
+                    opacity: sysTrayRevealer.reveal ? 1 : 0
+                    Behavior on opacity {
+                        animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+                    }
+
+                    // Sized off the tray's own implicit content size, not the
+                    // Layout.fillHeight-stretched item — anchoring to the full bar
+                    // height puffed the capsule up into its neighbour.
+                    StandaloneBackdrop {
+                        anchors.centerIn: parent
+                        width: sysTray.implicitWidth + 16
+                        height: sysTray.implicitHeight + 8
+                    }
                 }
             }
 

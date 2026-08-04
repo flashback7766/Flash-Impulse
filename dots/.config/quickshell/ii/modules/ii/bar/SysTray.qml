@@ -78,7 +78,18 @@ Item {
 
         RippleButton {
             id: trayOverflowButton
-            visible: root.showOverflowMenu && root.unpinnedItems.length > 0
+            readonly property bool shown: root.showOverflowMenu && root.unpinnedItems.length > 0
+            // The chevron comes and goes as apps unpin themselves from the tray;
+            // fading it keeps the row from jumping under the cursor.
+            visible: opacity > 0
+            opacity: shown ? 1 : 0
+            scale: shown ? 1 : 0.6
+            Behavior on opacity {
+                animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+            }
+            Behavior on scale {
+                animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+            }
             toggled: root.trayOverflowOpen
             property bool containsMouse: hovered
 

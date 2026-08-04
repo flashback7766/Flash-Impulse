@@ -39,13 +39,24 @@ MouseArea {
 
                 MaterialSymbol {
                     id: boltIcon
+                    readonly property bool shown: isCharging && percentage < 1
                     Layout.alignment: Qt.AlignVCenter
                     Layout.leftMargin: -2
                     Layout.rightMargin: -2
                     fill: 1
                     text: "bolt"
                     iconSize: Appearance.font.pixelSize.smaller
-                    visible: isCharging && percentage < 1 // TODO: animation
+                    // Plugging in is a thing that happens while you are watching
+                    // the bar, so the bolt strikes in rather than appearing.
+                    visible: opacity > 0
+                    opacity: shown ? 1 : 0
+                    scale: shown ? 1 : 0.4
+                    Behavior on opacity {
+                        animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+                    }
+                    Behavior on scale {
+                        animation: Appearance.animation.clickBounce.numberAnimation.createObject(this)
+                    }
                 }
                 StyledText {
                     Layout.alignment: Qt.AlignVCenter

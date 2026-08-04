@@ -12,7 +12,19 @@ MaterialSymbol {
 
     Rectangle {
         id: notifPing
-        visible: !Notifications.silent && Notifications.unread > 0
+        readonly property bool shown: !Notifications.silent && Notifications.unread > 0
+        // A notification arriving is exactly the moment you might be looking
+        // elsewhere, so the dot pops rather than materialising fully formed.
+        visible: opacity > 0
+        opacity: shown ? 1 : 0
+        scale: shown ? 1 : 0.3
+        transformOrigin: Item.Center
+        Behavior on opacity {
+            animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+        }
+        Behavior on scale {
+            animation: Appearance.animation.clickBounce.numberAnimation.createObject(this)
+        }
         anchors {
             right: parent.right
             top: parent.top

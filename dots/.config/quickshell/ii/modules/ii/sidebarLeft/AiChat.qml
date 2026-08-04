@@ -1488,7 +1488,7 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                     top: parent.top
                     left: parent.left
                     right: parent.right
-                    margins: visible ? 10 : 0
+                    margins: attachedFileIndicator.shown ? 10 : 0
                 }
                 filePath: Ai.pendingFilePath
                 onRemove: Ai.clearAttachment()

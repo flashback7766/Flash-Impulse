@@ -77,9 +77,29 @@ DialogListItem {
             }
         }
 
+        // The chevron above already turns over; the row it reveals used to just
+        // be there, which made the two halves of the same gesture look like
+        // different events. It slides down out of the header instead.
+        Item {
+            Layout.fillWidth: true
+            clip: true
+            implicitHeight: root.expanded ? deviceActionsRow.implicitHeight + 8 : 0
+            visible: implicitHeight > 0
+            opacity: root.expanded ? 1 : 0
+            Behavior on implicitHeight {
+                animation: Appearance.animation.elementMove.numberAnimation.createObject(this)
+            }
+            Behavior on opacity {
+                animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+            }
+
         RowLayout {
-            visible: root.expanded
-            Layout.topMargin: 8
+            id: deviceActionsRow
+            anchors {
+                left: parent.left
+                right: parent.right
+                bottom: parent.bottom
+            }
             Item {
                 Layout.fillWidth: true
             }
@@ -110,6 +130,7 @@ DialogListItem {
                     }
                 }
             }
+        }
         }
         Item {
             Layout.fillHeight: true
