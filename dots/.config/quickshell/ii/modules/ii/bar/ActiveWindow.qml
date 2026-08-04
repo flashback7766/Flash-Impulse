@@ -15,6 +15,11 @@ Item {
     property string activeWindowAddress: `0x${activeWindow?.HyprlandToplevel?.address}`
     property bool focusingThisMonitor: HyprlandData.activeWorkspace?.monitor == monitor?.name
     property var biggestWindow: HyprlandData.biggestWindowForWorkspace(HyprlandData.monitors[root.monitor?.id]?.activeWorkspace.id)
+    // Coming out of the lock screen, a monitor can briefly report a phantom
+    // workspace id near INT32_MAX (HyprlandData recovers it within seconds).
+    // Shown raw, that read "Workspace 2147483646" here in the meantime.
+    readonly property int rawWorkspaceId: monitor?.activeWorkspace?.id ?? 1
+    readonly property int shownWorkspaceId: (rawWorkspaceId >= 1 && rawWorkspaceId <= 100) ? rawWorkspaceId : 1
 
     implicitWidth: colLayout.implicitWidth
 
@@ -59,7 +64,7 @@ Item {
             elide: Text.ElideRight
             text: root.focusingThisMonitor && root.activeWindow?.activated && root.biggestWindow ? 
                 root.activeWindow?.title :
-                (root.biggestWindow?.title) ?? `${Translation.tr("Workspace")} ${monitor?.activeWorkspace?.id ?? 1}`
+                (root.biggestWindow?.title) ?? `${Translation.tr("Workspace")} ${root.shownWorkspaceId}`
         }
 
     }
