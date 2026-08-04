@@ -14,10 +14,18 @@ if [[ -z "${UNLOCK_PASSWORD}" ]]; then
     read -s UNLOCK_PASSWORD || return
 fi
 
-# Unlock
-killall -q -u "$(whoami)" gnome-keyring-daemon
-eval $(echo -n "${UNLOCK_PASSWORD}" \
-           | gnome-keyring-daemon --daemonize --login \
-           | sed -e 's/^/export /')
+# Hand the password to the daemon that is already running, over its control
+# socket. This used to killall gnome-keyring-daemon and start a replacement
+# with --login, which was worse than doing nothing: every app holding a Secret
+# Service connection — gh, Electron's safeStorage, the shell's own key store —
+# lost it, and collections that were open before the unlock came back locked,
+# so the next thing wanting a secret popped a password dialog. Worse, --login
+# against an existing login keyring whose password does not match moves it
+# aside as login.keyring.backup-<date> and creates an empty one in its place.
+#
+# --start is a no-op when a daemon is already up; it is here so this still
+# works if one somehow is not.
+gnome-keyring-daemon --start --components=secrets >/dev/null 2>&1
+printf '%s' "${UNLOCK_PASSWORD}" | gnome-keyring-daemon --unlock >/dev/null 2>&1
 unset UNLOCK_PASSWORD
 echo '' >&2
