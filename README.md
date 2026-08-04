@@ -101,15 +101,36 @@ cd Flash-Impulse
 ```
 
 Supported: Arch / CachyOS (tested), other pacman-based distros and Fedora (best effort).
-The installer selects components, takes a timestamped backup you can roll back with one
-command, migrates your existing configs and stores API keys in the system keyring.
+
+Run bare on a terminal, that opens a wizard — pick components with the arrow keys and
+space, decide what happens to an existing install, and see exactly what will change on a
+review screen before anything is written. A timestamped backup of every config directory
+the install can touch is taken first.
+
+The wizard only covers *choosing*. Once you confirm, it tears down and the install runs on
+the normal terminal, because package managers need to show their output and may stop on a
+sudo prompt — there is no honest way to render that inside a managed screen.
+
+Given a command or a flag, or with output redirected, it behaves like any other CLI
+instead:
 
 ```bash
-./install.sh doctor              # check distro, deps, claude CLI, stored keys
+./install.sh -y                  # no wizard: install everything, keep custom configs
+./install.sh doctor              # distro, tools, keys, install state (exit 4 if lacking)
+./install.sh doctor --json       # same, machine-readable
 ./install.sh secrets set gemini  # store an API key in the system keyring
 ./install.sh backups             # list pre-install backups
 ./install.sh rollback            # restore the latest backup
+./install.sh install --dry-run   # walk the whole flow, change nothing
+./install.sh help install        # per-command help
 ```
+
+Exit codes are meaningful: `0` ok, `1` failed, `2` bad usage, `3` cancelled, `4` missing
+dependency. Colour follows whether stdout is a terminal, and `--color always|never|auto`
+overrides that.
+
+The whole thing is bash and ANSI with no dependencies — it has to run before the packages
+it installs exist, so it cannot lean on `gum`, `dialog` or `whiptail` being present.
 
 Power users can drive the underlying engine directly via `./setup` (inherited from
 upstream, still fully functional).
