@@ -136,9 +136,14 @@ StyledPopup {
                     value: `${ResourceUsage.cpuPowerW.toFixed(1)} W`
                 }
                 StyledPopupValueRow {
+                    // On the charger the whole-system figure is unreadable, so
+                    // the row used to just vanish. The same counter still says
+                    // something useful there — how fast the charger is filling
+                    // the battery — so show that instead of leaving a gap.
                     visible: ResourceUsage.systemPowerW > 0
-                    icon: "battery_charging_full"
-                    label: Translation.tr("System:")
+                    icon: ResourceUsage.systemPowerIsCharge ? "battery_charging_full" : "power"
+                    label: ResourceUsage.systemPowerIsCharge
+                        ? Translation.tr("Charging:") : Translation.tr("System:")
                     value: `${ResourceUsage.systemPowerW.toFixed(1)} W`
                 }
                 StyledPopupValueRow {

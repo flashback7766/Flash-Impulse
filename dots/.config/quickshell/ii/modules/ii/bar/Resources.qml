@@ -64,6 +64,21 @@ MouseArea {
             warningThreshold: Config.options.bar.resources.gpuWarningThreshold
         }
 
+        Resource {
+            // A memory chip, to sit next to the board glyph the GPU uses — the
+            // pair reads as "the graphics card, and its memory".
+            iconName: "memory_alt"
+            percentage: ResourceUsage.vramUsedPercentage
+            // On an APU vramTotal is a carve-out of system RAM, which is still
+            // worth watching: it is the limit a model or a game actually hits.
+            shown: Config.options.bar.resources.showVram && ResourceUsage.gpuDetected && ResourceUsage.vramTotal > 0 && (
+                Config.options.bar.resources.alwaysShowCpu ||
+                !(MprisController.activePlayer?.trackTitle?.length > 0) ||
+                root.alwaysShowAllResources)
+            Layout.leftMargin: shown ? 6 : 0
+            warningThreshold: Config.options.bar.resources.vramWarningThreshold
+        }
+
     }
 
     ResourcesPopup {

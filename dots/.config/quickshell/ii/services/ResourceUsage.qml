@@ -74,7 +74,10 @@ Singleton {
     property real vramFreqMhz: 0         // MHz, memory clock
 
     // --- Power
-    property real systemPowerW: 0        // W, whole system while on battery
+    // W. On battery this is the whole system's draw; on the charger it is the
+    // rate going into the battery. Which one it is, is systemPowerIsCharge.
+    property real systemPowerW: 0
+    property bool systemPowerIsCharge: false
     property real cpuPowerW: 0           // W, from RAPL when the counter is readable
 
     property string maxAvailableMemoryString: kbToGbString(root.memoryTotal)
@@ -268,21 +271,36 @@ Singleton {
     }
 
     function readPower() {
-        // Battery: the honest whole-system figure, but only while on DC.
-        if (fileBatStatus.path.length > 0 && fileBatStatus.text().trim() === "Discharging") {
-            if (fileBatPower.path.length > 0) {
-                const uw = parseInt(fileBatPower.text());
-                if (!isNaN(uw) && uw > 0) return uw / 1000000;
-            }
-            // Some batteries only report current + voltage.
-            if (fileBatCurrent.path.length > 0 && fileBatVoltage.path.length > 0) {
-                const ua = parseInt(fileBatCurrent.text());
-                const uv = parseInt(fileBatVoltage.text());
-                if (!isNaN(ua) && !isNaN(uv) && ua > 0 && uv > 0)
-                    return (ua / 1000000) * (uv / 1000000);
-            }
+        if (fileBatStatus.path.length === 0) {
+            root.systemPowerIsCharge = false;
+            return 0;
         }
-        return 0;
+        const status = fileBatStatus.text().trim();
+        // The same counter reads both ways: discharging it is the honest
+        // whole-system figure, charging it is what the charger is pushing in.
+        // Anything else — "Full", "Not charging" once a charge limit kicks in —
+        // reads zero, and there is nothing to show.
+        const charging = (status === "Charging");
+        if (!charging && status !== "Discharging") {
+            root.systemPowerIsCharge = false;
+            return 0;
+        }
+
+        let watts = 0;
+        if (fileBatPower.path.length > 0) {
+            const uw = parseInt(fileBatPower.text());
+            if (!isNaN(uw) && uw > 0) watts = uw / 1000000;
+        }
+        // Some batteries only report current + voltage.
+        if (watts === 0 && fileBatCurrent.path.length > 0 && fileBatVoltage.path.length > 0) {
+            const ua = parseInt(fileBatCurrent.text());
+            const uv = parseInt(fileBatVoltage.text());
+            if (!isNaN(ua) && !isNaN(uv) && ua > 0 && uv > 0)
+                watts = (ua / 1000000) * (uv / 1000000);
+        }
+
+        root.systemPowerIsCharge = charging && watts > 0;
+        return watts;
     }
 
     /**
