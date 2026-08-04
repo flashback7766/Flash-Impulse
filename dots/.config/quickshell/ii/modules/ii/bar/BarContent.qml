@@ -334,7 +334,9 @@ Item { // Bar content region
 
             SysTray {
                 id: sysTray
-                visible: root.useShortenedForm === 0
+                // Nothing in the tray means no tray, rather than an empty capsule
+                // parked next to the indicators.
+                visible: root.useShortenedForm === 0 && sysTray.hasItems
                 Layout.fillWidth: false
                 Layout.fillHeight: true
                 // The tray and the indicators already sit in separate capsules;

@@ -115,7 +115,7 @@ Singleton {
 
             property JsonObject appearance: JsonObject {
                 property bool extraBackgroundTint: true
-                property int fakeScreenRounding: 2 // 0: None | 1: Always | 2: When not fullscreen
+                property int fakeScreenRounding: 0 // 0: None | 1: Always | 2: When not fullscreen
                 property JsonObject fonts: JsonObject {
                     property string main: "Google Sans Flex"
                     property string numbers: "Google Sans Flex"
@@ -126,7 +126,7 @@ Singleton {
                     property string expressive: "Space Grotesk"
                 }
                 property JsonObject transparency: JsonObject {
-                    property bool enable: true
+                    property bool enable: false
                     property bool automatic: true
                     property real backgroundTransparency: 0.11
                     property real contentTransparency: 0.57
@@ -148,8 +148,8 @@ Singleton {
                     // warm dark neutrals, One UI style. (The wallpaper itself is too
                     // pastel to seed from — auto picks its cream and washes out, and
                     // scheme-expressive hue-rotates the accent to pink.)
-                    property string type: "scheme-content" // Allowed: auto, scheme-content, scheme-expressive, scheme-fidelity, scheme-fruit-salad, scheme-monochrome, scheme-neutral, scheme-rainbow, scheme-tonal-spot
-                    property string accentColor: "#ff7a1a"
+                    property string type: "auto" // Allowed: auto, scheme-content, scheme-expressive, scheme-fidelity, scheme-fruit-salad, scheme-monochrome, scheme-neutral, scheme-rainbow, scheme-tonal-spot
+                    property string accentColor: ""
                 }
             }
 
@@ -179,7 +179,7 @@ Singleton {
                 property JsonObject widgets: JsonObject {
                     property JsonObject clock: JsonObject {
                         property bool enable: true
-                        property bool showOnlyWhenLocked: false
+                        property bool showOnlyWhenLocked: true
                         property string placementStrategy: "leastBusy" // "free", "leastBusy", "mostBusy"
                         // Only consulted by the "free" placement strategy; kept in sync
                         // with the reference setup's desktop clock position.
@@ -288,12 +288,12 @@ Singleton {
                     property bool showScreenRecord: false
                 }
                 property JsonObject workspaces: JsonObject {
-                    property bool monochromeIcons: true
+                    property bool monochromeIcons: false
                     property int shown: 5
                     property bool showAppIcons: true
-                    property bool alwaysShowNumbers: false
+                    property bool alwaysShowNumbers: true
                     property int showNumberDelay: 150 // milliseconds
-                    property list<string> numberMap: ["1", "2"] // Characters to show instead of numbers on workspace indicator
+                    property list<string> numberMap: [] // Characters to show instead of numbers on workspace indicator
                     property bool useNerdFont: false
                 }
                 property JsonObject weather: JsonObject {
@@ -363,7 +363,7 @@ Singleton {
             }
 
             property JsonObject language: JsonObject {
-                property string ui: "auto" // UI language. "auto" for system locale, or specific language code like "zh_CN", "en_US"
+                property string ui: "en_US" // UI language. "auto" for system locale, or specific language code like "zh_CN", "en_US"
                 property JsonObject translator: JsonObject {
                     property string engine: "auto" // Run `trans -list-engines` for available engines. auto should use google
                     property string targetLanguage: "auto" // Run `trans -list-all` for available languages
@@ -377,7 +377,7 @@ Singleton {
 
             property JsonObject light: JsonObject {
                 property JsonObject night: JsonObject {
-                    property bool automatic: true
+                    property bool automatic: false
                     property string from: "19:00" // Format: "HH:mm", 24-hour time
                     property string to: "06:30"   // Format: "HH:mm", 24-hour time
                     property int colorTemperature: 5000
@@ -474,7 +474,7 @@ Singleton {
             property JsonObject tray: JsonObject {
                 property bool monochromeIcons: true
                 property bool showItemId: false
-                property bool invertPinnedItems: false // Makes the below a whitelist for the tray and blacklist for the pinned area
+                property bool invertPinnedItems: true // Makes the below a whitelist for the tray and blacklist for the pinned area
                 property list<var> pinnedItems: [ "Fcitx" ]
                 property bool filterPassive: true
             }

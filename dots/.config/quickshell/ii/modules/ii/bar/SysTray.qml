@@ -20,6 +20,10 @@ Item {
 
     property list<var> pinnedItems: TrayService.pinnedItems
     property list<var> unpinnedItems: TrayService.unpinnedItems
+    // Whether there is anything at all to draw. An empty tray still has a size —
+    // the grid's own margins — so a caller that puts a capsule behind it gets a
+    // small blank pill sitting in the bar with nothing in it.
+    readonly property bool hasItems: root.pinnedItems.length > 0 || root.unpinnedItems.length > 0
     onUnpinnedItemsChanged: {
         if (unpinnedItems.length == 0) root.closeOverflowMenu();
     }
