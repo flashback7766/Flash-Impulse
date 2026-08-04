@@ -128,6 +128,14 @@ Item { // Bar content region
             Media {
                 visible: root.useShortenedForm < 2
                 Layout.fillWidth: true
+                // Without this, a RowLayout child's minimum width defaults to
+                // its implicitWidth — here, the circle plus the *unelided*
+                // track title. Five resource chips already crowd this capsule,
+                // so that minimum routinely exceeded what was left, and rather
+                // than shrink the text just refused to. Down to 0, eliding
+                // takes over and the title shrinks instead of the whole
+                // module getting shoved into an unreadable sliver.
+                Layout.minimumWidth: 0
             }
         }
 

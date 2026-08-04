@@ -389,7 +389,11 @@ Singleton {
         property real baseBarHeight: 40
         property real barHeight: Config.options.bar.cornerStyle === 1 ? 
             (baseBarHeight + root.sizes.hyprlandGapsOut * 2) : baseBarHeight
-        property real barCenterSideModuleWidth: Config.options?.bar.verbose ? 360 : 140
+        // Verbose packs five resource chips (mem/swap/CPU/VRAM/GPU) plus the
+        // media title into this capsule; 360 was sized before VRAM joined the
+        // row and was already tight, so the title had nothing left and sat
+        // permanently elided to a couple of characters.
+        property real barCenterSideModuleWidth: Config.options?.bar.verbose ? 430 : 140
         property real barCenterSideModuleWidthShortened: 280
         property real barCenterSideModuleWidthHellaShortened: 190
         property real barShortenScreenWidthThreshold: 1200 // Shorten if screen width is at most this value

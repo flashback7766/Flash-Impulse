@@ -74,10 +74,14 @@ Item {
 
         StyledText {
             visible: Config.options.bar.verbose
-            width: rowLayout.width - (CircularProgress.size + rowLayout.spacing * 2)
+            // Used to also carry an explicit `width:` referencing
+            // `CircularProgress.size` — CircularProgress is the component, not
+            // an instance, so that property never existed and the binding
+            // evaluated to NaN. Layout.fillWidth already sizes this; the dead
+            // binding just fought it for which width won on any given frame.
             Layout.alignment: Qt.AlignVCenter
-            Layout.fillWidth: true // Ensures the text takes up available space
-            Layout.rightMargin: rowLayout.spacing
+            Layout.fillWidth: true
+            Layout.minimumWidth: 0
             horizontalAlignment: Text.AlignHCenter
             elide: Text.ElideRight // Truncates the text on the right
             color: Appearance.colors.colOnLayer1
