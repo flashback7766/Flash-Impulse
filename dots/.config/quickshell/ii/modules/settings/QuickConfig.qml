@@ -12,16 +12,24 @@ ContentPage {
     forceWidth: true
 
 
+    // Light / Dark / Auto. Picking a side turns following the sun off — the
+    // choice you just made by hand should be the one that sticks.
     component SmallLightDarkPreferenceButton: RippleButton {
         id: smallLightDarkPreferenceButton
-        required property bool dark
+        required property string mode
+        readonly property bool isAuto: mode === "auto"
         property color colText: toggled ? Appearance.colors.colOnPrimary : Appearance.colors.colOnLayer2
         padding: 5
         Layout.fillWidth: true
-        toggled: Appearance.m3colors.darkmode === dark
+        toggled: isAuto ? Config.options.appearance.autoTheme.enable : (!Config.options.appearance.autoTheme.enable && Appearance.m3colors.darkmode === (mode === "dark"))
         colBackground: Appearance.colors.colLayer2
         onClicked: {
-            Quickshell.execDetached(["bash", "-c", `${Directories.wallpaperSwitchScriptPath} --mode ${dark ? "dark" : "light"} --noswitch`]);
+            if (isAuto) {
+                Config.options.appearance.autoTheme.enable = true;
+                return;
+            }
+            Config.options.appearance.autoTheme.enable = false;
+            Quickshell.execDetached(["bash", "-c", `${Directories.wallpaperSwitchScriptPath} --mode ${mode} --noswitch`]);
         }
         contentItem: Item {
             anchors.centerIn: parent
@@ -31,12 +39,12 @@ ContentPage {
                 MaterialSymbol {
                     Layout.alignment: Qt.AlignHCenter
                     iconSize: 30
-                    text: dark ? "dark_mode" : "light_mode"
+                    text: smallLightDarkPreferenceButton.isAuto ? "routine" : (smallLightDarkPreferenceButton.mode === "dark" ? "dark_mode" : "light_mode")
                     color: smallLightDarkPreferenceButton.colText
                 }
                 StyledText {
                     Layout.alignment: Qt.AlignHCenter
-                    text: dark ? Translation.tr("Dark") : Translation.tr("Light")
+                    text: smallLightDarkPreferenceButton.isAuto ? Translation.tr("Auto") : (smallLightDarkPreferenceButton.mode === "dark" ? Translation.tr("Dark") : Translation.tr("Light"))
                     font.pixelSize: Appearance.font.pixelSize.smaller
                     color: smallLightDarkPreferenceButton.colText
                 }
@@ -119,11 +127,130 @@ ContentPage {
 
                     SmallLightDarkPreferenceButton {
                         Layout.fillHeight: true
-                        dark: false
+                        mode: "light"
                     }
                     SmallLightDarkPreferenceButton {
                         Layout.fillHeight: true
-                        dark: true
+                        mode: "dark"
+                    }
+                    SmallLightDarkPreferenceButton {
+                        Layout.fillHeight: true
+                        mode: "auto"
+                    }
+                }
+            }
+        }
+
+        // Only worth showing once Auto is picked; collapses out of the way again.
+        // Not the Revealer widget: it sizes itself from childrenRect, and a child
+        // that fills the width would then be defining the width it reads back.
+        Item {
+            id: autoThemeOptions
+            Layout.fillWidth: true
+            clip: true
+            readonly property bool shown: Config.options.appearance.autoTheme.enable
+            implicitHeight: shown ? autoThemeColumn.implicitHeight : 0
+            visible: implicitHeight > 0
+            opacity: shown ? 1 : 0
+            Behavior on implicitHeight {
+                animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+            }
+            Behavior on opacity {
+                animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+            }
+
+            ColumnLayout {
+                id: autoThemeColumn
+                anchors {
+                    left: parent.left
+                    right: parent.right
+                    top: parent.top
+                }
+                spacing: 10
+
+                ConfigSelectionArray {
+                    currentValue: Config.options.appearance.autoTheme.mode
+                    onSelected: newValue => {
+                        Config.options.appearance.autoTheme.mode = newValue;
+                    }
+                    options: [
+                        {
+                            value: "sun",
+                            icon: "wb_twilight",
+                            displayName: Translation.tr("Sunset")
+                        },
+                        {
+                            value: "schedule",
+                            icon: "schedule",
+                            displayName: Translation.tr("Schedule")
+                        }
+                    ]
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 10
+                    visible: Config.options.appearance.autoTheme.mode === "sun"
+
+                    MaterialSymbol {
+                        text: AutoTheme.hasLocation ? "location_on" : "location_off"
+                        iconSize: Appearance.font.pixelSize.larger
+                        color: Appearance.colors.colSubtext
+                    }
+                    StyledText {
+                        Layout.fillWidth: true
+                        font.pixelSize: Appearance.font.pixelSize.smaller
+                        color: Appearance.colors.colSubtext
+                        wrapMode: Text.Wrap
+                        text: AutoTheme.hasLocation ? Translation.tr("%1 — sunrise %2, sunset %3").arg(AutoTheme.locationName).arg(AutoTheme.sunriseText).arg(AutoTheme.sunsetText) : Translation.tr("No coordinates for this timezone — using the schedule below")
+                    }
+                    MaterialTextField {
+                        Layout.preferredWidth: 200
+                        placeholderText: Translation.tr("Timezone or lat,lon")
+                        text: Config.options.appearance.autoTheme.location
+                        onEditingFinished: {
+                            Config.options.appearance.autoTheme.location = text.trim();
+                        }
+                        StyledToolTip {
+                            text: Translation.tr("Leave empty to follow the system timezone. Otherwise a zone name like Europe/Moscow, or coordinates like 40.18,44.51")
+                        }
+                    }
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 10
+                    visible: Config.options.appearance.autoTheme.mode !== "sun" || !AutoTheme.hasLocation
+
+                    StyledText {
+                        text: Translation.tr("Light at")
+                        color: Appearance.colors.colOnLayer1
+                        font.pixelSize: Appearance.font.pixelSize.small
+                    }
+                    MaterialTextField {
+                        Layout.preferredWidth: 90
+                        text: Config.options.appearance.autoTheme.lightTime
+                        inputMask: "99:99"
+                        onEditingFinished: {
+                            Config.options.appearance.autoTheme.lightTime = text;
+                        }
+                    }
+                    StyledText {
+                        Layout.leftMargin: 10
+                        text: Translation.tr("Dark at")
+                        color: Appearance.colors.colOnLayer1
+                        font.pixelSize: Appearance.font.pixelSize.small
+                    }
+                    MaterialTextField {
+                        Layout.preferredWidth: 90
+                        text: Config.options.appearance.autoTheme.darkTime
+                        inputMask: "99:99"
+                        onEditingFinished: {
+                            Config.options.appearance.autoTheme.darkTime = text;
+                        }
+                    }
+                    Item {
+                        Layout.fillWidth: true
                     }
                 }
             }

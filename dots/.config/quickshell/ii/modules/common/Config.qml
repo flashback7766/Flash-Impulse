@@ -151,6 +151,22 @@ Singleton {
                     property string type: "auto" // Allowed: auto, scheme-content, scheme-expressive, scheme-fidelity, scheme-fruit-salad, scheme-monochrome, scheme-neutral, scheme-rainbow, scheme-tonal-spot
                     property string accentColor: ""
                 }
+                property JsonObject autoTheme: JsonObject {
+                    // Follow the time of day: light while the sun is up, dark once
+                    // it sets. Off by default — the light/dark buttons in settings
+                    // turn it off again, so a manual pick is never fought over.
+                    property bool enable: false
+                    // "sun": sunrise and sunset for a location.
+                    // "schedule": two fixed times you set yourself.
+                    property string mode: "sun"
+                    property string lightTime: "07:00" // Format: "HH:mm", 24-hour time
+                    property string darkTime: "19:00"  // Format: "HH:mm", 24-hour time
+                    // Where the sun is. Empty means "wherever the system clock says
+                    // we are" — the timezone is a city, and zone1970.tab has its
+                    // coordinates, so this needs no network and no setup. Override
+                    // with a zone name ("Europe/Moscow") or a raw "lat,lon".
+                    property string location: ""
+                }
             }
 
             property JsonObject audio: JsonObject {
