@@ -48,7 +48,7 @@ through a whitelist / blacklist / model-judge pipeline before it runs, with the 
 written to an audit log.
 
 <div align="center">
-<img src="docs/screenshots/sidebar-left-tools.jpg" width="100%" alt="AI sidebar running a shell command">
+<img src="docs/screenshots/gifs/sidebar-ai-request.gif" width="100%" alt="AI sidebar asking a question, running a shell command, and answering">
 </div>
 
 **Claude Code as a backend.** The `Claude Code · *` models drive the local `claude` CLI
@@ -61,27 +61,36 @@ Claude Sonnet 5 / Opus 4.8 / Fable 5, GPT-5.6 Luna/Terra/Sol.
 
 ## The rest of the shell
 
+Nothing here just cuts in or out — every open, close and state change is a real animation,
+timed to feel immediate rather than decorative.
+
 <table>
 <tr>
-<td width="50%"><img src="docs/screenshots/sidebar-right.jpg" alt="Right sidebar"><br>
+<td width="50%"><img src="docs/screenshots/gifs/sidebar-right.gif" alt="Right sidebar opening and closing"><br>
 <sub><b>Right sidebar</b> — quick toggles, grouped notifications, calendar, to-do, timer,
 volume mixer, Wi-Fi and Bluetooth pickers.</sub></td>
-<td width="50%"><img src="docs/screenshots/launcher.jpg" alt="Launcher"><br>
+<td width="50%"><img src="docs/screenshots/gifs/launcher.gif" alt="Launcher, typing a query"><br>
 <sub><b>Launcher & overview</b> — apps, commands, a calculator and web search in one field,
 over a live workspace grid.</sub></td>
 </tr>
 <tr>
-<td width="50%"><img src="docs/screenshots/session.jpg" alt="Session menu"><br>
-<sub><b>Session menu</b> — opens as a circle of blur growing from the middle, with the
-buttons cascading in behind it.</sub></td>
+<td width="50%"><img src="docs/screenshots/gifs/session.gif" alt="Session menu opening and closing"><br>
+<sub><b>Session menu</b> — the blur expands from the middle instead of the screen just
+cutting to it, and the buttons cascade in behind it.</sub></td>
 <td width="50%"><img src="docs/screenshots/settings-dark.png" alt="Settings"><br>
 <sub><b>Settings</b> — the options worth clicking, with the full config a button away.</sub></td>
 </tr>
 </table>
 
+<div align="center">
+<img src="docs/screenshots/gifs/notification-popup.gif" width="70%" alt="A notification arriving, with the bell badge popping in on the bar">
+<br><sub>A notification landing — the bell badge on the bar pops in with it rather than
+appearing pre-formed.</sub>
+</div>
+
 **Real hardware readouts in the bar** — CPU (htop-style per-thread aggregate), temperature,
-frequency, GPU load and temperature, system power draw. All read straight from sysfs, with
-zero processes spawned on the polling path.
+frequency, GPU load and temperature, VRAM, system power draw (and charge rate once you plug
+in). All read straight from sysfs, with zero processes spawned on the polling path.
 
 ## Install
 
