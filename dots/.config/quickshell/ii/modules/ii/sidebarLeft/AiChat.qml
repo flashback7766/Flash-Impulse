@@ -1491,7 +1491,7 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                     margins: visible ? 10 : 0
                 }
                 filePath: Ai.pendingFilePath
-                onRemove: Ai.attachFile("")
+                onRemove: Ai.clearAttachment()
             }
 
             RowLayout { // Input field and send button
@@ -1775,7 +1775,7 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                                     Ai.abortAll();
                                     event.accepted = true;
                                 } else if (Ai.pendingFilePath.length > 0) {
-                                    Ai.attachFile("");
+                                    Ai.clearAttachment();
                                     event.accepted = true;
                                 } else {
                                     event.accepted = false;

@@ -2691,7 +2691,13 @@ The shell (Quickshell config "ii"):
 
     function attachFile(filePath: string) {
         const path = CF.FileUtils.trimFileProtocol(filePath);
-        if (path.length === 0) return;
+        // Attaching nothing means detaching. Two callers already assumed that —
+        // the ✕ on the attachment and Escape in the composer — and both silently
+        // did nothing, because this used to just return and leave the file on.
+        if (path.length === 0) {
+            root.clearAttachment();
+            return;
+        }
         root.pendingFilePath = path;
         root.pendingFileMime = "";
         root.pendingFileBase64 = "";
@@ -2714,6 +2720,12 @@ The shell (Quickshell config "ii"):
     }
 
     function clearAttachment() {
+        // Stop the encode first. A big screenshot takes a moment to base64, and
+        // without this, detaching mid-encode let the process finish and write
+        // the bytes back over the fields we just cleared — an attachment with no
+        // path, which still went out with the next message.
+        attachEncodeProc.running = false;
+        attachEncodeProc.buffer = "";
         root.pendingFilePath = "";
         root.pendingFileMime = "";
         root.pendingFileBase64 = "";
