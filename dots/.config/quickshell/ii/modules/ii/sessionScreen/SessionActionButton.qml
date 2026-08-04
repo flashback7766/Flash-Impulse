@@ -15,12 +15,19 @@ RippleButton {
     // from the session screen's single reveal value, offset per button.
     property real appear: 1
     opacity: button.appear
-    transform: Scale {
-        origin.x: button.width / 2
-        origin.y: button.height / 2
-        xScale: 0.8 + 0.2 * button.appear
-        yScale: 0.8 + 0.2 * button.appear
-    }
+    transform: [
+        Scale {
+            origin.x: button.width / 2
+            origin.y: button.height / 2
+            xScale: 0.72 + 0.28 * button.appear
+            yScale: 0.72 + 0.28 * button.appear
+        },
+        // Each one lifts into place as it fades up, which is what makes the
+        // cascade read as movement rather than as eight things blinking on.
+        Translate {
+            y: (1 - button.appear) * 20
+        }
+    ]
 
     buttonRadius: (button.focus || button.down) ? size / 2 : Appearance.rounding.verylarge
     colBackground: button.keyboardDown ? Appearance.colors.colSecondaryContainerActive : 

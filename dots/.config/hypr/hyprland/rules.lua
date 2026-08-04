@@ -148,7 +148,13 @@ hl.layer_rule({ match = { namespace = "quickshell:regionSelector" }, no_anim = t
 hl.layer_rule({ match = { namespace = "quickshell:screenshot" }, no_anim = true})
 hl.layer_rule({ match = { namespace = "quickshell:session" }, blur = true})
 hl.layer_rule({ match = { namespace = "quickshell:session" }, no_anim = true})
-hl.layer_rule({ match = { namespace = "quickshell:session" }, ignore_alpha = 0})
+-- Blur what is actually behind, not the wallpaper. The blanket xray rule above
+-- made every window vanish the frame the menu opened and come back the frame it
+-- closed — a cut no amount of animation on our side can smooth over.
+hl.layer_rule({ match = { namespace = "quickshell:session" }, xray = false})
+-- Above zero so the blur follows the shape we draw instead of covering the whole
+-- screen at once: the dim expands from the middle, and the blur expands with it.
+hl.layer_rule({ match = { namespace = "quickshell:session" }, ignore_alpha = 0.05})
 hl.layer_rule({ match = { namespace = "quickshell:sidebarRight" }, animation = "slide right"})
 hl.layer_rule({ match = { namespace = "quickshell:sidebarLeft" }, animation = "slide left"})
 hl.layer_rule({ match = { namespace = "quickshell:verticalBar" }, animation = "slide"})

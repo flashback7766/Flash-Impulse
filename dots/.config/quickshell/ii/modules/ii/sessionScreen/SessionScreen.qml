@@ -21,21 +21,27 @@ Scope {
      * Lives out here rather than inside the window so the window can stay
      * mapped for the whole of the closing animation — the menu used to blink
      * out of existence the instant it was dismissed, because the Loader tracked
-     * sessionOpen directly. Coming in it decelerates, going out it accelerates,
-     * which is the usual pair: entering wants to settle, leaving wants to get
-     * out of the way.
+     * sessionOpen directly.
+     *
+     * Deliberately linear. The easing is applied per element instead, because
+     * the eight buttons come in staggered: with the curve baked in here, an
+     * offset measured against reveal lands wherever the curve happens to be
+     * steep, and the cascade collapses into everything arriving at once.
      */
     property real reveal: GlobalStates.sessionOpen ? 1 : 0
     Behavior on reveal {
         NumberAnimation {
-            duration: GlobalStates.sessionOpen
-                ? Appearance.animation.elementMoveEnter.duration
-                : Appearance.animation.elementMoveExit.duration
-            easing.type: Easing.BezierSpline
-            easing.bezierCurve: GlobalStates.sessionOpen
-                ? Appearance.animation.elementMoveEnter.bezierCurve
-                : Appearance.animation.elementMoveExit.bezierCurve
+            duration: GlobalStates.sessionOpen ? 500 : 260
+            easing.type: Easing.Linear
         }
+    }
+
+    // Fast out of the gate, settling at the end — for the way in, and equally
+    // for the way out, where reveal runs backwards and this holds near 1 for a
+    // moment before dropping away.
+    function decel(t: real): real {
+        const c = Math.max(0, Math.min(1, t));
+        return 1 - Math.pow(1 - c, 3);
     }
 
     Loader {
@@ -68,23 +74,27 @@ Scope {
             WlrLayershell.namespace: "quickshell:session"
             WlrLayershell.layer: WlrLayer.Overlay
             WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
-            // The backdrop dims in with everything else rather than being there
-            // in full the moment the window maps.
-            color: ColorUtils.transparentize(Appearance.m3colors.m3background,
-                1 - (1 - (Appearance.m3colors.darkmode ? 0.05 : 0.12)) * root.reveal)
+            // Nothing here: the dim is a shape below, so that the compositor's
+            // blur — which it applies wherever this surface is opaque enough —
+            // grows with the shape instead of hitting the whole screen at once.
+            color: "transparent"
+
+            readonly property real shapeProgress: root.decel(root.reveal)
 
             /**
              * Where each button is in the cascade.
              *
              * One shared progress value read at eight offsets, rather than eight
              * timers: the grid fills in from the top-left instead of every
-             * button landing on the same frame. The divisor keeps the last one
-             * arriving exactly at 1, so nothing is left part-faded when the
-             * animation settles.
+             * button landing on the same frame. Only on the way in — leaving,
+             * they go together, because a cascade in reverse reads as the menu
+             * struggling to close rather than as choreography.
              */
             function appearAt(index) {
-                const start = index * 0.055;
-                return Math.max(0, Math.min(1, (root.reveal - start) / (1 - start)));
+                if (!GlobalStates.sessionOpen)
+                    return root.decel(root.reveal);
+                const start = (index / 7) * 0.45;
+                return root.decel((root.reveal - start) / 0.55);
             }
 
             anchors {
@@ -95,6 +105,23 @@ Scope {
 
             implicitWidth: root.focusedScreen?.width ?? 0
             implicitHeight: root.focusedScreen?.height ?? 0
+
+            // The dim, as a circle wide enough to swallow the corners, opening
+            // from the middle. Its alpha never animates — it is the size that
+            // does — so every pixel it covers is over the blur threshold and
+            // the blur front travels with the edge.
+            Rectangle {
+                id: dimShape
+                anchors.centerIn: parent
+                readonly property real diameter: Math.ceil(Math.sqrt(sessionRoot.width * sessionRoot.width + sessionRoot.height * sessionRoot.height))
+                implicitWidth: diameter
+                implicitHeight: diameter
+                radius: diameter / 2
+                scale: sessionRoot.shapeProgress
+                // Not quite opaque: the blur behind is worth seeing a little of,
+                // and it is what tells you the desktop is still there.
+                color: ColorUtils.transparentize(Appearance.m3colors.m3background, Appearance.m3colors.darkmode ? 0.20 : 0.16)
+            }
 
             MouseArea {
                 id: sessionMouseArea
@@ -109,7 +136,11 @@ Scope {
                 anchors.centerIn: parent
                 spacing: 15
 
-                opacity: root.reveal
+                // A beat behind the dim, so the panel arrives onto a surface that
+                // is already there rather than racing it.
+                readonly property real progress: GlobalStates.sessionOpen ? root.decel((root.reveal - 0.12) / 0.88) : root.decel(root.reveal)
+
+                opacity: progress
                 // Rises a little as it settles, and the whole block eases up from
                 // slightly under size. Transform rather than layout properties so
                 // none of this triggers a relayout per frame.
@@ -117,11 +148,11 @@ Scope {
                     Scale {
                         origin.x: contentColumn.width / 2
                         origin.y: contentColumn.height / 2
-                        xScale: 0.94 + 0.06 * root.reveal
-                        yScale: 0.94 + 0.06 * root.reveal
+                        xScale: 0.93 + 0.07 * contentColumn.progress
+                        yScale: 0.93 + 0.07 * contentColumn.progress
                     },
                     Translate {
-                        y: (1 - root.reveal) * 24
+                        y: (1 - contentColumn.progress) * 28
                     }
                 ]
 
