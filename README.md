@@ -1,36 +1,87 @@
+<div align="center">
+
 # Flash-Impulse
 
-A Hyprland desktop built on Quickshell — fork of
-[end-4/dots-hyprland](https://github.com/end-4/dots-hyprland) (illogical-impulse) merged
-with [better-ii-ai](https://github.com/flashback7766/better-ii-ai), heading toward a
-**Material 3 Expressive × One UI** design language with a seriously capable AI sidebar.
+**A Hyprland desktop built on Quickshell — with an AI sidebar that can actually do things.**
 
-> Status: working desktop, AI stack integrated. The One UI visual pass and branding are
-> still in progress — see [ROADMAP.md](ROADMAP.md).
+Material 3 Expressive × One UI, a shell that reads your hardware straight from sysfs,
+and a chat panel that runs shell commands behind a three-tier safety review.
 
-## Highlights
+<img src="docs/screenshots/desktop-dark.jpg" width="100%" alt="Flash-Impulse desktop, dark theme">
 
-- **AI sidebar with real function calling** — multi-provider chat (Gemini, OpenAI,
-  Anthropic, any local OpenAI-compatible server), streaming, attachments, context
-  compression, rotating chat history, cost tracking.
-- **Claude Code as a backend** — the `Claude Code · *` models drive the local `claude`
-  CLI instead of the HTTP API: your Claude **subscription** powers the sidebar (no API
-  key), with Claude Code's own tool suite and permission system. Sessions survive across
-  messages via `--resume`.
-- **Three-tier command safety** — whitelist / blacklist / Gemini-judge pipeline reviews
-  every shell command the AI wants to run; every decision is written to an audit log.
-  Explicit `/yolo on` mode for people who like living dangerously.
-- **Current model roster** (July 2026): Gemini 3.5 Flash-Lite (default, free tier),
-  Gemini 3.6 Flash, Claude Sonnet 5 / Opus 4.8 / Fable 5, GPT-5.6 Luna/Terra/Sol.
-- **Real hardware readouts in the bar** — CPU (htop-style per-thread aggregate),
-  temperature, frequency, GPU load/temp and system power draw, all read straight from
-  sysfs with zero processes spawned on the polling path.
-- **Low-end profile** — `performance-mode.sh on` keeps the layout, shapes and colours
-  identical while cutting blur passes, dropping window shadows and shortening
-  animations, for machines whose GPU is fill-rate starved.
-- **Sane installer** — component selection, timestamped backups with one-command
-  rollback, migration of your existing configs, API keys in the system keyring.
-- **RU layout out of the box** — `us,ru` with Alt+Shift toggle as the shipped default.
+</div>
+
+A fork of [end-4/dots-hyprland](https://github.com/end-4/dots-hyprland) (illogical-impulse)
+merged with [better-ii-ai](https://github.com/flashback7766/better-ii-ai).
+
+> **Status:** working desktop, AI stack integrated. The One UI visual pass is ongoing —
+> see [ROADMAP.md](ROADMAP.md).
+
+---
+
+## Look
+
+The wallpaper, the icon and the palette are original artwork ([`brand/`](brand)), drawn as
+vectors and rendered in float so the gradients do not band. Light and dark are the same
+composition — only the ground changes — and the shell swaps between them with the theme.
+
+| Light | Dark |
+|---|---|
+| <img src="docs/screenshots/desktop-light.jpg" alt="Light theme"> | <img src="docs/screenshots/desktop-dark.jpg" alt="Dark theme"> |
+
+**Follow the sun.** Light while it is up, dark once it sets. The coordinates come from your
+system timezone — a zone name is a city, and `zone1970.tab` ships that city's latitude and
+longitude — so there is no network call, no API key and nothing to configure. Or set two
+times yourself. Switching is edge-triggered: override the theme by hand at midnight and it
+stays overridden until sunrise.
+
+<div align="center">
+<img src="docs/screenshots/settings-auto-theme.png" width="70%" alt="Auto theme settings">
+</div>
+
+## The AI sidebar
+
+Multi-provider chat (Gemini, OpenAI, Anthropic, any local OpenAI-compatible server) with
+streaming, attachments, context compression, rotating history and live cost tracking.
+It calls tools — reads files, runs commands, edits configs — and every command goes
+through a whitelist / blacklist / model-judge pipeline before it runs, with the decision
+written to an audit log.
+
+<div align="center">
+<img src="docs/screenshots/sidebar-left-tools.jpg" width="100%" alt="AI sidebar running a shell command">
+</div>
+
+**Claude Code as a backend.** The `Claude Code · *` models drive the local `claude` CLI
+instead of the HTTP API, so your Claude **subscription** powers the sidebar — no API key,
+Claude Code's own tool suite and permission system, and sessions that survive across
+messages via `--resume`.
+
+Current roster (July 2026): Gemini 3.5 Flash-Lite (default, free tier), Gemini 3.6 Flash,
+Claude Sonnet 5 / Opus 4.8 / Fable 5, GPT-5.6 Luna/Terra/Sol.
+
+## The rest of the shell
+
+<table>
+<tr>
+<td width="50%"><img src="docs/screenshots/sidebar-right.jpg" alt="Right sidebar"><br>
+<sub><b>Right sidebar</b> — quick toggles, grouped notifications, calendar, to-do, timer,
+volume mixer, Wi-Fi and Bluetooth pickers.</sub></td>
+<td width="50%"><img src="docs/screenshots/launcher.jpg" alt="Launcher"><br>
+<sub><b>Launcher & overview</b> — apps, commands, a calculator and web search in one field,
+over a live workspace grid.</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/screenshots/session.jpg" alt="Session menu"><br>
+<sub><b>Session menu</b> — opens as a circle of blur growing from the middle, with the
+buttons cascading in behind it.</sub></td>
+<td width="50%"><img src="docs/screenshots/settings-dark.png" alt="Settings"><br>
+<sub><b>Settings</b> — the options worth clicking, with the full config a button away.</sub></td>
+</tr>
+</table>
+
+**Real hardware readouts in the bar** — CPU (htop-style per-thread aggregate), temperature,
+frequency, GPU load and temperature, system power draw. All read straight from sysfs, with
+zero processes spawned on the polling path.
 
 ## Install
 
@@ -41,8 +92,8 @@ cd Flash-Impulse
 ```
 
 Supported: Arch / CachyOS (tested), other pacman-based distros and Fedora (best effort).
-
-Useful subcommands:
+The installer selects components, takes a timestamped backup you can roll back with one
+command, migrates your existing configs and stores API keys in the system keyring.
 
 ```bash
 ./install.sh doctor              # check distro, deps, claude CLI, stored keys
@@ -54,9 +105,11 @@ Useful subcommands:
 Power users can drive the underlying engine directly via `./setup` (inherited from
 upstream, still fully functional).
 
+RU layout is shipped by default — `us,ru` with Alt+Shift to toggle.
+
 ## AI quick start
 
-Open the left sidebar and just type. Handy commands:
+Open the left sidebar and just type.
 
 | Command | Effect |
 |---|---|
@@ -66,11 +119,12 @@ Open the left sidebar and just type. Handy commands:
 | `/yolo on\|off` | auto-approve **all** AI shell commands (risky) |
 | `/new`, `/clear`, `/save`, `/load` | chat management |
 
-For the Claude Code models, install the [claude CLI](https://claude.com/claude-code) and
-log in once — `./install.sh doctor` will tell you if anything is missing. Logs live in
+For the Claude Code models, install the [claude CLI](https://claude.com/claude-code) and log
+in once — `./install.sh doctor` will tell you if anything is missing. Logs live in
 `~/.local/share/flash-impulse/logs/`.
 
-Architecture details: [docs/ai-architecture.md](docs/ai-architecture.md).
+Architecture details: [docs/ai-architecture.md](docs/ai-architecture.md), and the full
+sidebar reference in [AI_SIDEBAR.md](AI_SIDEBAR.md).
 
 ## Running on older hardware
 
@@ -78,18 +132,18 @@ Architecture details: [docs/ai-architecture.md](docs/ai-architecture.md).
 ~/.config/hypr/hyprland/scripts/performance-mode.sh on     # or off / toggle / status
 ```
 
-Blur costs roughly `passes × radius × area`, so the profile drops it from 3 passes at
-radius 10 to 1 at 4 — still frosted, around an order of magnitude less fill rate. It
-also disables window shadows (`render_power 10` is a very soft, very expensive
-falloff), shortens every animation to 60% of its duration, and halves the resource
-polling rate. Layout, rounding, spacing and colours are untouched.
+Blur costs roughly `passes × radius × area`, so the profile drops it from 3 passes at radius
+10 to 1 at 4 — still frosted, around an order of magnitude less fill rate. It also disables
+window shadows (`render_power 10` is a very soft, very expensive falloff), shortens every
+animation to 60% of its duration, and halves the resource polling rate. Layout, rounding,
+spacing and colours are untouched.
 
-The setting persists in `~/.config/hypr/custom/variables.lua` as `performanceMode`, so
-it survives reloads and updates.
+The setting persists in `~/.config/hypr/custom/variables.lua` as `performanceMode`, so it
+survives reloads and updates.
 
-Worth knowing before blaming the shell for GPU load: at idle this desktop draws **0%**
-GPU. Spikes come from whatever window is actively repainting (Electron apps are the
-usual suspect) and from brief panel animations — not from the bar sitting there.
+Worth knowing before blaming the shell for GPU load: at idle this desktop draws **0%** GPU.
+Spikes come from whatever window is actively repainting (Electron apps are the usual
+suspect) and from brief panel animations — not from the bar sitting there.
 
 ## Credits & license
 

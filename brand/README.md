@@ -17,19 +17,28 @@ Original artwork, GPL-3.0 like the rest of the repo.
 Rendered outputs (regenerate with the commands below):
 
 - `dots/.config/quickshell/ii/assets/images/default_wallpaper.png` — 3840×2160
+- `dots/.config/quickshell/ii/assets/images/default_wallpaper_dark.png` — the same
+  composition with a dark ground, swapped in with the theme
 - `dots/.local/share/icons/flash-impulse.svg` — copy of `logo.svg`, resolved by
   `Quickshell.iconPath("flash-impulse")` in the About panel
 
 ## Regenerate
 
 ```bash
-# Wallpaper
-rsvg-convert -w 3840 -h 2160 brand/wallpaper.svg \
-  -o dots/.config/quickshell/ii/assets/images/default_wallpaper.png
-
-# Logo (SVG is used directly; just keep the icon copy in sync)
+python3 brand/render_wallpapers.py
 cp brand/logo.svg dots/.local/share/icons/flash-impulse.svg
 ```
+
+`render_wallpapers.py` re-implements the geometry of `wallpaper.svg` in float rather than
+shelling out to `rsvg-convert`, and writes both variants. The reason is banding: the
+artwork is almost entirely wide, shallow gradients, and every SVG renderer here writes
+8 bit, so a gradient that moves one code per ~100 px turns those steps into visible
+contour rings — mild on the light version, obvious on the dark one against a near-black
+ground. Rendering in float and quantising once with triangular dither scatters the step
+boundary into noise instead. Measured along a column through the top-left sphere, the gap
+between code changes went from 104 px to about 2.
+
+The palette for the dark variant lives at the top of that script, next to the light one.
 
 ## Palette
 
