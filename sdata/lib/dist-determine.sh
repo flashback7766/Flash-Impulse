@@ -75,8 +75,13 @@ elif test -f /etc/os-release; then
 else
   printf "${STY_RED}/etc/os-release does not exist, aborting...${STY_RST}\n" ; exit 1
 fi
-export OS_DISTRO_ID=$(awk -F'=' '/^ID=/ { gsub(/["\x27]/,"",$2); print tolower($2) }' ${OS_RELEASE_FILE} 2> /dev/null)
-export OS_DISTRO_ID_LIKE=$(awk -F'=' '/^ID_LIKE=/ { gsub(/["\x27]/,"",$2); print tolower($2) }' ${OS_RELEASE_FILE} 2> /dev/null)
+# Surrounding whitespace is stripped as well as quotes. os-release is written by
+# hand often enough that a trailing space gets in — this machine ships
+# "ID=arch  " — and every distro test below is an anchored match, so a single
+# stray space silently drops a perfectly supported Arch install all the way to
+# the fallback branch, which then forces the experimental --via-nix path.
+export OS_DISTRO_ID=$(awk -F'=' '/^ID=/ { gsub(/["\x27]/,"",$2); gsub(/^[ \t]+|[ \t]+$/,"",$2); print tolower($2) }' ${OS_RELEASE_FILE} 2> /dev/null)
+export OS_DISTRO_ID_LIKE=$(awk -F'=' '/^ID_LIKE=/ { gsub(/["\x27]/,"",$2); gsub(/^[ \t]+|[ \t]+$/,"",$2); print tolower($2) }' ${OS_RELEASE_FILE} 2> /dev/null)
 
 
 ####################

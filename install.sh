@@ -323,12 +323,9 @@ fi_secrets_list() {
 # Doctor
 
 fi_doctor() {
+  # dist-determine.sh normalises the os-release values, so nothing to clean up
+  # here — doing it in both places would suggest either one were optional.
   source ./sdata/lib/dist-determine.sh
-  # /etc/os-release is free-form enough that values arrive with stray
-  # whitespace — this machine ships `ID=arch  `, which then shows up quoted in
-  # --json output and misaligns the plain one.
-  OS_DISTRO_ID="$(printf '%s' "${OS_DISTRO_ID:-}" | tr -d '[:space:]')"
-  OS_GROUP_ID="$(printf '%s' "${OS_GROUP_ID:-}" | tr -d '[:space:]')"
 
   local -a tools=(git rsync curl hyprctl qs secret-tool claude)
   local -a missing=()
