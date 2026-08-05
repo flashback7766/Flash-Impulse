@@ -57,7 +57,7 @@ Claude Code's own tool suite and permission system, and sessions that survive ac
 messages via `--resume`.
 
 Current roster (July 2026): Gemini 3.5 Flash-Lite (default, free tier), Gemini 3.6 Flash,
-Claude Sonnet 5 / Opus 4.8 / Fable 5, GPT-5.6 Luna/Terra/Sol.
+Claude Sonnet 5 / Opus 5 / Fable 5, GPT-5.6 Luna/Terra/Sol.
 
 ## The rest of the shell
 

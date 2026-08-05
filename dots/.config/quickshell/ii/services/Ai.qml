@@ -774,7 +774,7 @@ The shell (Quickshell config "ii"):
         "gemini-3.1-pro": [2.00, 12.00],
         "claude-haiku-4-5": [1.00, 5.00],
         "claude-sonnet-5": [3.00, 15.00],
-        "claude-opus-4-8": [5.00, 25.00],
+        "claude-opus-5": [5.00, 25.00],
         "claude-fable-5": [10.00, 50.00],
         "gpt-5.6-luna": [1.00, 5.00],
         "gpt-5.6-terra": [2.50, 15.00],
@@ -1080,13 +1080,13 @@ The shell (Quickshell config "ii"):
             "key_get_description": Translation.tr("**Pricing**: ~$3/M input, ~$15/M output\n\n**Instructions**: Anthropic Console → API Keys → Create Key"),
             "api_format": "anthropic",
         }),
-        "claude-opus-4-8": aiModelComponent.createObject(this, {
+        "claude-opus-5": aiModelComponent.createObject(this, {
             "name": "Claude Opus",
             "icon": "anthropic-symbolic",
             "description": Translation.tr("Online | Anthropic's model\nMost intelligent generally-available Opus. Best for complex reasoning and coding."),
             "homepage": "https://anthropic.com",
             "endpoint": "https://api.anthropic.com/v1/messages",
-            "model": "claude-opus-4-8",
+            "model": "claude-opus-5",
             "requires_key": true,
             "key_id": "anthropic",
             "key_get_link": "https://console.anthropic.com/settings/keys",
@@ -1183,11 +1183,17 @@ The shell (Quickshell config "ii"):
         }),
     }
     property var modelList: Object.keys(root.models)
-    property var currentModelId: Persistent.states?.ai?.model || modelList[0]
+    // Built-in IDs that were renamed when a model was bumped. A selection saved
+    // under the old ID is remapped so it doesn't dangle on a model that's gone.
+    readonly property var renamedModelIds: ({
+        "claude-opus-4-8": "claude-opus-5",
+    })
+    property var currentModelId: root.renamedModelIds[Persistent.states?.ai?.model]
+        || Persistent.states?.ai?.model || modelList[0]
     // Track built-in model IDs so we know which ones are removable
     readonly property var builtinModelIds: [
         "gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-3.1-pro",
-        "claude-haiku-4-5", "claude-sonnet-5", "claude-opus-4-8", "claude-fable-5",
+        "claude-haiku-4-5", "claude-sonnet-5", "claude-opus-5", "claude-fable-5",
         "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol",
         "cc-haiku", "cc-sonnet", "cc-opus", "cc-fable"
     ]
