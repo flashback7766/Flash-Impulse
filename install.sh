@@ -41,7 +41,12 @@ FI_KEYRING_SERVICE="flash-impulse"
 FI_PROVIDERS=(gemini openai anthropic)
 
 # Exit codes, so callers can branch on *why* it stopped rather than parsing text.
-readonly EX_OK=0 EX_FAIL=1 EX_USAGE=2 EX_CANCELLED=3 EX_MISSING_DEP=4
+# EX_OK is never referenced — success is a bare `return`/`exit` — but it is part
+# of the set documented in --help, and dropping it would leave the list with a
+# hole where 0 should be.
+# shellcheck disable=SC2034
+readonly EX_OK=0
+readonly EX_FAIL=1 EX_USAGE=2 EX_CANCELLED=3 EX_MISSING_DEP=4
 
 # Directories under $HOME that an install can touch and that are worth
 # snapshotting for rollback. Kept deliberately explicit (no wildcards) so a
@@ -450,7 +455,11 @@ fi_wizard() {
   FI_MIGRATE="keep"
   local hypr_custom="${XDG_CONFIG_HOME}/hypr/custom"
   if [[ -d "$hypr_custom" || -f "$FIRSTRUN_FILE" ]]; then
+    # Read by tui_radio in sdata/lib/tui.sh, which shellcheck does not follow
+    # through the source above — hence "appears unused" for both of these.
+    # shellcheck disable=SC2034
     TUI_RD_LABEL=("Keep my tweaks" "Start clean")
+    # shellcheck disable=SC2034
     TUI_RD_DESC=(
       "Leave ~/.config/hypr/custom/* alone — the deploy step never overwrites it"
       "Move the old custom configs aside and use this fork's defaults"

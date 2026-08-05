@@ -1,6 +1,10 @@
 # Terminal UI primitives for the Flash-Impulse installer.
 #
-# This is NOT a script for execution, but a library to source.
+# This is NOT a script for execution, but a library to source — no shebang and
+# no execute bit, matching the other files in this directory. The directive
+# below is what tells shellcheck which shell to check it against in the absence
+# of one.
+# shellcheck shell=bash
 #
 # Pure bash + ANSI on purpose. The installer's whole job is to put the
 # dependencies on the machine, so it runs before any of them exist — it cannot
@@ -184,13 +188,13 @@ tui_checklist() {
             up|k)    (( cur = cur > 0 ? cur - 1 : n - 1 )) ;;
             down|j)  (( cur = cur < n - 1 ? cur + 1 : 0 )) ;;
             space)
-                if [[ "${TUI_CL_STATE[$cur]}" == "on" ]]; then
-                    TUI_CL_STATE[$cur]="off"
+                if [[ "${TUI_CL_STATE[cur]}" == "on" ]]; then
+                    TUI_CL_STATE[cur]="off"
                 else
-                    TUI_CL_STATE[$cur]="on"
+                    TUI_CL_STATE[cur]="on"
                 fi ;;
-            a) for (( i = 0; i < n; i++ )); do TUI_CL_STATE[$i]="on"; done ;;
-            n) for (( i = 0; i < n; i++ )); do TUI_CL_STATE[$i]="off"; done ;;
+            a) for (( i = 0; i < n; i++ )); do TUI_CL_STATE[i]="on"; done ;;
+            n) for (( i = 0; i < n; i++ )); do TUI_CL_STATE[i]="off"; done ;;
             enter) return 0 ;;
             q|esc) return 1 ;;
         esac

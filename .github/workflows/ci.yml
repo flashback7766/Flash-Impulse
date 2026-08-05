@@ -13,8 +13,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install shellcheck
         run: sudo apt-get update -q && sudo apt-get install -y shellcheck
-      - name: Lint install.sh
-        run: shellcheck install.sh
+      # Only the files this fork owns. The rest of sdata/lib is inherited from
+      # upstream and lints dirty, so including it would make CI red for
+      # reasons no change here can fix.
+      - name: Lint installer
+        run: shellcheck install.sh sdata/lib/tui.sh
 
   qml-parse:
     name: QML parse gate
