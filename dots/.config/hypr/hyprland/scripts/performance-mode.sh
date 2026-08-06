@@ -11,7 +11,7 @@
 set -o pipefail
 
 CUSTOM_VARS="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/custom/variables.lua"
-SHELL_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/illogical-impulse/config.json"
+SHELL_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/flash-impulse/config.json"
 
 current_state() {
     [[ -f "$CUSTOM_VARS" ]] && grep -qE '^\s*performanceMode\s*=\s*true' "$CUSTOM_VARS" && echo on || echo off

@@ -7,8 +7,9 @@
 
 printf "${STY_CYAN}[$0]: Hi there! Before we start:${STY_RST}\n"
 printf "\n"
-printf "${STY_PURPLE}${STY_BOLD}Flash-Impulse${STY_RST}${STY_PURPLE} — a Hyprland desktop on Quickshell, forked from\n"
-printf "end-4/dots-hyprland with a Claude Code-powered AI sidebar.${STY_RST}\n"
+printf "${STY_PURPLE}${STY_BOLD}Flash-Impulse${STY_RST}${STY_PURPLE} — a Hyprland desktop on Quickshell,\n"
+printf "with a Claude Code-powered AI sidebar.${STY_RST}\n"
+printf "${STY_PURPLE}https://github.com/flashback7766/Flash-Impulse${STY_RST}\n"
 printf "\n"
 pause
 printf "${STY_CYAN}${STY_BOLD}Quick overview about what this script does:${STY_RST}\n"

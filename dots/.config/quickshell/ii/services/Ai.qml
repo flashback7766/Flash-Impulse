@@ -618,7 +618,7 @@ Hyprland here is configured in **Lua**, not hyprlang. There is no \`hyprland.con
 - Apply config edits with \`hyprctl reload\`. Never log out or restart the compositor for something that reloads.
 
 The shell (Quickshell config "ii"):
-- Read its settings with \`get_shell_config\` and change them with \`set_shell_config\`. Do not hand-edit \`~/.config/illogical-impulse/config.json\` — the shell owns that file and will overwrite you.
+- Read its settings with \`get_shell_config\` and change them with \`set_shell_config\`. Do not hand-edit \`~/.config/flash-impulse/config.json\` — the shell owns that file and will overwrite you.
 - Its QML lives in \`~/.config/quickshell/ii\`, which is often a deployed copy of a dotfiles repo. Check for one before editing there, or the change is lost on the next deploy.
 - Never kill or restart the shell to apply something that applies live.
 

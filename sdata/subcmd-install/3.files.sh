@@ -38,6 +38,9 @@ function auto_backup_configs(){
   fi
 }
 function gen_firstrun(){
+  # Before anything creates the new directory — once it exists the migration
+  # correctly refuses to run, and an existing config would be stranded.
+  migrate_legacy_confdir
   x mkdir -p "$(dirname ${FIRSTRUN_FILE})"
   x touch "${FIRSTRUN_FILE}"
   x mkdir -p "$(dirname ${INSTALLED_LISTFILE})"
@@ -175,7 +178,7 @@ function install_google_sans_flex(){
   local src_name="google-sans-flex"
   local src_url="https://github.com/end-4/google-sans-flex"
   local src_dir="$REPO_ROOT/cache/$src_name"
-  local target_dir="${XDG_DATA_HOME}/fonts/illogical-impulse-$src_name"
+  local target_dir="${XDG_DATA_HOME}/fonts/flash-impulse-$src_name"
   if fc-list | grep -qi "$font_name"; then return; fi
   x mkdir -p $src_dir
   x cd $src_dir

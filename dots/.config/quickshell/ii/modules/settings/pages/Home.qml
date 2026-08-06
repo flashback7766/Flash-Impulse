@@ -223,14 +223,15 @@ ContentPage {
                 onClicked: Quickshell.execDetached(["qs", "-p", Quickshell.shellPath(""), "ipc", "call", "cheatsheet", "toggle"])
             }
             RippleButtonWithIcon {
-                materialIcon: "help"
-                mainText: Translation.tr("Usage guide")
-                onClicked: Qt.openUrlExternally("https://end-4.github.io/dots-hyprland-wiki/en/ii-qs/02usage/")
+                materialIcon: "auto_stories"
+                mainText: Translation.tr("Documentation")
+                onClicked: Qt.openUrlExternally("https://github.com/flashback7766/Flash-Impulse#readme")
             }
             RippleButtonWithIcon {
-                materialIcon: "construction"
-                mainText: Translation.tr("Configuration reference")
-                onClicked: Qt.openUrlExternally("https://end-4.github.io/dots-hyprland-wiki/en/ii-qs/03config/")
+                materialIcon: "adjust"
+                materialIconFill: false
+                mainText: Translation.tr("Report an issue")
+                onClicked: Qt.openUrlExternally("https://github.com/flashback7766/Flash-Impulse/issues")
             }
         }
 

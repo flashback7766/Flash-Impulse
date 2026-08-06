@@ -120,6 +120,8 @@ ContentPage {
             }
         }
 
+        // These used to point at end-4's repo — so "Issues" filed a bug about
+        // this fork on someone else's tracker, where nobody can act on it.
         Flow {
             Layout.fillWidth: true
             spacing: 5
@@ -128,7 +130,7 @@ ContentPage {
                 materialIcon: "auto_stories"
                 mainText: Translation.tr("Documentation")
                 onClicked: {
-                    Qt.openUrlExternally("https://end-4.github.io/dots-hyprland-wiki/en/ii-qs/02usage/")
+                    Qt.openUrlExternally("https://github.com/flashback7766/Flash-Impulse#readme")
                 }
             }
             RippleButtonWithIcon {
@@ -136,25 +138,23 @@ ContentPage {
                 materialIconFill: false
                 mainText: Translation.tr("Issues")
                 onClicked: {
-                    Qt.openUrlExternally("https://github.com/end-4/dots-hyprland/issues")
+                    Qt.openUrlExternally("https://github.com/flashback7766/Flash-Impulse/issues")
                 }
             }
             RippleButtonWithIcon {
                 materialIcon: "forum"
                 mainText: Translation.tr("Discussions")
                 onClicked: {
-                    Qt.openUrlExternally("https://github.com/end-4/dots-hyprland/discussions")
+                    Qt.openUrlExternally("https://github.com/flashback7766/Flash-Impulse/discussions")
                 }
             }
             RippleButtonWithIcon {
-                materialIcon: "favorite"
-                mainText: Translation.tr("Donate")
+                nerdIcon: ""
+                mainText: Translation.tr("Source")
                 onClicked: {
-                    Qt.openUrlExternally("https://github.com/sponsors/end-4")
+                    Qt.openUrlExternally("https://github.com/flashback7766/Flash-Impulse")
                 }
             }
-
-            
         }
     }
 }

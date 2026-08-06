@@ -11,8 +11,9 @@ and a chat panel that runs shell commands behind a three-tier safety review.
 
 </div>
 
-A fork of [end-4/dots-hyprland](https://github.com/end-4/dots-hyprland) (illogical-impulse)
-merged with [better-ii-ai](https://github.com/flashback7766/better-ii-ai).
+By [flashback7766](https://github.com/flashback7766), built on
+[better-ii-ai](https://github.com/flashback7766/better-ii-ai) and on the upstream desktop
+credited at the bottom.
 
 > **Status:** working desktop, AI stack integrated. See [ROADMAP.md](ROADMAP.md).
 
@@ -150,6 +151,10 @@ Power users can drive the underlying engine directly via `./setup` (inherited fr
 upstream, still fully functional).
 
 RU layout is shipped by default — `us,ru` with Alt+Shift to toggle.
+
+Config lives in `~/.config/flash-impulse/config.json`. An install that predates the
+rename is moved across on upgrade, entry by entry, and nothing already in the new
+directory is overwritten.
 
 ## AI quick start
 

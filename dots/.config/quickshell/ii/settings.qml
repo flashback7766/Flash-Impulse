@@ -115,8 +115,8 @@ ApplicationWindow {
             name: Translation.tr("Bar contents"),
             icon: "widgets",
             category: Translation.tr("Shell"),
-            description: Translation.tr("Tray, utility buttons, weather and tooltips"),
-            keywords: "tray systray utility buttons screenshot color picker keyboard weather tooltip notification count",
+            description: Translation.tr("Which modules are on it, and how wide the capsules get"),
+            keywords: "tray systray utility buttons screenshot color picker keyboard weather tooltip notification count modules resources media clock battery status icons width verbose",
             component: "modules/settings/pages/BarModules.qml"
         },
         {
@@ -681,9 +681,9 @@ ApplicationWindow {
                         colBackgroundHover: Appearance.colors.colSecondaryContainerHover
                         colRipple: Appearance.colors.colSecondaryContainerActive
 
-                        onClicked: Qt.openUrlExternally(`${Directories.config}/illogical-impulse/config.json`)
+                        onClicked: Qt.openUrlExternally(`${Directories.config}/flash-impulse/config.json`)
                         altAction: () => {
-                            Quickshell.clipboardText = CF.FileUtils.trimFileProtocol(`${Directories.config}/illogical-impulse/config.json`);
+                            Quickshell.clipboardText = CF.FileUtils.trimFileProtocol(`${Directories.config}/flash-impulse/config.json`);
                             configFileButton.justCopied = true;
                             revertTextTimer.restart();
                         }

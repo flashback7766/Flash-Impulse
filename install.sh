@@ -588,6 +588,10 @@ fi_install() {
   fi_backup_create
   fi_do_migration
 
+  # Ahead of the engine, so doctor/rollback and the engine's own state files all
+  # agree on where the config lives from this point on.
+  migrate_legacy_confdir
+
   # Our own timestamped backup already ran; the engine should not take a second.
   export SKIP_BACKUP=true
   ui_step "Running the install engine"

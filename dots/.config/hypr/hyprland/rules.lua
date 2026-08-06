@@ -138,7 +138,7 @@ hl.layer_rule({ match = { namespace = "osk[0-9]*" }, blur = true})
 hl.layer_rule({ match = { namespace = "osk[0-9]*" }, ignore_alpha = 0.6})
 
 -- Quickshell
--- Quickshell: illogical-impulse
+-- Quickshell: the shell's own layers
 hl.layer_rule({ match = { namespace = "quickshell:.*" }, blur_popups = true})
 hl.layer_rule({ match = { namespace = "quickshell:.*" }, blur = true})
 hl.layer_rule({ match = { namespace = "quickshell:.*" }, ignore_alpha = 0.79})
