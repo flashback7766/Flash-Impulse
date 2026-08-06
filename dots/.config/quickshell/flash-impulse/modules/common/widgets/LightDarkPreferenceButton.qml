@@ -17,7 +17,7 @@ RippleButton {
     colBackground: Appearance.colors.colLayer2
     toggled: Appearance.m3colors.darkmode === dark
     onClicked: {
-        Quickshell.execDetached(["bash", "-c", `${Directories.wallpaperSwitchScriptPath} --mode ${dark ? "dark" : "light"} --noswitch`])
+        ThemeTransition.requestMode(dark ? "dark" : "light", -1, -1);
     }
     contentItem: Item {
         anchors.centerIn: parent

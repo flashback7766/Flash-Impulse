@@ -36,7 +36,10 @@ RippleButton {
             return;
         }
         Config.options.appearance.autoTheme.enable = false;
-        Quickshell.execDetached(["bash", "-c", `${Directories.wallpaperSwitchScriptPath} --mode ${root.mode} --noswitch`]);
+        // No origin: this lives in the settings window, and a Wayland client
+        // is not told where it sits on screen, so there is no honest point to
+        // grow from. Centre reveal instead of a made-up one.
+        ThemeTransition.requestMode(root.mode, -1, -1);
     }
 
     contentItem: Item {

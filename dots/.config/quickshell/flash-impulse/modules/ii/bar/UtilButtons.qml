@@ -1,5 +1,6 @@
 import qs
 import qs.modules.common
+import qs.services
 import qs.modules.common.widgets
 import QtQuick
 import QtQuick.Layouts
@@ -89,13 +90,15 @@ Item {
             active: Config.options.bar.utilButtons.showDarkModeToggle
             visible: Config.options.bar.utilButtons.showDarkModeToggle
             sourceComponent: CircleUtilButton {
+                id: darkModeButton
                 Layout.alignment: Qt.AlignVCenter
                 onClicked: event => {
-                    if (Appearance.m3colors.darkmode) {
-                        Quickshell.execDetached(["bash", "-c", `${Directories.wallpaperSwitchScriptPath} --mode light --noswitch`])
-                    } else {
-                        Quickshell.execDetached(["bash", "-c", `${Directories.wallpaperSwitchScriptPath} --mode dark --noswitch`])
-                    }
+                    // The bar's layer surface spans the whole screen width and
+                    // sits against its edge, so a position inside the surface is
+                    // already a position on the screen — no offset to add, unlike
+                    // the sidebar.
+                    const p = darkModeButton.mapToItem(null, darkModeButton.width / 2, darkModeButton.height / 2);
+                    ThemeTransition.requestMode(Appearance.m3colors.darkmode ? "light" : "dark", p.x, p.y);
                 }
                 MaterialSymbol {
                     horizontalAlignment: Qt.AlignHCenter

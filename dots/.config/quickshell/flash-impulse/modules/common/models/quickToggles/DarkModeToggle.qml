@@ -15,9 +15,9 @@ QuickToggleModel {
     
     mainAction: () => {
         if (Appearance.m3colors.darkmode) {
-            Quickshell.execDetached([Directories.wallpaperSwitchScriptPath, "--mode", "light", "--noswitch"]);
+            ThemeTransition.requestMode("light", -1, -1);
         } else {
-            Quickshell.execDetached([Directories.wallpaperSwitchScriptPath, "--mode", "dark", "--noswitch"]);
+            ThemeTransition.requestMode("dark", -1, -1);
         }
     }
 

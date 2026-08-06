@@ -115,6 +115,10 @@ Singleton {
 
             property JsonObject appearance: JsonObject {
                 property bool extraBackgroundTint: true
+                // Freeze the screen while the theme switches and reveal the new
+                // one from where you clicked. Off falls back to the old
+                // behaviour: the switch happens live, visible relayout and all.
+                property bool themeTransition: true
                 property int fakeScreenRounding: 0 // 0: None | 1: Always | 2: When not fullscreen
                 property JsonObject fonts: JsonObject {
                     property string main: "Google Sans Flex"

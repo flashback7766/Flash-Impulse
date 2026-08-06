@@ -2,6 +2,7 @@ pragma Singleton
 pragma ComponentBehavior: Bound
 
 import qs.modules.common
+import qs.services
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -73,9 +74,12 @@ Singleton {
         onLoadFailed: root.resetFilePathNextTime();
     }
 
+    // Goes through ThemeTransition rather than launching the script directly:
+    // that is what freezes the screen first, so the relayout storm happens out
+    // of sight. Without a position, it reveals from the centre.
     function toggleLightDark() {
         const currentlyDark = Appearance.m3colors.darkmode;
-        Quickshell.execDetached([Directories.wallpaperSwitchScriptPath, "--mode", currentlyDark ? "light" : "dark", "--noswitch"]);
+        ThemeTransition.requestMode(currentlyDark ? "light" : "dark", -1, -1);
     }
 
     GlobalShortcut {
@@ -87,11 +91,4 @@ Singleton {
         }
     }
 
-    IpcHandler {
-        target: "theme"
-
-        function toggleLightDark(): void {
-            root.toggleLightDark();
-        }
-    }
 }

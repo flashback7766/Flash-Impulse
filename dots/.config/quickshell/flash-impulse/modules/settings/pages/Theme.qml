@@ -253,6 +253,18 @@ ContentPage {
         title: Translation.tr("Surfaces")
 
         ConfigSwitch {
+            buttonIcon: "animation"
+            text: Translation.tr("Animate theme changes")
+            checked: Config.options.appearance.themeTransition
+            onCheckedChanged: {
+                Config.options.appearance.themeTransition = checked;
+            }
+            StyledToolTip {
+                text: Translation.tr("Freezes the screen while the new palette is generated and reveals it from where you clicked. Off switches live, relayout and all.")
+            }
+        }
+
+        ConfigSwitch {
             buttonIcon: "ev_shadow"
             text: Translation.tr("Transparency")
             checked: Config.options.appearance.transparency.enable

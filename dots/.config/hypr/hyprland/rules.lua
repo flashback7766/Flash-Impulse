@@ -149,6 +149,11 @@ hl.layer_rule({ match = { namespace = "quickshell:screenCorners" }, animation = 
 hl.layer_rule({ match = { namespace = "quickshell:lockWindowPusher" }, no_anim = true})
 hl.layer_rule({ match = { namespace = "quickshell:notificationPopup" }, animation = "fade"})
 hl.layer_rule({ match = { namespace = "quickshell:overlay" }, no_anim = true})
+-- The theme-transition cover does its own reveal, and Hyprland fading the layer
+-- in on top of that put a visible dip on screen at the exact moment the switch
+-- starts — measured at 13 points of brightness, right where this is supposed to
+-- look calm. Two animations on one surface is one too many.
+hl.layer_rule({ match = { namespace = "quickshell:themeTransition" }, no_anim = true})
 hl.layer_rule({ match = { namespace = "quickshell:overlay" }, ignore_alpha = 1})
 hl.layer_rule({ match = { namespace = "quickshell:overview" }, no_anim = true})
 hl.layer_rule({ match = { namespace = "quickshell:polkit" }, no_anim = true})

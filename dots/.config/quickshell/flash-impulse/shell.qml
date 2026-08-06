@@ -42,6 +42,8 @@ ShellRoot {
         // leftover game-mode state at startup, which has to happen whether or
         // not anything ever looks at a game-mode toggle this session.
         GameMode.ensureLoaded()
+        // Owns the theme-transition overlay for the same reason.
+        ThemeTransition.ensureLoaded()
     }
 
 

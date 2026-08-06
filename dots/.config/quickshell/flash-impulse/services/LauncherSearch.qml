@@ -71,14 +71,14 @@ Singleton {
         {
             action: "dark",
             execute: () => {
-                Quickshell.execDetached([Directories.wallpaperSwitchScriptPath, "--mode", "dark", "--noswitch"]);
+                ThemeTransition.requestMode("dark", -1, -1);
             }
         },
 ,
         {
             action: "light",
             execute: () => {
-                Quickshell.execDetached([Directories.wallpaperSwitchScriptPath, "--mode", "light", "--noswitch"]);
+                ThemeTransition.requestMode("light", -1, -1);
             }
         },
         {

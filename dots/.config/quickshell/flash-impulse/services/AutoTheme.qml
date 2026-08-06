@@ -205,7 +205,10 @@ Singleton {
             return;
         if (Appearance.m3colors.darkmode === root.shouldBeDark)
             return;
-        Quickshell.execDetached([Directories.wallpaperSwitchScriptPath, "--mode", root.shouldBeDark ? "dark" : "light", "--noswitch"]);
+        // Sunset and sunrise get the same treatment: this fires while you are
+        // looking at something else, and a silent relayout storm is exactly the
+        // kind of thing that reads as the machine hiccupping.
+        ThemeTransition.requestMode(root.shouldBeDark ? "dark" : "light", -1, -1);
     }
 
     // The crossing itself. Anything the user did by hand before now is over.
