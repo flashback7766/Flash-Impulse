@@ -184,8 +184,8 @@ Disables **syntax highlighting**, lowers **stream repaint frequency**, drops
 `harness.qml` renders block widgets offscreen to a PNG, so a change can be
 checked without restarting the shell:
 
-    HARNESS_OUT=/tmp/blocks.png qs -p ~/.config/quickshell/ii/harness.qml
+    HARNESS_OUT=/tmp/blocks.png qs -p ~/.config/quickshell/flash-impulse/harness.qml
 
-Never `qs -c ii kill` while the screen is locked — it kills the lockscreen and
+Never `qs -c flash-impulse kill` while the screen is locked — it kills the lockscreen and
 drops Hyprland into a fallback only clearable from a TTY. Check first with
-`qs -c ii ipc call lock status`.
+`qs -c flash-impulse ipc call lock status`.

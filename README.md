@@ -152,9 +152,11 @@ upstream, still fully functional).
 
 RU layout is shipped by default — `us,ru` with Alt+Shift to toggle.
 
-Config lives in `~/.config/flash-impulse/config.json`. An install that predates the
-rename is moved across on upgrade, entry by entry, and nothing already in the new
-directory is overwritten.
+The shell runs as `qs -c flash-impulse` from `~/.config/quickshell/flash-impulse`, and
+its settings live in `~/.config/flash-impulse/config.json`. An install predating those
+names is migrated on upgrade — the settings directory entry by entry (nothing already in
+the new location is overwritten), and absolute paths inside `config.json` repointed at
+the new shell directory.
 
 ## AI quick start
 

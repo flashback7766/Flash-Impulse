@@ -619,7 +619,7 @@ Hyprland here is configured in **Lua**, not hyprlang. There is no \`hyprland.con
 
 The shell (Quickshell config "ii"):
 - Read its settings with \`get_shell_config\` and change them with \`set_shell_config\`. Do not hand-edit \`~/.config/flash-impulse/config.json\` — the shell owns that file and will overwrite you.
-- Its QML lives in \`~/.config/quickshell/ii\`, which is often a deployed copy of a dotfiles repo. Check for one before editing there, or the change is lost on the next deploy.
+- Its QML lives in \`~/.config/quickshell/flash-impulse\`, which is often a deployed copy of a dotfiles repo. Check for one before editing there, or the change is lost on the next deploy.
 - Never kill or restart the shell to apply something that applies live.
 
 ## Don't waste turns

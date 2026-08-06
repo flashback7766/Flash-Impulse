@@ -17,8 +17,8 @@ Original artwork, GPL-3.0 like the rest of the repo.
 
 Rendered outputs (regenerate with the commands below):
 
-- `dots/.config/quickshell/ii/assets/images/default_wallpaper.png` — 3840×2160
-- `dots/.config/quickshell/ii/assets/images/default_wallpaper_dark.png` — the same
+- `dots/.config/quickshell/flash-impulse/assets/images/default_wallpaper.png` — 3840×2160
+- `dots/.config/quickshell/flash-impulse/assets/images/default_wallpaper_dark.png` — the same
   composition with a dark ground, swapped in with the theme
 - `dots/.local/share/icons/flash-impulse.svg` — copy of `logo.svg`, resolved by
   `Quickshell.iconPath("flash-impulse")` in the About panel

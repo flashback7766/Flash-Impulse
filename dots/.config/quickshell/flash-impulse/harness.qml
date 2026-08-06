@@ -1,6 +1,6 @@
 // Offscreen render harness for the chat block widgets.
 //
-// Run with:  qs -p ~/.config/quickshell/ii/harness.qml
+// Run with:  qs -p ~/.config/quickshell/flash-impulse/harness.qml
 //
 // It instantiates the blocks against fixture data and grabs the scene graph to a
 // PNG, so a widget can be checked visually without the sidebar being on screen —

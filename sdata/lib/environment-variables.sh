@@ -24,6 +24,9 @@ STY_RST='\e[00m'
 BACKUP_DIR="${BACKUP_DIR:-$HOME/flash-impulse-original-dots-backup}"
 DOTS_CORE_CONFDIR="${XDG_CONFIG_HOME}/flash-impulse"
 DOTS_CORE_CONFDIR_LEGACY="${XDG_CONFIG_HOME}/illogical-impulse"
+QS_CONFIG_NAME="flash-impulse"
+QS_CONFIG_DIR="${XDG_CONFIG_HOME}/quickshell/${QS_CONFIG_NAME}"
+QS_CONFIG_DIR_LEGACY="${XDG_CONFIG_HOME}/quickshell/ii"
 INSTALLED_LISTFILE="${DOTS_CORE_CONFDIR}/installed_listfile"
 FIRSTRUN_FILE="${DOTS_CORE_CONFDIR}/installed_true"
 
@@ -60,4 +63,31 @@ function migrate_legacy_confdir() {
   if (( moved > 0 )) && [[ -z "$(ls -A "${DOTS_CORE_CONFDIR_LEGACY}" 2> /dev/null)" ]]; then
     ${DRY_RUN:+echo} rmdir -- "${DOTS_CORE_CONFDIR_LEGACY}"
   fi
+}
+
+# The Quickshell config directory was "ii", short for the upstream project's
+# name. Nothing is migrated out of it because nothing user-authored lives there
+# — the installer rsyncs the whole quickshell/ directory with --delete, so the
+# old copy goes with it. Worth saying out loud though: a terminal still holding
+# `qs -c ii` will stop finding its config, and anyone who edited files in place
+# rather than in a dotfiles checkout loses those edits to the same sync they
+# always did.
+# Absolute paths into the old shell directory that the user's own config points
+# at — the default wallpaper is one, and it is stored as an absolute path the
+# moment it is applied. The directory it names is deleted by this install, so
+# without this the desktop comes back with no wallpaper and the palette falls
+# back to grey, which looks like the theme broke rather than like a file moved.
+function migrate_legacy_qs_paths_in_config() {
+  local cfg="${DOTS_CORE_CONFDIR}/config.json"
+  [[ -f "$cfg" ]] || return 0
+  grep -q "/quickshell/ii/" "$cfg" || return 0
+  printf "${STY_CYAN}Repointing paths in %s at %s${STY_RST}\n" "$cfg" "${QS_CONFIG_DIR}"
+  ${DRY_RUN:+echo} sed -i "s|/quickshell/ii/|/quickshell/${QS_CONFIG_NAME}/|g" "$cfg"
+}
+
+function warn_legacy_qs_confdir() {
+  [[ -d "${QS_CONFIG_DIR_LEGACY}" ]] || return 0
+  printf "${STY_YELLOW}Note: the shell config moved to %s.${STY_RST}\n" "${QS_CONFIG_DIR}"
+  printf "${STY_YELLOW}      %s will be removed by this install; use \`qs -c %s\` from now on.${STY_RST}\n" \
+    "${QS_CONFIG_DIR_LEGACY}" "${QS_CONFIG_NAME}"
 }

@@ -5,8 +5,8 @@
 | Path | What it is |
 |---|---|
 | `dots/` | The actual dotfiles deployed to `~` (Hyprland, Quickshell shell, terminals, …) |
-| `dots/.config/quickshell/ii/services/Ai.qml` | AI sidebar orchestrator |
-| `dots/.config/quickshell/ii/services/ai/` | Provider strategies + command safety pipeline |
+| `dots/.config/quickshell/flash-impulse/services/Ai.qml` | AI sidebar orchestrator |
+| `dots/.config/quickshell/flash-impulse/services/ai/` | Provider strategies + command safety pipeline |
 | `install.sh` | User-facing installer (backup/rollback/secrets/doctor) |
 | `setup`, `sdata/` | Lower-level install engine inherited from upstream |
 | `docs/` | Architecture docs |
@@ -28,7 +28,7 @@
 
 # Translations
 
-See `dots/.config/quickshell/ii/translations/tools`
+See `dots/.config/quickshell/flash-impulse/translations/tools`
 
 # Code
 
@@ -71,7 +71,7 @@ _Most stuff in the shell will work but not everything._
 - Copy `dots/.config/quickshell` folder to your home directory.
 
 ## Extra setup for Quickshell
-- Quickshell-specific LSP setup: Run `touch ~/.config/quickshell/ii/.qmlls.ini` for proper LSP support.
+- Quickshell-specific LSP setup: Run `touch ~/.config/quickshell/flash-impulse/.qmlls.ini` for proper LSP support.
 - Hint for VSCode: Get the official "Qt Qml" extension, go to its settings and change custom exe path to `/usr/bin/qmlls6`.
 
 ## Python
@@ -81,8 +81,8 @@ If your changes involves using python package or script, please use the virtual 
 
 - Launch Hyprland (not the "uwsm-managed" one)
 - For the shell:
-  - Open `~/.config/quickshell/ii` in your code editor.
-  - In a terminal run `pkill qs; qs -c ii` to start the shell in the terminal (for logs).
+  - Open `~/.config/quickshell/flash-impulse` in your code editor.
+  - In a terminal run `pkill qs; qs -c flash-impulse` to start the shell in the terminal (for logs).
   - Make edits in the opened folder. Changes are reloaded live.
 
 # Testing the installer

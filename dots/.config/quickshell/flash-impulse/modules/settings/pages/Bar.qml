@@ -239,7 +239,7 @@ ContentPage {
             value: Config.options.bar.topLeftIcon
             onEdited: newValue => Config.options.bar.topLeftIcon = newValue
             StyledToolTip {
-                text: Translation.tr("\"distro\" for your distro's logo, or the name of any icon in ~/.config/quickshell/ii/assets/icons")
+                text: Translation.tr("\"distro\" for your distro's logo, or the name of any icon in ~/.config/quickshell/flash-impulse/assets/icons")
             }
         }
 

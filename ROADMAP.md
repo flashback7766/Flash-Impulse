@@ -145,7 +145,7 @@ All areas matter equally, no single priority:
 
 - Global fork settings (theme choice, which components were installed, AI provider
   defaults) live in their own namespace: **`~/.config/flash-impulse/`** — explicitly
-  *not* mixed into `~/.config/hypr` or `~/.config/quickshell/ii`, so upstream-style
+  *not* mixed into `~/.config/hypr` or `~/.config/quickshell/flash-impulse`, so upstream-style
   config files stay clean and distinguishable from fork-specific state.
 - API keys: system keyring, not files (see §2).
 
@@ -160,14 +160,52 @@ All areas matter equally, no single priority:
 - **CI**: GitHub Actions, basic — `shellcheck` on the installer, lint pass on QML/Lua.
   No test framework beyond that for now.
 
-## 7. Explicitly out of scope / deferred
+## 7. Direction (not yet scheduled)
+
+Two standing goals from 2026-08-06. Neither is a task with a finish line; both are
+tie-breakers for how to do the next piece of work.
+
+### 7.1 Diverge from the inherited code
+
+Being a fork is fine and is stated plainly in the README — the objection is not to the
+attribution, it is that most of the tree is still recognisably upstream's. The share of
+code that is obviously inherited should go down over time.
+
+This does **not** mean renaming things to look different, or rewriting working code for
+the sake of a diff. It means: when a module has to be touched anyway, it gets rebuilt
+around how this fork actually works rather than patched in upstream's shape. The settings
+app and the bar module system are the pattern to follow — both started as a change to an
+inherited file and ended as something that is ours, with the old design's specific
+failures named in the commit.
+
+Priority order when picking what to rebuild: the things a user interacts with most (bar,
+sidebars, launcher, overview) before the plumbing.
+
+### 7.2 Data-oriented layout for weak CPUs
+
+Prefer contiguous, sequentially-scanned data over graphs of small objects. QML encourages
+the opposite — one object per list item, each with its own bindings and its own place in
+memory — and on a slow CPU the cost shows up as cache misses on every frame, not as one
+slow function you can find in a profile.
+
+Concretely, when rewriting a hot path: keep values in flat typed arrays indexed in
+parallel rather than in an array of objects; iterate in index order; do the work in one
+pass over the array instead of per-item bindings that each re-evaluate independently. The
+resource chips, workspace list, notification list and launcher results are the obvious
+candidates — all of them are lists rebuilt often, on a machine where the shell has to
+share the CPU with whatever the user is actually doing.
+
+Measure before and after. The claim to beat is frame time on the weakest machine
+available, not lines of code.
+
+## 8. Explicitly out of scope / deferred
 
 - No automatic upstream sync with end-4/dots-hyprland.
 - No multi-distro real hardware testing beyond Arch/CachyOS.
 - No formal versioning/releases — rolling release like the upstream project.
 - No AI-generated wallpapers at install time.
 
-## 8. Suggested build order
+## 9. Suggested build order
 
 1. ✅ Scaffold repo (squashed history from both sources), GPL-3.0 LICENSE, README.
 2. ✅ Rewrite `install.sh` (component selection, backup/rollback, migration prompt,

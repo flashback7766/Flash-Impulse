@@ -1,6 +1,6 @@
 # Flash-Impulse AI subsystem architecture
 
-Audience: anyone touching `dots/.config/quickshell/ii/services/Ai.qml` or
+Audience: anyone touching `dots/.config/quickshell/flash-impulse/services/Ai.qml` or
 `services/ai/*`. Read this before changing the AI stack; update it when you do.
 
 ## Big picture

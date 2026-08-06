@@ -21,7 +21,7 @@ from PIL import Image
 
 W, H = 3840, 2160
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                   "../dots/.config/quickshell/ii/assets/images")
+                   "../dots/.config/quickshell/flash-impulse/assets/images")
 
 
 def hex_rgb(s):

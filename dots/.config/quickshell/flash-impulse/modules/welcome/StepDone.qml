@@ -25,7 +25,7 @@ ContentPage {
                 colBackground: Appearance.colors.colPrimaryContainer
                 colBackgroundHover: Appearance.colors.colPrimaryContainerHover
                 colRipple: Appearance.colors.colPrimaryContainerActive
-                onClicked: Quickshell.execDetached(["qs", "-p", `${Directories.config}/quickshell/ii/settings.qml`])
+                onClicked: Quickshell.execDetached(["qs", "-p", `${Directories.config}/quickshell/flash-impulse/settings.qml`])
             }
             RippleButtonWithIcon {
                 materialIcon: "keyboard_alt"

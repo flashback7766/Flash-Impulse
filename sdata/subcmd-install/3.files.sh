@@ -41,6 +41,8 @@ function gen_firstrun(){
   # Before anything creates the new directory — once it exists the migration
   # correctly refuses to run, and an existing config would be stranded.
   migrate_legacy_confdir
+  migrate_legacy_qs_paths_in_config
+  warn_legacy_qs_confdir
   x mkdir -p "$(dirname ${FIRSTRUN_FILE})"
   x touch "${FIRSTRUN_FILE}"
   x mkdir -p "$(dirname ${INSTALLED_LISTFILE})"
@@ -257,6 +259,6 @@ printf "${STY_CYAN}Claude Code models (no key needed) after installing the ${STY
 printf "${STY_CYAN}Upstream docs still apply to most of the desktop: ${STY_UNDERLINE}https://ii.clsty.link${STY_RST}\n"
 printf "\n"
 
-if [[ -z "${ILLOGICAL_IMPULSE_VIRTUAL_ENV}" ]]; then
-  printf "\n${STY_RED}[$0]: \!! Important \!! : Please ensure environment variable ${STY_RST} \$ILLOGICAL_IMPULSE_VIRTUAL_ENV ${STY_RED} is set to proper value (by default \"~/.local/state/quickshell/.venv\"), or Quickshell config will not work. We have already provided this configuration in ~/.config/hypr/hyprland/env.conf, but you need to ensure it is included in hyprland.conf, and also a restart is needed for applying it.${STY_RST}\n"
+if [[ -z "${FLASH_IMPULSE_VENV}" && -z "${ILLOGICAL_IMPULSE_VIRTUAL_ENV}" ]]; then
+  printf "\n${STY_RED}[$0]: \!! Important \!! : Please ensure environment variable ${STY_RST} \$FLASH_IMPULSE_VENV ${STY_RED} is set to proper value (by default \"~/.local/state/quickshell/.venv\"), or Quickshell config will not work. We have already provided this configuration in ~/.config/hypr/hyprland/env.conf, but you need to ensure it is included in hyprland.conf, and also a restart is needed for applying it.${STY_RST}\n"
 fi
