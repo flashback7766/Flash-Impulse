@@ -1,0 +1,21 @@
+groups=(flash-impulse)
+pkgname=flash-impulse-portal
+pkgver=1.0
+pkgrel=4
+pkgdesc='Flash-Impulse XDG Desktop Portals'
+arch=(any)
+# Renamed from illogical-impulse-*. `replaces` is what makes pacman swap the old
+# metapackage out on upgrade instead of leaving both installed and both owning
+# the same dependency set; `conflicts` stops them coexisting if something tries
+# to install the old one afterwards; `provides` keeps anything that still
+# depends on the old name satisfied.
+provides=("illogical-impulse-portal")
+conflicts=("illogical-impulse-portal")
+replaces=("illogical-impulse-portal")
+license=(None)
+depends=(
+  xdg-desktop-portal
+  xdg-desktop-portal-kde
+  xdg-desktop-portal-gtk
+  xdg-desktop-portal-hyprland
+)

@@ -1,0 +1,24 @@
+groups=(flash-impulse)
+pkgname=flash-impulse-python
+pkgver=1.1
+pkgrel=6
+pkgdesc='Flash-Impulse Python Dependencies'
+arch=(any)
+# Renamed from illogical-impulse-*. `replaces` is what makes pacman swap the old
+# metapackage out on upgrade instead of leaving both installed and both owning
+# the same dependency set; `conflicts` stops them coexisting if something tries
+# to install the old one afterwards; `provides` keeps anything that still
+# depends on the old name satisfied.
+provides=("illogical-impulse-python")
+conflicts=("illogical-impulse-python")
+replaces=("illogical-impulse-python")
+license=(None)
+depends=(
+  clang
+  uv
+  gtk4
+  libadwaita
+  libsoup3
+  libportal-gtk4
+  gobject-introspection
+)

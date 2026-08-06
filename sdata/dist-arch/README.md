@@ -8,7 +8,14 @@ The old deps install method mainly involved `./sdata/dependencies.conf` (which h
 ## Current Dependency Installation
 Local PKGBUILDs under `./sdata/dist-arch/` are used to install dependencies.
 
-The mechanism is introduced by [Makrennel](https://github.com/Makrennel) in [PR#570](https://github.com/end-4/dots-hyprland/pull/570).
+The mechanism was introduced by [Makrennel](https://github.com/Makrennel) in [PR#570](https://github.com/end-4/dots-hyprland/pull/570) upstream.
+
+## Naming
+The metapackages are `flash-impulse-*`, in the `flash-impulse` group. They were
+`illogical-impulse-*` before; each one carries `replaces`/`conflicts`/`provides` for its
+predecessor, and `install-deps.sh` removes the old one explicitly after building the
+replacement — `replaces` alone only takes effect during a sync from a repository, and
+these are installed from local files.
 
 Why is this awesome?
 - It makes it possible to control version since some packages may involve breaking changes from time to time.

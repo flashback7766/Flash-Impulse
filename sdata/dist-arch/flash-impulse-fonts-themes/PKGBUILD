@@ -1,0 +1,33 @@
+groups=(flash-impulse)
+pkgname=flash-impulse-fonts-themes
+pkgver=1.0
+pkgrel=7
+pkgdesc='Flash-Impulse Fonts and Theming Dependencies'
+arch=(any)
+# Renamed from illogical-impulse-*. `replaces` is what makes pacman swap the old
+# metapackage out on upgrade instead of leaving both installed and both owning
+# the same dependency set; `conflicts` stops them coexisting if something tries
+# to install the old one afterwards; `provides` keeps anything that still
+# depends on the old name satisfied.
+provides=("illogical-impulse-fonts-themes")
+conflicts=("illogical-impulse-fonts-themes")
+replaces=("illogical-impulse-fonts-themes")
+license=(None)
+depends=(
+  adw-gtk-theme-git
+  breeze
+  breeze-plus
+  darkly-bin
+  eza
+  fish
+  fontconfig
+  kitty
+  matugen
+  otf-space-grotesk
+  starship
+  ttf-jetbrains-mono-nerd
+  ttf-material-symbols-variable-git
+  ttf-readex-pro
+  ttf-rubik-vf
+  ttf-twemoji
+)

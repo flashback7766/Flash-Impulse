@@ -1,0 +1,25 @@
+groups=(flash-impulse)
+pkgname=flash-impulse-bibata-modern-classic-bin
+pkgver=2.0.6
+pkgrel=3
+pkgdesc="Material Based Cursor Theme, installed for Flash-Impulse"
+arch=('any')
+# Renamed from illogical-impulse-*. `replaces` is what makes pacman swap the old
+# metapackage out on upgrade instead of leaving both installed and both owning
+# the same dependency set; `conflicts` stops them coexisting if something tries
+# to install the old one afterwards; `provides` keeps anything that still
+# depends on the old name satisfied.
+provides=("illogical-impulse-bibata-modern-classic-bin")
+replaces=("illogical-impulse-bibata-modern-classic-bin")
+url="https://github.com/ful1e5/Bibata_Cursor"
+license=('GPL-3.0-or-later')
+conflicts=("bibata-cursor-theme" "bibata-cursor-theme-bin" "illogical-impulse-bibata-modern-classic-bin")
+options=('!strip')
+_variant=Bibata-Modern-Classic
+source=("${pkgname%-bin}-$pkgver.tar.xz::$url/releases/download/v$pkgver/$_variant.tar.xz")
+sha256sums=('SKIP')
+
+package() {
+  install -dm755 "$pkgdir/usr/share/icons"
+  cp -dr --no-preserve=mode $_variant "$pkgdir/usr/share/icons"
+}

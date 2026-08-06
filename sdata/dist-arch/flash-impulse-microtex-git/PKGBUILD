@@ -1,11 +1,19 @@
-groups=(illogical-impulse)
-pkgname=illogical-impulse-microtex-git
+groups=(flash-impulse)
+pkgname=flash-impulse-microtex-git
 _pkgname=MicroTeX
 pkgver=r494.0e3707f
-pkgrel=4
-pkgdesc='MicroTeX for illogical-impulse dotfiles.'
+pkgrel=5
+pkgdesc='MicroTeX for Flash-Impulse.'
 #pkgdesc="A dynamic, cross-platform, and embeddable LaTeX rendering library"
 arch=("x86_64")
+# Renamed from illogical-impulse-*. `replaces` is what makes pacman swap the old
+# metapackage out on upgrade instead of leaving both installed and both owning
+# the same dependency set; `conflicts` stops them coexisting if something tries
+# to install the old one afterwards; `provides` keeps anything that still
+# depends on the old name satisfied.
+provides=("illogical-impulse-microtex-git")
+conflicts=("illogical-impulse-microtex-git")
+replaces=("illogical-impulse-microtex-git")
 #url="https://github.com/NanoMichael/${_pkgname}"
 url="https://github.com/end-4/${_pkgname}"
 license=('MIT')

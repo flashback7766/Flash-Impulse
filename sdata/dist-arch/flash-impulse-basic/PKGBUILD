@@ -1,0 +1,29 @@
+groups=(flash-impulse)
+pkgname=flash-impulse-basic
+pkgver=1.0
+pkgrel=4
+pkgdesc='Flash-Impulse Basic Dependencies'
+arch=(any)
+# Renamed from illogical-impulse-*. `replaces` is what makes pacman swap the old
+# metapackage out on upgrade instead of leaving both installed and both owning
+# the same dependency set; `conflicts` stops them coexisting if something tries
+# to install the old one afterwards; `provides` keeps anything that still
+# depends on the old name satisfied.
+provides=("illogical-impulse-basic")
+conflicts=("illogical-impulse-basic")
+replaces=("illogical-impulse-basic")
+license=(None)
+depends=(
+  bc
+  coreutils
+  cliphist
+  cmake
+  curl
+  wget
+  ripgrep
+  jq
+  xdg-user-dirs
+  # Used in install script
+  rsync
+  go-yq # https://github.com/mikefarah/yq
+)

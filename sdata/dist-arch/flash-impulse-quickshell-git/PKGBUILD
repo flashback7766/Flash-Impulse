@@ -3,14 +3,20 @@ _commit='7511545ee20664e3b8b8d3322c0ffe7567c56f7a'
 # https://git.outfoxxed.me/quickshell/quickshell/commits/branch/master
 # https://aur.archlinux.org/packages/quickshell-git
 
-groups=(illogical-impulse)
-_prefix='illogical-impulse'
+groups=(flash-impulse)
+_prefix='flash-impulse'
 _pkgname=quickshell
 pkgname="$_prefix-$_pkgname-git"
 pkgver=0.1.0.r1
-pkgrel=8
+pkgrel=9
 pkgdesc="$_pkgname-git pinned commit and extra deps for $_prefix"
 arch=(x86_64 aarch64)
+# Renamed from illogical-impulse-*. `replaces` is what makes pacman swap the old
+# metapackage out on upgrade instead of leaving both installed and both owning
+# the same dependency set; `conflicts` stops them coexisting if something tries
+# to install the old one afterwards; `provides` keeps anything that still
+# depends on the old name satisfied.
+replaces=("illogical-impulse-quickshell-git")
 url='https://git.outfoxxed.me/quickshell/quickshell'
 options=(!strip)
 license=('LGPL-3.0-only')
@@ -53,8 +59,8 @@ makedepends=(
   'wayland'
   'wayland-protocols'
 )
-provides=("$_pkgname" "$_pkgname-git")
-conflicts=("$_pkgname" "$_pkgname-git")
+provides=("$_pkgname" "$_pkgname-git" "illogical-impulse-quickshell-git")
+conflicts=("$_pkgname" "$_pkgname-git" "illogical-impulse-quickshell-git")
 
 _pkgsrc="$_pkgname"
 source=("$_pkgsrc::git+$url.git#commit=$_commit"
@@ -67,7 +73,7 @@ build() {
   cmake -GNinja -B build \
     -DCMAKE_BUILD_TYPE="RelWithDebInfo" \
     -DCMAKE_INSTALL_PREFIX=/usr \
-    -DDISTRIBUTOR="AUR (package: quickshell-git)" \
+    -DDISTRIBUTOR="Flash-Impulse (package: flash-impulse-quickshell-git)" \
     -DDISTRIBUTOR_DEBUGINFO_AVAILABLE=NO \
     -DINSTALL_QML_PREFIX=lib/qt6/qml
 

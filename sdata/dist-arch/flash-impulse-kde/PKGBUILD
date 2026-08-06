@@ -1,0 +1,24 @@
+groups=(flash-impulse)
+pkgname=flash-impulse-kde
+pkgver=1.0
+pkgrel=4
+pkgdesc='Flash-Impulse KDE Dependencies'
+arch=(any)
+# Renamed from illogical-impulse-*. `replaces` is what makes pacman swap the old
+# metapackage out on upgrade instead of leaving both installed and both owning
+# the same dependency set; `conflicts` stops them coexisting if something tries
+# to install the old one afterwards; `provides` keeps anything that still
+# depends on the old name satisfied.
+provides=("illogical-impulse-kde")
+conflicts=("illogical-impulse-kde")
+replaces=("illogical-impulse-kde")
+license=(None)
+depends=(
+  bluedevil
+  gnome-keyring
+  networkmanager
+  plasma-nm
+  polkit-kde-agent
+  dolphin
+  systemsettings
+)

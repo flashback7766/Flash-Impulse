@@ -85,18 +85,56 @@ install-local-pkgbuild() {
   # -A, --ignorearch: Ignore a missing or incomplete arch field in the build script.
   # -s, --syncdeps: Install missing dependencies using pacman. When build-time or run-time dependencies are not found, pacman will try to resolve them.
   # -f, --force: build a package even if it already exists in the PKGDEST
-  # -i, --install: Install or upgrade the package after a successful build using pacman(8).
-  # In https://github.com/end-4/dots-hyprland/issues/823#issuecomment-3394774645 it's suggested to use `sudo pacman -U --noconfirm *.pkg.tar.zst` instead of `makepkg -i`, however it's possible that multiple *.pkg.tar.zst exist, which makes this command not reliable.
-  x makepkg -Afsi --noconfirm
+  #
+  # Build first, install second, rather than `makepkg -i` doing both.
+  #
+  # The metapackages were renamed illogical-impulse-* -> flash-impulse-*, and
+  # each new one carries `replaces`. That alone does not help here: pacman only
+  # acts on `replaces` during a sync from a repository. Installed from a local
+  # file it is an ordinary name conflict, which `--noconfirm` answers "no" to,
+  # failing the whole transaction.
+  #
+  # So the predecessor is removed explicitly — but only after the replacement
+  # has been built. Three of these packages own real files, `quickshell` among
+  # them, and that is the binary the desktop is running on: remove it before the
+  # build and a build that fails leaves the machine with no shell at all.
+  # -C, --cleanbuild: wipe $srcdir before building. Needed because these
+  # directories were renamed: a working copy left over from a build under the
+  # old name records the old absolute path in its git alternates, and makepkg
+  # then fails with "does not appear to be a git repository" pointing at a
+  # directory that no longer exists. The download cache lives outside $srcdir
+  # and is kept, so the cost is a fresh checkout, not a fresh clone.
+  x makepkg -ACfs --noconfirm
+  remove_renamed_predecessor "$pkgname"
+  # --packagelist rather than a *.pkg.tar.zst glob: a directory that has been
+  # built in before can hold artifacts from an older pkgver, and installing
+  # those alongside the new one is how you end up downgrading something by
+  # accident. This asks makepkg which files this build actually produced.
+  local built=()
+  readarray -t built < <(makepkg --packagelist)
+  x sudo pacman -U --noconfirm --needed "${built[@]}"
   x popd
 }
 
+# -Rdd: skip the dependency check. Removing a metapackage would otherwise make
+# pacman consider cascading into the very packages the replacement is about to
+# claim, and anything left orphaned for the second in between is adopted again
+# by the install that follows immediately.
+remove_renamed_predecessor(){
+  local new=$1
+  local old="${new/#flash-impulse-/illogical-impulse-}"
+  [[ "$old" != "$new" ]] || return 0
+  pacman -Qq "$old" &> /dev/null || return 0
+  printf "${STY_CYAN}[$0]: Replacing $old with $new${STY_RST}\n"
+  try sudo pacman -Rdd --noconfirm "$old"
+}
+
 # Install core dependencies from the meta-packages
-metapkgs=(./sdata/dist-arch/illogical-impulse-{audio,backlight,basic,fonts-themes,kde,portal,python,screencapture,toolkit,widgets})
-metapkgs+=(./sdata/dist-arch/illogical-impulse-hyprland)
-metapkgs+=(./sdata/dist-arch/illogical-impulse-microtex-git)
-metapkgs+=(./sdata/dist-arch/illogical-impulse-quickshell-git)
-metapkgs+=(./sdata/dist-arch/illogical-impulse-bibata-modern-classic-bin)
+metapkgs=(./sdata/dist-arch/flash-impulse-{audio,backlight,basic,fonts-themes,kde,portal,python,screencapture,toolkit,widgets})
+metapkgs+=(./sdata/dist-arch/flash-impulse-hyprland)
+metapkgs+=(./sdata/dist-arch/flash-impulse-microtex-git)
+metapkgs+=(./sdata/dist-arch/flash-impulse-quickshell-git)
+metapkgs+=(./sdata/dist-arch/flash-impulse-bibata-modern-classic-bin)
 
 for i in "${metapkgs[@]}"; do
   metainstallflags="--needed"
