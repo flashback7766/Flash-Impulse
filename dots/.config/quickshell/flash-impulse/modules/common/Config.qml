@@ -367,6 +367,30 @@ Singleton {
                 property int suspend: 3
             }
 
+            // Idle behaviour, split by power source like Windows' "Screen, sleep" panel
+            // — a laptop wants to lock and sleep aggressively on battery and can afford
+            // to sit unlocked longer on mains. IdleManager turns this into
+            // ~/.config/hypr/hypridle.conf and restarts hypridle whenever a value here
+            // changes or the machine crosses the AC/battery line.
+            property JsonObject idle: JsonObject {
+                property JsonObject ac: JsonObject {
+                    property bool lockEnable: true
+                    property int lockMinutes: 10
+                    property bool screenOffEnable: true
+                    property int screenOffMinutes: 15
+                    property bool suspendEnable: false
+                    property int suspendMinutes: 30
+                }
+                property JsonObject battery: JsonObject {
+                    property bool lockEnable: true
+                    property int lockMinutes: 5
+                    property bool screenOffEnable: true
+                    property int screenOffMinutes: 8
+                    property bool suspendEnable: true
+                    property int suspendMinutes: 15
+                }
+            }
+
             property JsonObject calendar: JsonObject {
                 property string locale: "en-GB"
             }

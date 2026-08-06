@@ -256,6 +256,24 @@ ApplicationWindow {
             component: "modules/settings/pages/Privacy.qml"
         },
         {
+            id: "displays",
+            name: Translation.tr("Displays"),
+            icon: "monitor",
+            category: Translation.tr("System"),
+            description: Translation.tr("Arrangement, resolution, refresh rate and scale per screen"),
+            keywords: "display monitor screen resolution refresh rate hz scale orientation rotate arrangement multi-monitor",
+            component: "modules/settings/pages/Displays.qml"
+        },
+        {
+            id: "idlepower",
+            name: Translation.tr("Idle & power"),
+            icon: "bedtime",
+            category: Translation.tr("System"),
+            description: Translation.tr("When the screen locks, turns off and sleeps — on battery and plugged in"),
+            keywords: "idle sleep suspend lock timeout screen off power battery ac",
+            component: "modules/settings/pages/IdlePower.qml"
+        },
+        {
             id: "nightlight",
             name: Translation.tr("Night light"),
             icon: "nightlight",
@@ -422,7 +440,13 @@ ApplicationWindow {
 
     Shortcut {
         sequences: ["Ctrl+F"]
-        onActivated: searchField.forceActiveFocus()
+        onActivated: {
+            searchField.forceActiveFocus();
+            // Select what's there, so a second Ctrl+F starts a new search
+            // instead of appending to the last one — which is what every other
+            // search field does, and what makes the shortcut usable twice.
+            searchField.selectAll();
+        }
     }
     Shortcut {
         sequences: ["Ctrl+Tab", "Ctrl+PgDown"]

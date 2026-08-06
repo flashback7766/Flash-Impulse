@@ -60,7 +60,11 @@ ComboBox {
 
             Loader {
                 Layout.alignment: Qt.AlignVCenter
-                active: root.buttonIcon.length > 0 || (root.currentIndex >= 0 && typeof root.model[root.currentIndex] === 'object' && root.model[root.currentIndex]?.icon)
+                // Boolean at every branch: `a?.icon` on an item without one is
+                // `undefined`, and Loader.active rejected that outright rather
+                // than falsy-coercing it — so any model without per-item icons
+                // (the common case) warned on every combo box using this.
+                active: root.buttonIcon.length > 0 || !!(root.currentIndex >= 0 && typeof root.model[root.currentIndex] === 'object' && root.model[root.currentIndex]?.icon)
                 visible: active
                 sourceComponent: MaterialSymbol {
                     text: {

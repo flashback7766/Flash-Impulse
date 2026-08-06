@@ -40,6 +40,12 @@ QtObject {
     property string functionResponse
     property bool functionPending: false
     property var functionCallParts
+    // Gemini 3's "thought signature", carried on whichever part of a streamed
+    // turn the model attaches it to — which in practice is often an earlier
+    // thought chunk, not the chunk that finally carries the functionCall. Held
+    // here across chunks so it can be grafted onto the functionCall part before
+    // it's saved to functionCallParts; see GeminiApiStrategy._processJsonObject.
+    property string pendingThoughtSignature: ""
     property bool visibleToUser: true
 
     // Earlier answers to the same question, kept when you regenerate instead of

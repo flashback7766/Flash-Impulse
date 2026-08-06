@@ -5,6 +5,7 @@ import qs.modules.common
 import qs.modules.ii.background
 import qs.modules.ii.bar
 import qs.modules.ii.cheatsheet
+import qs.modules.ii.displayConfirm
 import qs.modules.ii.lock
 import qs.modules.ii.mediaControls
 import qs.modules.ii.notificationPopup
@@ -25,6 +26,7 @@ Scope {
     PanelLoader { extraCondition: !Config.options.bar.vertical; component: Bar {} }
     PanelLoader { component: Background {} }
     PanelLoader { component: Cheatsheet {} }
+    PanelLoader { component: DisplayConfirm {} }
     PanelLoader { component: Lock {} }
     PanelLoader { component: MediaControls {} }
     PanelLoader { component: NotificationPopup {} }

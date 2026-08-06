@@ -284,6 +284,16 @@ ApiStrategy {
                 const part = parts[i];
                 if (!part) continue;
 
+                // The signature can land on any part of the turn — commonly a
+                // thought part several chunks before the functionCall itself
+                // arrives, since streaming delivers each part the moment it's
+                // ready rather than buffering the whole turn. Remembered here so
+                // it can be grafted onto the functionCall part below; Gemini
+                // rejects a replayed functionCall that doesn't carry one.
+                if (part.thoughtSignature) {
+                    message.pendingThoughtSignature = part.thoughtSignature;
+                }
+
                 // A reasoning part is the same shape as a text part, flagged with
                 // `thought: true` — so the flag has to be checked before the text is
                 // taken as answer content, or thoughts land in the reply.
@@ -300,18 +310,32 @@ ApiStrategy {
             }
 
             // Find functionCall part
-            let functionCallPart = null;
+            let functionCallIndex = -1;
             for (let i = 0; i < parts.length; i++) {
                 if (parts[i] && parts[i].functionCall) {
-                    functionCallPart = parts[i];
+                    functionCallIndex = i;
                     break;
                 }
             }
-            if (functionCallPart) {
+            if (functionCallIndex !== -1) {
+                let functionCallPart = parts[functionCallIndex];
                 const functionCall = functionCallPart.functionCall;
                 message.functionName = functionCall.name;
                 message.functionCall = { name: functionCall.name, args: functionCall.args ?? {} };
-                message.functionCallParts = parts;
+                // Graft on a signature seen earlier in this turn if the part that
+                // finally carries the functionCall didn't get its own — see the
+                // note above. Consumed once so a later, separate function call on
+                // this same message doesn't inherit a stale value.
+                let turnParts = parts;
+                if (!functionCallPart.thoughtSignature && message.pendingThoughtSignature) {
+                    functionCallPart = Object.assign({}, functionCallPart, { thoughtSignature: message.pendingThoughtSignature });
+                    turnParts = parts.slice();
+                    turnParts[functionCallIndex] = functionCallPart;
+                    message.pendingThoughtSignature = "";
+                } else if (functionCallPart.thoughtSignature) {
+                    message.pendingThoughtSignature = "";
+                }
+                message.functionCallParts = turnParts;
                 const rawEntry = `\n\n[[ Function: ${functionCall.name}(${JSON.stringify(functionCall.args)}) ]]\n`;
                 message.rawContent += rawEntry;
                 return { functionCall: { name: functionCall.name, args: functionCall.args }, finished: finished };

@@ -31,6 +31,13 @@ ShellRoot {
         Cliphist.refresh()
         Wallpapers.load()
         Updates.load()
+        IdleManager.apply()
+        // Touching the singleton is what constructs it, and constructing it is
+        // what registers its IPC target — without this the settings app's
+        // "apply display settings" call has nothing listening on the other end.
+        // A bare property read would do it, but reads that exist for their side
+        // effects are exactly the kind of line someone deletes as dead code.
+        DisplayManager.ensureLoaded()
     }
 
 
