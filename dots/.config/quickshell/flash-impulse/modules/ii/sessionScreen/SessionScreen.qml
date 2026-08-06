@@ -44,6 +44,17 @@ Scope {
         return 1 - Math.pow(1 - c, 3);
     }
 
+    // Forget the origin once it is fully shut, not the moment it is dismissed:
+    // clearing it while the reveal is still shrinking would snap the circle to
+    // the centre mid-animation. After this, an open with no position of its own
+    // correctly gets the centre again.
+    onRevealChanged: {
+        if (root.reveal <= 0.001 && !GlobalStates.sessionOpen) {
+            GlobalStates.sessionOriginX = -1;
+            GlobalStates.sessionOriginY = -1;
+        }
+    }
+
     Loader {
         id: sessionLoader
         active: root.reveal > 0.001
@@ -81,6 +92,13 @@ Scope {
 
             readonly property real shapeProgress: root.decel(root.reveal)
 
+            // Where the reveal grows from. A keybind has no position and gets
+            // the centre; the sidebar's power button hands over its own, so the
+            // menu comes out of the thing that was pressed.
+            readonly property bool hasOrigin: GlobalStates.sessionOriginX >= 0 && GlobalStates.sessionOriginY >= 0
+            readonly property real originX: hasOrigin ? GlobalStates.sessionOriginX : width / 2
+            readonly property real originY: hasOrigin ? GlobalStates.sessionOriginY : height / 2
+
             /**
              * Where each button is in the cascade.
              *
@@ -107,13 +125,25 @@ Scope {
             implicitHeight: root.focusedScreen?.height ?? 0
 
             // The dim, as a circle wide enough to swallow the corners, opening
-            // from the middle. Its alpha never animates — it is the size that
+            // from the origin. Its alpha never animates — it is the size that
             // does — so every pixel it covers is over the blur threshold and
             // the blur front travels with the edge.
             Rectangle {
                 id: dimShape
-                anchors.centerIn: parent
-                readonly property real diameter: Math.ceil(Math.sqrt(sessionRoot.width * sessionRoot.width + sessionRoot.height * sessionRoot.height))
+                // Sized from the origin's distance to the furthest corner, not
+                // from the screen diagonal: those are the same number only when
+                // the origin is the centre. Opening from the right edge with a
+                // diagonal-sized circle would leave the far corners uncovered.
+                readonly property real diameter: {
+                    const ox = sessionRoot.originX;
+                    const oy = sessionRoot.originY;
+                    const w = sessionRoot.width;
+                    const h = sessionRoot.height;
+                    const dist = (x, y) => Math.sqrt(x * x + y * y);
+                    return Math.ceil(2 * Math.max(dist(ox, oy), dist(w - ox, oy), dist(ox, h - oy), dist(w - ox, h - oy)));
+                }
+                x: sessionRoot.originX - diameter / 2
+                y: sessionRoot.originY - diameter / 2
                 implicitWidth: diameter
                 implicitHeight: diameter
                 radius: diameter / 2
@@ -144,6 +174,14 @@ Scope {
                 // Rises a little as it settles, and the whole block eases up from
                 // slightly under size. Transform rather than layout properties so
                 // none of this triggers a relayout per frame.
+                // Leans out of the origin on the way in, so the panel reads as
+                // having come from the button rather than merely appearing while
+                // the dim happened to sweep past. Capped hard: an origin in the
+                // far corner would otherwise fling the whole grid across the
+                // screen, which is a different animation and a worse one.
+                readonly property real leanX: Math.max(-70, Math.min(70, (sessionRoot.originX - sessionRoot.width / 2) * 0.16))
+                readonly property real leanY: Math.max(-70, Math.min(70, (sessionRoot.originY - sessionRoot.height / 2) * 0.16))
+
                 transform: [
                     Scale {
                         origin.x: contentColumn.width / 2
@@ -152,7 +190,10 @@ Scope {
                         yScale: 0.93 + 0.07 * contentColumn.progress
                     },
                     Translate {
-                        y: (1 - contentColumn.progress) * 28
+                        x: (1 - contentColumn.progress) * contentColumn.leanX
+                        // The 28px rise it always had, plus whatever the origin
+                        // asks for.
+                        y: (1 - contentColumn.progress) * (28 + contentColumn.leanY)
                     }
                 ]
 
@@ -392,6 +433,8 @@ Scope {
         target: "session"
 
         function toggle(): void {
+            if (!GlobalStates.sessionOpen)
+                root.clearOrigin();
             GlobalStates.sessionOpen = !GlobalStates.sessionOpen;
         }
 
@@ -400,8 +443,16 @@ Scope {
         }
 
         function open(): void {
+            root.clearOrigin();
             GlobalStates.sessionOpen = true;
         }
+    }
+
+    // A keybind has no position on screen to come out of, so it says so rather
+    // than inheriting wherever the last click happened to be.
+    function clearOrigin(): void {
+        GlobalStates.sessionOriginX = -1;
+        GlobalStates.sessionOriginY = -1;
     }
 
     GlobalShortcut {
@@ -409,6 +460,8 @@ Scope {
         description: "Toggles session screen on press"
 
         onPressed: {
+            if (!GlobalStates.sessionOpen)
+                root.clearOrigin();
             GlobalStates.sessionOpen = !GlobalStates.sessionOpen;
         }
     }
@@ -418,6 +471,7 @@ Scope {
         description: "Opens session screen on press"
 
         onPressed: {
+            root.clearOrigin();
             GlobalStates.sessionOpen = true;
         }
     }

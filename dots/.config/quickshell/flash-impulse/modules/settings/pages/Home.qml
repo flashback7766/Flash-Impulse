@@ -206,6 +206,29 @@ ContentPage {
             color: Appearance.colors.colSubtext
             text: Translation.tr("Keeps the layout, shapes and colors, but uses cheaper blur, drops window shadows and shortens animations.")
         }
+
+        ConfigSwitch {
+            Layout.topMargin: 8
+            buttonIcon: "gamepad"
+            text: Translation.tr("Game mode")
+            checked: GameMode.active
+            onCheckedChanged: {
+                // Only the manual half is settable. While a game is running the
+                // service stays on regardless, so writing `active` back would be
+                // a switch that flips itself the moment you let go.
+                if (checked !== GameMode.active)
+                    GameMode.requestManual(checked);
+            }
+        }
+
+        StyledText {
+            Layout.fillWidth: true
+            Layout.leftMargin: 4
+            wrapMode: Text.Wrap
+            font.pixelSize: Appearance.font.pixelSize.smaller
+            color: Appearance.colors.colSubtext
+            text: GameMode.gameRunning ? Translation.tr("On automatically — a game is running. Strips animations, blur, shadows and rounding, and switches performance mode on for as long as the game lasts.") : Translation.tr("Strips animations, blur, shadows and rounding, and switches performance mode on with it. Turns on by itself when a game starts, and puts everything back when it exits.")
+        }
     }
 
     ContentSection {

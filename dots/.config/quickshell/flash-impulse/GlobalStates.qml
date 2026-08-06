@@ -28,6 +28,19 @@ Singleton {
     property bool screenUnlockFailed: false
     property bool screenTranslatorOpen: false
     property bool sessionOpen: false
+    // Where on the focused screen the session menu should appear to come from,
+    // in that screen's pixels. Set by whatever opened it when there is a real
+    // thing on screen it should grow out of — the power button in the right
+    // sidebar — and left negative for a keybind or an IPC call, which have no
+    // position and get the centre instead.
+    property real sessionOriginX: -1
+    property real sessionOriginY: -1
+
+    function openSessionFrom(x: real, y: real): void {
+        root.sessionOriginX = x;
+        root.sessionOriginY = y;
+        root.sessionOpen = true;
+    }
     property bool superDown: false
     property bool superReleaseMightTrigger: true
     property bool wallpaperSelectorOpen: false

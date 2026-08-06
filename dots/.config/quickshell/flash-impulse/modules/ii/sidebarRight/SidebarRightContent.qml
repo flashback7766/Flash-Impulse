@@ -287,10 +287,19 @@ Item {
                 }
             }
             QuickToggleButton {
+                id: sessionButton
                 toggled: false
                 buttonIcon: "power_settings_new"
                 onClicked: {
-                    GlobalStates.sessionOpen = true;
+                    // Hand the session menu this button's position so it can
+                    // grow out of the thing that was pressed rather than out of
+                    // the middle of the screen. mapToItem(null, …) gives the
+                    // position inside this layer surface; the surface is
+                    // anchored to the top-right, so its own screen offset is the
+                    // one term that has to be added.
+                    const local = sessionButton.mapToItem(null, sessionButton.width / 2, sessionButton.height / 2);
+                    const screenWidth = root.QsWindow.window?.screen?.width ?? 0;
+                    GlobalStates.openSessionFrom(screenWidth - root.sidebarWidth + local.x, local.y);
                 }
                 StyledToolTip {
                     text: Translation.tr("Session")

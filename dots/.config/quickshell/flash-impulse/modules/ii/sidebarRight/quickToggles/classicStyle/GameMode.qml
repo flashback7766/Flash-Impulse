@@ -24,10 +24,10 @@ QuickToggleButton {
         // Only the manual half is ours to flip. While a game is running the
         // service stays active regardless, which is the honest answer — turning
         // it off here would be undone the moment gamemoded next said anything.
-        GameMode.manualEnabled = !GameMode.manualEnabled;
+        GameMode.requestManual(!GameMode.active);
     }
 
     StyledToolTip {
-        text: GameMode.gamemodedActive ? Translation.tr("Game mode\nOn automatically — a game is running") : Translation.tr("Game mode")
+        text: GameMode.gameRunning ? Translation.tr("Game mode\nOn automatically — a game is running") : Translation.tr("Game mode")
     }
 }

@@ -17,8 +17,8 @@ QuickToggleModel {
     icon: "gamepad"
 
     mainAction: () => {
-        GameMode.manualEnabled = !GameMode.manualEnabled;
+        GameMode.requestManual(!GameMode.active);
     }
 
-    tooltipText: GameMode.gamemodedActive ? Translation.tr("Game mode\nOn automatically — a game is running") : Translation.tr("Game mode")
+    tooltipText: GameMode.gameRunning ? Translation.tr("Game mode\nOn automatically — a game is running") : Translation.tr("Game mode")
 }

@@ -28,44 +28,81 @@ import Quickshell.Io
  *
  * So the auto-enable records what it is about to overwrite, in a file outside
  * the config it is overwriting. On startup that file is reconciled against
- * whether a game is *actually* running now, and a stale one is undone. The
- * state file is the thing that makes this safe to leave running unattended.
+ * whether a game is *actually* running now, and a stale one is undone.
+ *
+ * ## One owner
+ *
+ * Singletons are per-process, and the settings app is its own process. Left
+ * ungated, opening Settings would start a second gdbus monitor, a second
+ * reconciliation, and a second opinion about whether game mode is on — two
+ * processes applying and undoing the same global settings. Only the shell calls
+ * ensureLoaded(), so only the shell watches and acts; everyone else reads the
+ * state out of the same file and asks over IPC to change it.
  */
 Singleton {
     id: root
 
     readonly property var opts: Config.options?.gameMode ?? null
 
+    // True only in the process that called ensureLoaded() — the shell.
+    property bool owns: false
+
     // A game registered with Feral GameMode. Independent of the manual toggle.
     property bool gamemodedActive: false
-    // The quick toggle in the sidebar.
+    // The quick toggle in the sidebar and in settings.
     property bool manualEnabled: false
+    // What the owner last wrote to the state file. The only thing a process
+    // that isn't the owner has any business believing.
+    property bool publishedActive: false
+    property bool publishedGamemoded: false
 
-    readonly property bool active: root.manualEnabled || (root.gamemodedActive && (root.opts?.followGamemoded ?? true))
+    // Whether a game is running, answered correctly in any process: the owner
+    // knows first-hand, everyone else reads what it published. Without this the
+    // settings app would always claim no game was running, since only the owner
+    // watches gamemoded.
+    readonly property bool gameRunning: root.owns ? root.gamemodedActive : root.publishedGamemoded
+
+    readonly property bool active: root.owns ? (root.manualEnabled || (root.gamemodedActive && (root.opts?.followGamemoded ?? true))) : root.publishedActive
 
     // Set while startup reconciliation is still deciding, so the normal
     // active-changed path doesn't fire against a half-known world.
     property bool reconciling: true
 
-    readonly property string restorePath: FileUtils.trimFileProtocol(`${Directories.state}/user/gamemode-restore.json`)
+    readonly property string statePath: FileUtils.trimFileProtocol(`${Directories.state}/user/gamemode-state.json`)
 
-    // Called from shell.qml to construct this singleton at startup, which is
-    // what runs the reconciliation below. Waiting for a toggle to be looked at
-    // would mean a stale low-end profile sits there until someone opens the
-    // sidebar — exactly the case this is meant to clean up.
-    function ensureLoaded(): void {}
+    // Called from shell.qml. Constructing the singleton is what starts the
+    // watching, and claiming ownership is what makes it the one that acts.
+    function ensureLoaded(): void {
+        root.owns = true;
+    }
+
+    // Anything that isn't the owner asks it to flip the switch.
+    function requestManual(value: bool): void {
+        if (root.owns) {
+            root.manualEnabled = value;
+            return;
+        }
+        Quickshell.execDetached(["qs", "-c", "flash-impulse", "ipc", "call", "gamemode", value ? "on" : "off"]);
+    }
 
     // ---------------------------------------------------------------- apply --
     function compositorOn(): void {
         const o = root.opts;
         const kw = [];
-        if (o?.disableAnimations ?? true) kw.push("keyword animations:enabled 0");
-        if (o?.disableShadows ?? true) kw.push("keyword decoration:shadow:enabled 0");
-        if (o?.disableBlur ?? true) kw.push("keyword decoration:blur:enabled 0");
-        if (o?.noGaps ?? true) kw.push("keyword general:gaps_in 0", "keyword general:gaps_out 0", "keyword general:border_size 1");
-        if (o?.squareCorners ?? true) kw.push("keyword decoration:rounding 0");
-        if (o?.allowTearing ?? true) kw.push("keyword general:allow_tearing 1");
-        if (kw.length === 0) return;
+        if (o?.disableAnimations ?? true)
+            kw.push("keyword animations:enabled 0");
+        if (o?.disableShadows ?? true)
+            kw.push("keyword decoration:shadow:enabled 0");
+        if (o?.disableBlur ?? true)
+            kw.push("keyword decoration:blur:enabled 0");
+        if (o?.noGaps ?? true)
+            kw.push("keyword general:gaps_in 0", "keyword general:gaps_out 0", "keyword general:border_size 1");
+        if (o?.squareCorners ?? true)
+            kw.push("keyword decoration:rounding 0");
+        if (o?.allowTearing ?? true)
+            kw.push("keyword general:allow_tearing 1");
+        if (kw.length === 0)
+            return;
         Quickshell.execDetached(["hyprctl", "--batch", kw.join("; ")]);
     }
 
@@ -79,27 +116,42 @@ Singleton {
     // ------------------------------------------------------------ transition --
     function enter(): void {
         root.compositorOn();
-        if (!(root.opts?.performanceMode ?? true))
+        if (!(root.opts?.performanceMode ?? true)) {
+            stateFile.publish();
             return;
+        }
         // Record before changing, and only if there is nothing recorded yet —
         // entering twice (toggle on, then a game starts) must not overwrite the
         // original value with the one we ourselves just set.
-        if (!restoreFile.hasRecord)
-            restoreFile.record(PerformanceMode.enabled);
+        if (!stateFile.hasRecord)
+            stateFile.previousPerformanceMode = PerformanceMode.enabled;
+        stateFile.hasRecord = true;
+        stateFile.publish();
         PerformanceMode.setEnabled(true);
     }
 
     function leave(): void {
         root.compositorOff();
-        if (!restoreFile.hasRecord)
+        if (!stateFile.hasRecord) {
+            stateFile.publish();
             return;
-        const previous = restoreFile.previousPerformanceMode;
-        restoreFile.clear();
+        }
+        const previous = stateFile.previousPerformanceMode;
+        stateFile.hasRecord = false;
+        stateFile.publish();
         PerformanceMode.setEnabled(previous);
     }
 
+    onGamemodedActiveChanged: {
+        // `active` may not change at all here — a game starting while the manual
+        // toggle is already on leaves it true — but the settings app still needs
+        // to know a game is running, so publish regardless.
+        if (root.owns && !root.reconciling)
+            stateFile.publish();
+    }
+
     onActiveChanged: {
-        if (root.reconciling)
+        if (!root.owns || root.reconciling)
             return;
         if (root.active)
             root.enter();
@@ -113,7 +165,7 @@ Singleton {
     // game is already running would believe nothing was going on.
     Process {
         id: initialQuery
-        running: true
+        running: root.owns
         command: ["bash", "-c", "busctl --user get-property com.feralinteractive.GameMode /com/feralinteractive/GameMode com.feralinteractive.GameMode ClientCount 2>/dev/null | awk '{print $2}'"]
         stdout: StdioCollector {
             id: initialOut
@@ -133,7 +185,7 @@ Singleton {
 
     Process {
         id: monitor
-        running: (root.opts?.followGamemoded ?? true)
+        running: root.owns && (root.opts?.followGamemoded ?? true)
         command: ["gdbus", "monitor", "--session", "--dest", "com.feralinteractive.GameMode"]
         stdout: SplitParser {
             onRead: line => {
@@ -153,13 +205,13 @@ Singleton {
 
     // ----------------------------------------------------------- reconciling --
     function reconcile(): void {
-        if (!restoreFile.loaded)
-            return; // Called again from onLoaded.
-        // And wait for the real performance-mode state. Its `enabled` defaults
-        // to false, so acting before the first status read means restoring
-        // "false" onto a value that is already believed to be false — which
-        // setEnabled() correctly treats as a no-op, leaving the low-end profile
-        // on with the record cleared and nothing left to notice it.
+        if (!root.owns || !stateFile.ready)
+            return; // Called again once the pieces are in place.
+        // Wait for the real performance-mode state. Its `enabled` defaults to
+        // false, so acting before the first status read means restoring "false"
+        // onto a value that is already believed to be false — which setEnabled()
+        // correctly treats as a no-op, leaving the low-end profile on with the
+        // record cleared and nothing left to notice it.
         if (!PerformanceMode.loaded)
             return; // Called again from the Connections below.
         root.reconciling = false;
@@ -173,12 +225,13 @@ Singleton {
 
         // Nothing running. A leftover record means the session ended while a
         // game was — reboot, crash, power loss — so undo what was never undone.
-        if (restoreFile.hasRecord) {
-            const previous = restoreFile.previousPerformanceMode;
-            restoreFile.clear();
+        if (stateFile.hasRecord) {
+            const previous = stateFile.previousPerformanceMode;
+            stateFile.hasRecord = false;
             console.log(`[GameMode] Stale game-mode state found; restoring performance mode to ${previous}.`);
             PerformanceMode.setEnabled(previous);
         }
+        stateFile.publish();
     }
 
     Connections {
@@ -190,56 +243,97 @@ Singleton {
     }
 
     FileView {
-        id: restoreFile
-        path: Qt.resolvedUrl(root.restorePath)
+        id: stateFile
+        path: Qt.resolvedUrl(root.statePath)
         // Read synchronously: reconcile() runs once at startup and has to make a
         // decision, not schedule one.
         blockLoading: true
         preload: true
         atomicWrites: true
+        // Non-owners follow along by watching this rather than by guessing.
+        watchChanges: true
         // The file legitimately doesn't exist most of the time.
         printErrors: false
 
         property bool hasRecord: false
         property bool previousPerformanceMode: false
-        property bool loaded: false
+        property bool ready: false
 
         function parse(): void {
-            restoreFile.hasRecord = false;
             try {
-                const text = restoreFile.text();
+                const text = stateFile.text();
                 if (text.trim().length > 0) {
                     const data = JSON.parse(text);
-                    restoreFile.previousPerformanceMode = data.previousPerformanceMode === true;
-                    restoreFile.hasRecord = true;
+                    root.publishedActive = data.active === true;
+                    root.publishedGamemoded = data.gameRunning === true;
+                    // A non-owner must not adopt the owner's manual flag as its
+                    // own — `active` above is what it reads, and manualEnabled
+                    // staying false keeps requestManual() going over IPC.
+                    if (root.owns)
+                        root.manualEnabled = data.manualEnabled === true;
+                    stateFile.hasRecord = data.restore !== undefined && data.restore !== null;
+                    stateFile.previousPerformanceMode = stateFile.hasRecord && data.restore.previousPerformanceMode === true;
+                } else {
+                    root.publishedActive = false;
+                    root.publishedGamemoded = false;
+                    stateFile.hasRecord = false;
                 }
             } catch (e) {
-                console.warn("[GameMode] Unreadable restore state; ignoring it.");
+                console.warn("[GameMode] Unreadable state file; ignoring it.");
+                stateFile.hasRecord = false;
             }
-            restoreFile.loaded = true;
+            stateFile.ready = true;
             root.reconcile();
         }
 
-        function record(previous: bool): void {
-            restoreFile.previousPerformanceMode = previous;
-            restoreFile.hasRecord = true;
-            restoreFile.setText(JSON.stringify({
-                previousPerformanceMode: previous
-            }));
+        // Only the owner writes. Publishing `active` is what lets the settings
+        // app show the right thing without running a second copy of all this.
+        function publish(): void {
+            if (!root.owns)
+                return;
+            const data = {
+                active: root.active,
+                manualEnabled: root.manualEnabled,
+                gameRunning: root.gamemodedActive
+            };
+            if (stateFile.hasRecord)
+                data.restore = {
+                    previousPerformanceMode: stateFile.previousPerformanceMode
+                };
+            stateFile.setText(JSON.stringify(data));
         }
 
-        function clear(): void {
-            restoreFile.hasRecord = false;
-            // Emptied rather than deleted: an empty file parses as "no record"
-            // just the same, and FileView has no delete.
-            restoreFile.setText("");
-        }
-
-        onLoaded: restoreFile.parse()
+        onLoaded: stateFile.parse()
+        onFileChanged: stateFile.reload()
         onLoadFailed: {
             // No file is the normal case — nothing was interrupted.
-            restoreFile.loaded = true;
+            root.publishedActive = false;
+            stateFile.hasRecord = false;
+            stateFile.ready = true;
             root.reconcile();
+        }
+    }
+
+    IpcHandler {
+        target: "gamemode"
+
+        function on(): string {
+            root.manualEnabled = true;
+            return "ok";
+        }
+
+        function off(): string {
+            root.manualEnabled = false;
+            return "ok";
+        }
+
+        function toggle(): string {
+            root.manualEnabled = !root.manualEnabled;
+            return root.manualEnabled ? "on" : "off";
+        }
+
+        function status(): string {
+            return root.active ? "on" : "off";
         }
     }
 }
