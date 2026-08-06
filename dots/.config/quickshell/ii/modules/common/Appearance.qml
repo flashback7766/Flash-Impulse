@@ -198,7 +198,8 @@ Singleton {
         property color colOnErrorContainer: m3colors.m3onErrorContainer
     }
 
-    // One UI-flavoured rounding: generously rounded, pill-leaning. (Flash-Impulse)
+    // The Material 3 Expressive shape scale: generously rounded, pill-leaning.
+    // (Flash-Impulse)
     rounding: QtObject {
         property int unsharpen: 2
         property int unsharpenmore: 6

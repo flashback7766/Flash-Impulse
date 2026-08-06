@@ -5,6 +5,14 @@ import QtQuick.Layouts
 
 RowLayout {
     id: root
+
+    // StyledToolTip looks for `hovered` on its parent; a bare RowLayout has no
+    // such property, so the tooltip's visible-condition sees `undefined`,
+    // treats that as "no hover tracking needed" and shows permanently.
+    property alias hovered: rootHoverHandler.hovered
+    HoverHandler {
+        id: rootHoverHandler
+    }
     property string text: ""
     property string icon
     property alias value: spinBoxWidget.value

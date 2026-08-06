@@ -9,12 +9,16 @@ RippleButton {
     property string materialIcon
     property bool materialIconFill: true
     property string mainText: "Button text"
+    // A filled button needs its label and glyph on the "on-" role of whatever
+    // container it sits on; the secondary-container default is only right for
+    // the tonal variant.
+    property color contentColor: Appearance.colors.colOnSecondaryContainer
     property Component mainContentComponent: Component {
         StyledText {
             visible: text !== ""
             text: buttonWithIconRoot.mainText
             font.pixelSize: Appearance.font.pixelSize.small
-            color: Appearance.colors.colOnSecondaryContainer
+            color: buttonWithIconRoot.contentColor
         }
     }
     implicitHeight: 35
@@ -33,7 +37,7 @@ RippleButton {
                 sourceComponent: MaterialSymbol {
                     text: buttonWithIconRoot.materialIcon
                     iconSize: Appearance.font.pixelSize.larger
-                    color: Appearance.colors.colOnSecondaryContainer
+                    color: buttonWithIconRoot.contentColor
                     fill: buttonWithIconRoot.materialIconFill ? 1 : 0
                 }
             }
@@ -45,7 +49,7 @@ RippleButton {
                     text: buttonWithIconRoot.nerdIcon
                     font.pixelSize: Appearance.font.pixelSize.larger
                     font.family: Appearance.font.family.iconNerd
-                    color: Appearance.colors.colOnSecondaryContainer
+                    color: buttonWithIconRoot.contentColor
                 }
             }
         }

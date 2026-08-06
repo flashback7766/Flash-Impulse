@@ -69,7 +69,8 @@ hl.config({
         workspace_swipe_create_new = true
     },
     general = {
-        -- Gaps and border (One UI breathes: slightly roomier than upstream)
+        -- Gaps and border (slightly roomier than upstream — M3 Expressive
+        -- spacing leaves more air than the default)
         gaps_in = 6,
         gaps_out = 10,
         gaps_workspaces = 50,
@@ -93,7 +94,7 @@ hl.config({
     },
     decoration = {
         -- 2 = circle, higher = squircle, 4 = very obvious squircle
-        -- One UI corners: big radius, gentle squircle (matches Appearance.windowRounding)
+        -- Big radius, gentle squircle (matches Appearance.windowRounding)
         rounding_power = 3.0,
         rounding = 26,
 

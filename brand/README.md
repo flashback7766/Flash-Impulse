@@ -2,17 +2,18 @@
 
 Original artwork, GPL-3.0 like the rest of the repo.
 
-> The look is *inspired by* the Samsung One UI 8.5 update-screen aesthetic (overlapping
-> matte spheres, orange↔blue gradient hotspots on a soft sage/cream field). It is **not**
-> a copy of any Samsung asset — these SVGs are drawn from scratch so they can ship under
-> the repo's license. Do not commit Samsung (or other third-party) wallpapers here.
+> The look — overlapping matte spheres, orange↔blue gradient hotspots on a soft
+> sage/cream field — was worked out against a Samsung update-screen wallpaper as a
+> reference. It is **not** a copy of any Samsung asset: these SVGs are drawn from
+> scratch so they can ship under the repo's license. Do not commit Samsung (or other
+> third-party) wallpapers here.
 
 ## Files
 
 | File | Purpose |
 |------|---------|
 | `wallpaper.svg` | Source for the default desktop wallpaper |
-| `logo.svg` | Source for the app/shell logo (One UI squircle badge) |
+| `logo.svg` | Source for the app/shell logo (squircle badge) |
 
 Rendered outputs (regenerate with the commands below):
 
@@ -43,8 +44,8 @@ The palette for the dark variant lives at the top of that script, next to the li
 ## Palette
 
 Sampled from the rendered wallpaper; use these as the seed for the Material 3
-Expressive × One UI theme (ROADMAP §7). One UI leans on **soft pastel accents over a
-warm-neutral base**, so the saturated orange is the "expressive" pop, used sparingly.
+Expressive theme (ROADMAP §7). The target is **soft pastel accents over a warm-neutral
+base**, so the saturated orange is the "expressive" pop, used sparingly.
 
 | Role | Hex | Notes |
 |------|-----|-------|
@@ -54,7 +55,7 @@ warm-neutral base**, so the saturated orange is the "expressive" pop, used spari
 | Warm surface | `#e6d2b4` | The lower-right diagonal band |
 | On-surface (light) | `#3a3d34` | Warm-neutral text |
 
-For **dark mode** (the One UI target — pastel accents on a dark, sage-tinted base):
+For **dark mode** (pastel accents on a dark, sage-tinted base):
 
 | Role | Hex |
 |------|-----|

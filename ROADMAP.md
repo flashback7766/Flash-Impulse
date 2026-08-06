@@ -2,8 +2,8 @@
 
 Fork of [end-4/dots-hyprland](https://github.com/end-4/dots-hyprland) (Illogical Impulse),
 merged with [flashback7766/better-ii-ai](https://github.com/flashback7766/better-ii-ai),
-redesigned around a One UI 8.5/9-inspired visual language, with a rewritten installer and a
-Claude Code-backed AI sidebar.
+redesigned around Material 3 Expressive, with a rewritten installer and a Claude
+Code-backed AI sidebar.
 
 Status: **planning complete, implementation not started.** This document is the source of
 truth from the requirements session on 2026-07-24. Next step for whoever picks this up:
@@ -22,7 +22,7 @@ already.
   for flash-impulse. No upstream-tracking remote — this fork is independent, no auto-sync
   with end-4 planned.
 - **Branding:** logo + "Flash-Impulse" name shown in UI and an About panel. Default
-  wallpapers: source/curate existing abstract One-UI-style wallpapers and bundle them in
+  wallpapers: source/curate existing abstract wallpapers and bundle them in
   the repo (no runtime AI generation of wallpapers).
 
 ## 1. Base merge (dots-hyprland + better-ii-ai)
@@ -119,27 +119,27 @@ Three-tier hybrid, all three tiers active simultaneously:
 - All shell invocations, judge verdicts, and outcomes get **logged to a file** (under
   `~/.local/share/flash-impulse/logs/`) for audit/debugging.
 
-## 4. Visual redesign — Material 3 Expressive × One UI 8.5/9
+## 4. Visual redesign — Material 3 Expressive
 
-The shell is already Material-based (Material You dynamic palette, MD3-style Quickshell
-components), so **Material 3 Expressive is the foundation** and **One UI 8.5/9 is the
-flavor layered on top**. Division of responsibility:
+**Material 3 Expressive is the design language, full stop.** The shell was already
+Material-based (Material You dynamic palette, MD3-style Quickshell components), so this
+is a matter of following the spec rather than layering a second one on top of it. An
+earlier version of this section named Samsung's One UI as a "flavor layer" for geometry
+and color; that only ever produced arguments about which language won a given decision.
+The spec answers the question on its own.
 
-- **Foundation — M3 Expressive**: component behavior and motion. Springy physics-based
-  animations, emphasized easing, shape morphing on press, bolder type scale. When
-  touching any component, the M3 Expressive spec is the default answer for how it moves
-  and behaves.
-- **Flavor — One UI**: geometry and palette. Large rounded corners, pill shapes,
-  generous padding/spacing (bar, popups, buttons), Samsung-style soft pastel accents on
-  a dark base.
-- **Conflict rule**: where the two disagree (e.g. M3E's loud saturated colors vs One
-  UI's restrained pastels), One UI wins on color, M3 Expressive wins on motion and
-  component behavior. This keeps the result coherent instead of a mix of two half
-  design languages.
+- **Motion**: springy physics-based animations, emphasized easing, shape morphing on
+  press. Upstream already ships the M3 Expressive spring curves (`expressive*Spatial`).
+- **Shape**: the M3 Expressive shape scale, which is generously rounded and pill-leaning
+  in its own right — the values here did not need to change when the One UI framing went
+  away.
+- **Color**: a Material You palette derived from the wallpaper, seeded from the brand
+  orange. Restrained rather than loud, because the accent has to survive being on screen
+  all day.
 
 All areas matter equally, no single priority:
-- **Wallpapers**: curate/bundle existing abstract One-UI-style wallpapers as defaults, no
-  runtime generation pipeline needed.
+- **Wallpapers**: curate/bundle existing abstract wallpapers as defaults, no runtime
+  generation pipeline needed.
 
 ## 5. Configuration & state
 
@@ -181,18 +181,18 @@ All areas matter equally, no single priority:
 5. ✅ Whitelist/blacklist/Gemini-judge pipeline + audit log + /yolo. Done 2026-07-24.
 6. ✅ Model rosters updated to July 2026 IDs (Gemini 3.5/3.6, Claude Sonnet 5 /
    Opus 4.8 / Fable 5, GPT-5.6); Gemini 3.5 Flash-Lite default.
-7. ✅ Material 3 Expressive × One UI visual pass (2026-07-24):
+7. ✅ Material 3 Expressive visual pass (2026-07-24):
    - Shapes: rounding scale bumped throughout (Appearance.rounding, window
      rounding 18→26, gentle squircle power 3.0), roomier gaps (6/10).
    - Color: matugen seeded from brand orange #ff7a1a with scheme-content →
-     pastel-orange primary on warm dark neutrals (One UI pastel-accent look).
+     pastel-orange primary on warm dark neutrals.
      Note for posterity: `auto` washes out on our pastel wallpaper and
      scheme-expressive hue-rotates to pink — content + explicit accent is
      the combo that works.
    - Motion: upstream already ships the M3 Expressive spring curves
-     (expressive*Spatial); per the §4 conflict rule nothing to change.
+     (expressive*Spatial), so nothing to change.
    Deployed live and verified (hyprctl options, qs restart clean, screenshot).
-8. ✅ Wallpaper + logo/branding (2026-07-24): original One-UI-8.5-style SVG art
+8. ✅ Wallpaper + logo/branding (2026-07-24): original abstract SVG art
    (brand/wallpaper.svg → default_wallpaper.png, brand/logo.svg → flash-impulse
    icon), About panel rebranded to Flash-Impulse. Note: the reference was a
    Samsung update-screen wallpaper — NOT redistributed; the shipped art is drawn
@@ -205,6 +205,18 @@ All areas matter equally, no single priority:
     removed, exp-update replaced by a thin `update`, and end-4 branding stripped from
     engine output. ~2600 net lines removed; full `--dry-run` walk verified.
 
+11. ✅ Settings & first-run rewritten (2026-08-06): the eight-page settings app
+    became 37 topic pages behind a Material 3 navigation drawer with search, and
+    the welcome scroll became a seven-step wizard. Every one of the 273 config
+    options is now editable in the app — including the ones that previously had
+    no UI at all (default apps, night light, scroll tuning, update thresholds,
+    tray/keyword/pinned lists, MCP servers, extra models), which is what let the
+    "check config.json for the rest" notice go away. Text fields were redrawn
+    compact and fully rounded; the Qt Material container is a 56px phone control
+    and looked it. Along the way: `notifications.forceMonitor.*` in the old
+    Interface page pointed at a config path that does not exist, so the
+    force-monitor switch had never done anything.
+
 **All build-order items complete.** Future niceties (not blockers): GUI
 permission-prompt MCP bridge for Claude Code, real button UI for AskUserQuestion
-blocks, deeper One UI component polish.
+blocks, deeper M3 Expressive component polish.

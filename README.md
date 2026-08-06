@@ -4,7 +4,7 @@
 
 **A Hyprland desktop built on Quickshell — with an AI sidebar that can actually do things.**
 
-Material 3 Expressive × One UI, a shell that reads your hardware straight from sysfs,
+Material 3 Expressive throughout, a shell that reads your hardware straight from sysfs,
 and a chat panel that runs shell commands behind a three-tier safety review.
 
 <img src="docs/screenshots/desktop-dark.jpg" width="100%" alt="Flash-Impulse desktop, dark theme">
@@ -14,8 +14,7 @@ and a chat panel that runs shell commands behind a three-tier safety review.
 A fork of [end-4/dots-hyprland](https://github.com/end-4/dots-hyprland) (illogical-impulse)
 merged with [better-ii-ai](https://github.com/flashback7766/better-ii-ai).
 
-> **Status:** working desktop, AI stack integrated. The One UI visual pass is ongoing —
-> see [ROADMAP.md](ROADMAP.md).
+> **Status:** working desktop, AI stack integrated. See [ROADMAP.md](ROADMAP.md).
 
 ---
 
@@ -59,6 +58,20 @@ messages via `--resume`.
 Current roster (July 2026): Gemini 3.5 Flash-Lite (default, free tier), Gemini 3.6 Flash,
 Claude Sonnet 5 / Opus 4.8 / Fable 5, GPT-5.6 Luna/Terra/Sol.
 
+## Settings
+
+Every option the shell has, in one place — thirty-odd pages of one topic each, grouped
+into Appearance / Shell / System / Services, with a search field that flattens the whole
+tree into a single result list. Nothing is left for the config file: the pages that used
+to say "check config.json for the rest" no longer have a rest to point at.
+
+<div align="center">
+<img src="docs/screenshots/settings-dark.png" width="100%" alt="Settings, showing the navigation drawer and the Home page">
+</div>
+
+First run opens a wizard instead — language, look, layout, performance, privacy, one
+screen at a time, with the step count in the corner.
+
 ## The rest of the shell
 
 Nothing here just cuts in or out — every open, close and state change is a real animation,
@@ -77,8 +90,9 @@ over a live workspace grid.</sub></td>
 <td width="50%"><img src="docs/screenshots/gifs/session.gif" alt="Session menu opening and closing"><br>
 <sub><b>Session menu</b> — the blur expands from the middle instead of the screen just
 cutting to it, and the buttons cascade in behind it.</sub></td>
-<td width="50%"><img src="docs/screenshots/settings-dark.png" alt="Settings"><br>
-<sub><b>Settings</b> — the options worth clicking, with the full config a button away.</sub></td>
+<td width="50%"><img src="docs/screenshots/welcome.png" alt="First-run wizard"><br>
+<sub><b>First run</b> — a wizard, one decision per screen, with the step count in the
+corner instead of one long scroll.</sub></td>
 </tr>
 </table>
 

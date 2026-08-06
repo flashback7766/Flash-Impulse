@@ -1,9 +1,13 @@
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Layouts
+import Qt5Compat.GraphicalEffects
 import Quickshell
+import Quickshell.Io
 import Quickshell.Widgets
 import qs.services
 import qs.modules.common
+import qs.modules.common.functions
 import qs.modules.common.widgets
 
 ContentPage {
@@ -78,6 +82,7 @@ ContentPage {
         }
 
     }
+
     ContentSection {
         icon: "folder_managed"
         title: Translation.tr("Dotfiles")

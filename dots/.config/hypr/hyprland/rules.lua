@@ -40,8 +40,20 @@ hl.window_rule({match = {class = "^(nm-connection-editor)$" },               cen
 hl.window_rule({match = {class = ".*plasmawindowed.*" },                     float = true})
 hl.window_rule({match = {class = "kcm_.*" },                                  float = true})
 hl.window_rule({match = {class = ".*bluedevilwizard" },                      float = true})
+-- The shell's own apps. Matched on title, so these have to track the titles the
+-- QML sets — they are "Flash-Impulse Settings" and "Flash-Impulse — first run"
+-- now, and an unmatched rule means the window silently tiles instead.
+-- Pinned as well as floated: both are things you open to change what is on the
+-- screen behind them, which is no use if they end up behind it.
 hl.window_rule({match = {title = ".*Welcome" },                              float = true})
-hl.window_rule({match = {title = "^(illogical-impulse Settings)$" },         float = true})
+hl.window_rule({match = {title = "^(Flash-Impulse — first run)$" },          float = true})
+hl.window_rule({match = {title = "^(Flash-Impulse — first run)$" },          pin = true})
+hl.window_rule({match = {title = "^(Flash-Impulse — first run)$" },          size = {"(monitor_w*0.55)", "(monitor_h*0.68)"} })
+hl.window_rule({match = {title = "^(Flash-Impulse — first run)$" },          center = true})
+hl.window_rule({match = {title = "^(Flash-Impulse Settings)$" },             float = true})
+hl.window_rule({match = {title = "^(Flash-Impulse Settings)$" },             pin = true})
+hl.window_rule({match = {title = "^(Flash-Impulse Settings)$" },             size = {"(monitor_w*0.62)", "(monitor_h*0.74)"} })
+hl.window_rule({match = {title = "^(Flash-Impulse Settings)$" },             center = true})
 hl.window_rule({match = {title = ".*Shell conflicts.*" },                    float = true})
 hl.window_rule({match = {class = "org.freedesktop.impl.portal.desktop.kde" }, float = true})
 hl.window_rule({match = {class = "org.freedesktop.impl.portal.desktop.kde" }, size = {"(monitor_w*0.60)", "(monitor_h*0.65)"} })

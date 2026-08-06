@@ -17,48 +17,110 @@ import qs.modules.common
 import qs.modules.common.widgets
 import qs.modules.common.functions
 
+/**
+ * First run.
+ *
+ * A linear wizard rather than the one long scroll this used to be. The old
+ * version put language, bar layout, theme, policies and a pile of links on a
+ * single page, which asks a first-time user to decide everything at once and
+ * gives no signal about how much is left. One decision per screen, with the
+ * step count visible, is the whole difference.
+ */
 ApplicationWindow {
     id: root
     property string firstRunFilePath: FileUtils.trimFileProtocol(`${Directories.state}/user/first_run.txt`)
     property string firstRunFileContent: "This file is just here to confirm you've been greeted :>"
     property real contentPadding: 8
     property bool showNextTime: false
+
+    readonly property var steps: [
+        {
+            name: Translation.tr("Welcome"),
+            icon: "waving_hand",
+            component: "modules/welcome/StepWelcome.qml"
+        },
+        {
+            name: Translation.tr("Language"),
+            icon: "language",
+            component: "modules/welcome/StepLanguage.qml"
+        },
+        {
+            name: Translation.tr("Look"),
+            icon: "format_paint",
+            component: "modules/welcome/StepLook.qml"
+        },
+        {
+            name: Translation.tr("Layout"),
+            icon: "dashboard",
+            component: "modules/welcome/StepLayout.qml"
+        },
+        {
+            name: Translation.tr("Performance"),
+            icon: "speed",
+            component: "modules/welcome/StepPerformance.qml"
+        },
+        {
+            name: Translation.tr("Privacy"),
+            icon: "shield_person",
+            component: "modules/welcome/StepPrivacy.qml"
+        },
+        {
+            name: Translation.tr("All set"),
+            icon: "check_circle",
+            component: "modules/welcome/StepDone.qml"
+        }
+    ]
+
+    property int currentStep: 0
+    readonly property bool onFirstStep: root.currentStep === 0
+    readonly property bool onLastStep: root.currentStep === root.steps.length - 1
+
+    function goTo(index: int): void {
+        const clamped = Math.max(0, Math.min(root.steps.length - 1, index));
+        if (clamped === root.currentStep)
+            return;
+        root.currentStep = clamped;
+    }
+
     visible: true
     onClosing: {
-        Quickshell.execDetached(["notify-send", Translation.tr("Welcome app"), Translation.tr("Enjoy! You can reopen the welcome app any time with <tt>Super+Shift+Alt+/</tt>. To open the settings app, hit <tt>Super+I</tt>"), "-a", "Shell"]);
+        Quickshell.execDetached(["notify-send", Translation.tr("Welcome"), Translation.tr("You can reopen this any time with <tt>Super+Shift+Alt+/</tt>. Settings live under <tt>Super+I</tt>."), "-a", "Shell"]);
         Qt.quit();
     }
-    title: Translation.tr("illogical-impulse Welcome")
+    title: Translation.tr("Flash-Impulse — first run")
 
     Component.onCompleted: {
         MaterialThemeLoader.reapplyTheme();
-        Config.readWriteDelay = 0 // Welcome app always only sets one var at a time so delay isn't needed
+        Config.readWriteDelay = 0; // Welcome app always only sets one var at a time so delay isn't needed
     }
 
-    minimumWidth: 600
-    minimumHeight: 400
-    width: 900
-    height: 650
+    minimumWidth: 700
+    minimumHeight: 560
+    width: 940
+    height: 720
     color: Appearance.m3colors.m3background
 
-
-    Process {
-        id: translationProc
-        property string locale: ""
-        command: [Directories.aiTranslationScriptPath, translationProc.locale]
+    Shortcut {
+        sequences: ["Alt+Right"]
+        onActivated: root.goTo(root.currentStep + 1)
+    }
+    Shortcut {
+        sequences: ["Alt+Left"]
+        onActivated: root.goTo(root.currentStep - 1)
     }
 
     ColumnLayout {
         anchors {
             fill: parent
-            margins: contentPadding
+            margins: root.contentPadding
         }
+        spacing: root.contentPadding
 
-        Item {
-            // Titlebar
+        Item { // Titlebar
             visible: Config.options?.windows.showTitlebar
             Layout.fillWidth: true
             implicitHeight: Math.max(welcomeText.implicitHeight, windowControlsRow.implicitHeight)
+
             StyledText {
                 id: welcomeText
                 anchors {
@@ -68,7 +130,7 @@ ApplicationWindow {
                     leftMargin: 12
                 }
                 color: Appearance.colors.colOnLayer0
-                text: Translation.tr("Hi there! First things first...")
+                text: Translation.tr("Setting up")
                 font {
                     family: Appearance.font.family.title
                     pixelSize: Appearance.font.pixelSize.title
@@ -79,8 +141,10 @@ ApplicationWindow {
                 id: windowControlsRow
                 anchors.verticalCenter: parent.verticalCenter
                 anchors.right: parent.right
+
                 StyledText {
                     font.pixelSize: Appearance.font.pixelSize.smaller
+                    color: Appearance.colors.colSubtext
                     text: Translation.tr("Show next time")
                 }
                 StyledSwitch {
@@ -115,342 +179,158 @@ ApplicationWindow {
             }
         }
 
-        Rectangle {
-            // Content container
-            color: Appearance.m3colors.m3surfaceContainerLow
-            radius: Appearance.rounding.windowRounding - root.contentPadding
-            implicitHeight: contentColumn.implicitHeight
-            implicitWidth: contentColumn.implicitWidth
+        Rectangle { // Content container
             Layout.fillWidth: true
             Layout.fillHeight: true
+            color: Appearance.m3colors.m3surfaceContainerLow
+            radius: Appearance.rounding.windowRounding - root.contentPadding
+            clip: true
 
-            ContentPage {
-                id: contentColumn
+            ColumnLayout {
                 anchors.fill: parent
+                spacing: 0
 
-                ContentSection {
+                ColumnLayout { // Step header
                     Layout.fillWidth: true
-                    icon: "language"
-                    title: Translation.tr("Language")
-
-                    ContentSubsection {
-                        title: Translation.tr("Select language")
-                        ConfigSelectionArray {
-                            id: languageSelector
-                            currentValue: Config.options.language.ui
-                            onSelected: newValue => {
-                                Config.options.language.ui = newValue;
-                            }
-                            options: [
-                                {
-                                    displayName: Translation.tr("Auto (System)"),
-                                    value: "auto"
-                                },
-                                ...Translation.allAvailableLanguages.map(lang => {
-                                    return {
-                                        displayName: lang,
-                                        value: lang
-                                    };
-                                })]
-                        }
-                    }
-
-                    NoticeBox {
-                        Layout.fillWidth: true
-                        text: Translation.tr("Language not listed or incomplete translations?\nYou can choose to generate translations for it with Gemini.\n1. Open the left sidebar with Super+A, set model to Gemini (if it isn't already)\n2. Type /key, hit Enter and follow the instructions\n3. Type /key YOUR_API_KEY\n4. Type the locale of your language below and press Generate")
-                    }
-
-                    ContentSubsection {
-                        title: Translation.tr("Generate translation with Gemini")
-                        
-                        ConfigRow {
-                            MaterialTextArea {
-                                id: localeInput
-                                Layout.fillWidth: true
-                                placeholderText: Translation.tr("Locale code, e.g. fr_FR, de_DE, zh_CN...")
-                                text: Config.options.language.ui === "auto" ? Qt.locale().name : Config.options.language.ui
-                            }
-                            RippleButtonWithIcon {
-                                id: generateTranslationBtn
-                                Layout.fillHeight: true
-                                nerdIcon: ""
-                                enabled: !translationProc.running || (translationProc.locale !== localeInput.text.trim())
-                                mainText: enabled ? Translation.tr("Generate\nTypically takes 2 minutes") : Translation.tr("Generating...\nDon't close this window!")
-                                onClicked: {
-                                    translationProc.locale = localeInput.text.trim();
-                                    translationProc.running = false;
-                                    translationProc.running = true;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                ContentSection {
-                    icon: "screenshot_monitor"
-                    title: Translation.tr("Bar")
-
-                    ConfigRow {
-                        ContentSubsection {
-                            title: Translation.tr("Bar position")
-                            ConfigSelectionArray {
-                                currentValue: (Config.options.bar.bottom ? 1 : 0) | (Config.options.bar.vertical ? 2 : 0)
-                                onSelected: newValue => {
-                                    Config.options.bar.bottom = (newValue & 1) !== 0;
-                                    Config.options.bar.vertical = (newValue & 2) !== 0;
-                                }
-                                options: [
-                                    {
-                                        displayName: Translation.tr("Top"),
-                                        icon: "arrow_upward",
-                                        value: 0 // bottom: false, vertical: false
-                                    },
-                                    {
-                                        displayName: Translation.tr("Left"),
-                                        icon: "arrow_back",
-                                        value: 2 // bottom: false, vertical: true
-                                    },
-                                    {
-                                        displayName: Translation.tr("Bottom"),
-                                        icon: "arrow_downward",
-                                        value: 1 // bottom: true, vertical: false
-                                    },
-                                    {
-                                        displayName: Translation.tr("Right"),
-                                        icon: "arrow_forward",
-                                        value: 3 // bottom: true, vertical: true
-                                    }
-                                ]
-                            }
-                        }
-                        ContentSubsection {
-                            title: Translation.tr("Bar style")
-
-                            ConfigSelectionArray {
-                                currentValue: Config.options.bar.cornerStyle
-                                onSelected: newValue => {
-                                    Config.options.bar.cornerStyle = newValue; // Update local copy
-                                }
-                                options: [
-                                    {
-                                        displayName: Translation.tr("Hug"),
-                                        icon: "line_curve",
-                                        value: 0
-                                    },
-                                    {
-                                        displayName: Translation.tr("Float"),
-                                        icon: "page_header",
-                                        value: 1
-                                    },
-                                    {
-                                        displayName: Translation.tr("Rect"),
-                                        icon: "toolbar",
-                                        value: 2
-                                    }
-                                ]
-                            }
-                        }
-                    }
-                }
-
-                ContentSection {
-                    icon: "format_paint"
-                    title: Translation.tr("Style & wallpaper")
-
-                    ButtonGroup {
-                        Layout.alignment: Qt.AlignHCenter
-                        LightDarkPreferenceButton {
-                            dark: false
-                        }
-                        LightDarkPreferenceButton {
-                            dark: true
-                        }
-                    }
+                    Layout.leftMargin: 28
+                    Layout.rightMargin: 28
+                    Layout.topMargin: 22
+                    spacing: 12
 
                     RowLayout {
-                        Layout.alignment: Qt.AlignHCenter
-                        RippleButtonWithIcon {
-                            materialIcon: "wallpaper"
-                            StyledToolTip {
-                                text: Translation.tr("Pick wallpaper image on your system")
+                        Layout.fillWidth: true
+                        spacing: 12
+
+                        MaterialSymbol {
+                            text: root.steps[root.currentStep].icon
+                            iconSize: 28
+                            fill: 1
+                            color: Appearance.colors.colPrimary
+                        }
+                        StyledText {
+                            Layout.fillWidth: true
+                            text: root.steps[root.currentStep].name
+                            color: Appearance.colors.colOnLayer1
+                            font {
+                                family: Appearance.font.family.title
+                                pixelSize: Appearance.font.pixelSize.title
+                                variableAxes: Appearance.font.variableAxes.title
                             }
-                            onClicked: {
-                                Quickshell.execDetached([`${Directories.wallpaperSwitchScriptPath}`]);
-                            }
-                            mainContentComponent: Component {
-                                RowLayout {
-                                    spacing: 10
-                                    StyledText {
-                                        font.pixelSize: Appearance.font.pixelSize.small
-                                        text: Translation.tr("Choose file")
-                                        color: Appearance.colors.colOnSecondaryContainer
-                                    }
-                                    RowLayout {
-                                        spacing: 3
-                                        KeyboardKey {
-                                            key: "Ctrl"
-                                        }
-                                        KeyboardKey {
-                                            key: "󰖳"
-                                        }
-                                        StyledText {
-                                            Layout.alignment: Qt.AlignVCenter
-                                            text: "+"
-                                        }
-                                        KeyboardKey {
-                                            key: "T"
-                                        }
-                                    }
-                                }
-                            }
+                        }
+                        StyledText {
+                            text: Translation.tr("Step %1 of %2").arg(root.currentStep + 1).arg(root.steps.length)
+                            font.pixelSize: Appearance.font.pixelSize.smaller
+                            color: Appearance.colors.colSubtext
                         }
                     }
 
-                    NoticeBox {
+                    WizardStepIndicator {
                         Layout.fillWidth: true
-                        text: Translation.tr("Change any time later with /dark, /light, /wallpaper in the launcher\nIf the shell's colors aren't changing:\n    1. Open the right sidebar with Super+N\n    2. Click \"Reload Hyprland & Quickshell\" in the top-right corner")
+                        count: root.steps.length
+                        currentIndex: root.currentStep
                     }
                 }
 
-                ContentSection {
-                    icon: "speed"
-                    title: Translation.tr("Performance")
-
-                    ConfigSwitch {
-                        buttonIcon: "speed"
-                        text: Translation.tr("Performance mode")
-                        enabled: !PerformanceMode.busy
-                        checked: PerformanceMode.enabled
-                        onCheckedChanged: PerformanceMode.setEnabled(checked)
-                    }
-
-                    NoticeBox {
-                        Layout.fillWidth: true
-                        text: Translation.tr("Keeps the same layout, shapes and colors, but uses cheaper blur, drops window shadows and shortens animations. Worth enabling on older integrated graphics.")
-                    }
-                }
-
-                ContentSection {
-                    icon: "rule"
-                    title: Translation.tr("Policies")
-
-                    ConfigRow {
-                        Layout.fillWidth: true
-
-
-                        ContentSubsection {
-                            title: "AI"
-
-                            ConfigSelectionArray {
-                                currentValue: Config.options.policies.ai
-                                onSelected: newValue => {
-                                    Config.options.policies.ai = newValue;
-                                }
-                                options: [
-                                    {
-                                        displayName: Translation.tr("No"),
-                                        icon: "close",
-                                        value: 0
-                                    },
-                                    {
-                                        displayName: Translation.tr("Yes"),
-                                        icon: "check",
-                                        value: 1
-                                    },
-                                    {
-                                        displayName: Translation.tr("Local only"),
-                                        icon: "sync_saved_locally",
-                                        value: 2
-                                    }
-                                ]
-                            }
-                        }
-                    }
-                }
-
-                ContentSection {
-                    icon: "info"
-                    title: Translation.tr("Info")
-
-                    Flow {
-                        Layout.fillWidth: true
-                        spacing: 5
-
-                        RippleButtonWithIcon {
-                            materialIcon: "keyboard_alt"
-                            onClicked: {
-                                Quickshell.execDetached(["qs", "-p", Quickshell.shellPath(""), "ipc", "call", "cheatsheet", "toggle"]);
-                            }
-                            mainContentComponent: Component {
-                                RowLayout {
-                                    spacing: 10
-                                    StyledText {
-                                        font.pixelSize: Appearance.font.pixelSize.small
-                                        text: Translation.tr("Keybinds")
-                                        color: Appearance.colors.colOnSecondaryContainer
-                                    }
-                                    RowLayout {
-                                        spacing: 3
-                                        KeyboardKey {
-                                            key: "󰖳"
-                                        }
-                                        StyledText {
-                                            Layout.alignment: Qt.AlignVCenter
-                                            text: "+"
-                                        }
-                                        KeyboardKey {
-                                            key: "/"
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        RippleButtonWithIcon {
-                            materialIcon: "help"
-                            mainText: Translation.tr("Usage")
-                            onClicked: {
-                                Qt.openUrlExternally("https://end-4.github.io/dots-hyprland-wiki/en/ii-qs/02usage/");
-                            }
-                        }
-                        RippleButtonWithIcon {
-                            materialIcon: "construction"
-                            mainText: Translation.tr("Configuration")
-                            onClicked: {
-                                Qt.openUrlExternally("https://end-4.github.io/dots-hyprland-wiki/en/ii-qs/03config/");
-                            }
-                        }
-                    }
-                }
-
-                ContentSection {
-                    icon: "monitoring"
-                    title: Translation.tr("Useless buttons")
-
-                    Flow {
-                        Layout.fillWidth: true
-                        spacing: 5
-
-                        RippleButtonWithIcon {
-                            nerdIcon: "󰊤"
-                            mainText: Translation.tr("GitHub")
-                            onClicked: {
-                                Qt.openUrlExternally("https://github.com/end-4/dots-hyprland");
-                            }
-                        }
-                        RippleButtonWithIcon {
-                            materialIcon: "favorite"
-                            mainText: "Funny number"
-                            onClicked: {
-                                Qt.openUrlExternally("https://github.com/sponsors/end-4");
-                            }
-                        }
-                    }
-                }
-
-                Item {
+                Loader {
+                    id: stepLoader
                     Layout.fillWidth: true
                     Layout.fillHeight: true
+                    Layout.topMargin: 4
+                    active: Config.ready
+
+                    Component.onCompleted: source = root.steps[0].component
+
+                    Connections {
+                        target: root
+                        function onCurrentStepChanged(): void {
+                            switchAnim.complete();
+                            switchAnim.start();
+                        }
+                    }
+
+                    SequentialAnimation {
+                        id: switchAnim
+
+                        NumberAnimation {
+                            target: stepLoader
+                            properties: "opacity"
+                            from: 1
+                            to: 0
+                            duration: 100
+                            easing.type: Appearance.animation.elementMoveExit.type
+                            easing.bezierCurve: Appearance.animationCurves.emphasizedFirstHalf
+                        }
+                        PropertyAction {
+                            target: stepLoader
+                            property: "source"
+                            value: root.steps[root.currentStep].component
+                        }
+                        NumberAnimation {
+                            target: stepLoader
+                            properties: "opacity"
+                            from: 0
+                            to: 1
+                            duration: 200
+                            easing.type: Appearance.animation.elementMoveEnter.type
+                            easing.bezierCurve: Appearance.animationCurves.emphasizedLastHalf
+                        }
+                    }
+                }
+
+                Rectangle { // Footer
+                    Layout.fillWidth: true
+                    implicitHeight: footerRow.implicitHeight + 28
+                    color: Appearance.colors.colSurfaceContainer
+
+                    RowLayout {
+                        id: footerRow
+                        anchors {
+                            left: parent.left
+                            right: parent.right
+                            verticalCenter: parent.verticalCenter
+                            leftMargin: 24
+                            rightMargin: 24
+                        }
+                        spacing: 10
+
+                        RippleButtonWithIcon {
+                            // Hidden rather than disabled on the first step: a
+                            // greyed-out Back is a control that looks broken.
+                            visible: !root.onFirstStep
+                            implicitHeight: 44
+                            buttonRadius: Appearance.rounding.full
+                            materialIcon: "arrow_back"
+                            mainText: Translation.tr("Back")
+                            onClicked: root.goTo(root.currentStep - 1)
+                        }
+                        Item {
+                            Layout.fillWidth: true
+                        }
+                        RippleButtonWithIcon {
+                            visible: !root.onLastStep
+                            implicitHeight: 44
+                            buttonRadius: Appearance.rounding.full
+                            materialIcon: "arrow_forward"
+                            mainText: Translation.tr("Next")
+                            colBackground: Appearance.colors.colPrimary
+                            colBackgroundHover: Appearance.colors.colPrimaryHover
+                            colRipple: Appearance.colors.colPrimaryActive
+                            contentColor: Appearance.colors.colOnPrimary
+                            onClicked: root.goTo(root.currentStep + 1)
+                        }
+                        RippleButtonWithIcon {
+                            visible: root.onLastStep
+                            implicitHeight: 44
+                            buttonRadius: Appearance.rounding.full
+                            materialIcon: "check"
+                            mainText: Translation.tr("Finish")
+                            colBackground: Appearance.colors.colPrimary
+                            colBackgroundHover: Appearance.colors.colPrimaryHover
+                            colRipple: Appearance.colors.colPrimaryActive
+                            contentColor: Appearance.colors.colOnPrimary
+                            onClicked: root.close()
+                        }
+                    }
                 }
             }
         }

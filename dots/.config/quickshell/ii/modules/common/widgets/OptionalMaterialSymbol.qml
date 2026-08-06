@@ -7,6 +7,10 @@ Loader {
     id: root
     required property string icon
     property real iconSize: Appearance.font.pixelSize.larger
+    // Used to read `root.toggled`, which a Loader does not have — so the
+    // conditional always took the same branch. Kept as the default, now
+    // overridable by the caller.
+    property color color: Appearance.colors.colOnSecondaryContainer
     Layout.alignment: Qt.AlignVCenter
 
     active: root.icon && root.icon.length > 0
@@ -20,7 +24,7 @@ Loader {
             anchors.centerIn: parent
 
             iconSize: root.iconSize
-            color: root.toggled ? Appearance.colors.colOnPrimary : Appearance.colors.colOnSecondaryContainer
+            color: root.color
             text: root.icon
         }
     }

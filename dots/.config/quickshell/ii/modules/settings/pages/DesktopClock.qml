@@ -1,83 +1,22 @@
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Layouts
+import Qt5Compat.GraphicalEffects
+import Quickshell
+import Quickshell.Io
+import Quickshell.Widgets
 import qs.services
 import qs.modules.common
+import qs.modules.common.functions
 import qs.modules.common.widgets
 
 ContentPage {
     forceWidth: true
 
     ContentSection {
-        icon: "wallpaper"
-        title: Translation.tr("Wallpaper")
-
-        ConfigSwitch {
-            buttonIcon: "brightness_6"
-            text: Translation.tr('Match wallpaper to light/dark theme')
-            checked: Config.options.background.themeWallpaper.enable
-            onCheckedChanged: {
-                Config.options.background.themeWallpaper.enable = checked;
-            }
-            StyledToolTip {
-                text: Translation.tr("Swaps between a light and a dark cut of the same wallpaper whenever the theme changes.\nOnly applies while one of the pair is set — pick a wallpaper of your own and the theme leaves it alone.")
-            }
-        }
-
-        ContentSubsectionLabel {
-            visible: Config.options.background.themeWallpaper.enable && !Wallpapers.themeWallpaperActive
-            text: Translation.tr("Currently on a wallpaper of your own, so the theme isn't changing it.")
-        }
-    }
-
-    ContentSection {
-        icon: "sync_alt"
-        title: Translation.tr("Parallax")
-
-        ConfigSwitch {
-            buttonIcon: "unfold_more_double"
-            text: Translation.tr("Vertical")
-            checked: Config.options.background.parallax.vertical
-            onCheckedChanged: {
-                Config.options.background.parallax.vertical = checked;
-            }
-        }
-
-        ConfigRow {
-            uniform: true
-            ConfigSwitch {
-                buttonIcon: "counter_1"
-                text: Translation.tr("Depends on workspace")
-                checked: Config.options.background.parallax.enableWorkspace
-                onCheckedChanged: {
-                    Config.options.background.parallax.enableWorkspace = checked;
-                }
-            }
-            ConfigSwitch {
-                buttonIcon: "side_navigation"
-                text: Translation.tr("Depends on sidebars")
-                checked: Config.options.background.parallax.enableSidebar
-                onCheckedChanged: {
-                    Config.options.background.parallax.enableSidebar = checked;
-                }
-            }
-        }
-        ConfigSpinBox {
-            icon: "loupe"
-            text: Translation.tr("Preferred wallpaper zoom (%)")
-            value: Config.options.background.parallax.workspaceZoom * 100
-            from: 10
-            to: 200
-            stepSize: 1
-            onValueChanged: {
-                Config.options.background.parallax.workspaceZoom = value / 100;
-            }
-        }
-    }
-
-    ContentSection {
         id: settingsClock
         icon: "clock_loader_40"
-        title: Translation.tr("Widget: Clock")
+        title: Translation.tr("Clock widget")
 
         function stylePresent(styleName) {
             if (!Config.options.background.widgets.clock.showOnlyWhenLocked && Config.options.background.widgets.clock.style === styleName) {
@@ -130,6 +69,41 @@ ContentPage {
                         value: "mostBusy"
                     },
                 ]
+            }
+        }
+
+        ContentSubsection {
+            title: Translation.tr("Position")
+            tooltip: Translation.tr("A fraction of the screen, 0 to 1. Normally set by dragging the widget; here for when you want the two screens to match exactly.")
+
+            ConfigRow {
+                uniform: true
+                ConfigSlider {
+                    enabled: Config.options.background.widgets.clock.placementStrategy === "free"
+                    buttonIcon: "swap_horiz"
+                    text: Translation.tr("Horizontal")
+                    textWidth: 90
+                    showValue: true
+                    from: 0
+                    to: 1
+                    value: Config.options.background.widgets.clock.x
+                    onValueChanged: {
+                        Config.options.background.widgets.clock.x = value;
+                    }
+                }
+                ConfigSlider {
+                    enabled: Config.options.background.widgets.clock.placementStrategy === "free"
+                    buttonIcon: "swap_vert"
+                    text: Translation.tr("Vertical")
+                    textWidth: 90
+                    showValue: true
+                    from: 0
+                    to: 1
+                    value: Config.options.background.widgets.clock.y
+                    onValueChanged: {
+                        Config.options.background.widgets.clock.y = value;
+                    }
+                }
             }
         }
 
@@ -338,6 +312,15 @@ ContentPage {
                 stepSize: 1
                 onValueChanged: {
                     Config.options.background.widgets.clock.cookie.sides = value;
+                }
+            }
+
+            ConfigSwitch {
+                buttonIcon: "calendar_today"
+                text: Translation.tr("Date inside the dial")
+                checked: Config.options.background.widgets.clock.cookie.dateInClock
+                onCheckedChanged: {
+                    Config.options.background.widgets.clock.cookie.dateInClock = checked;
                 }
             }
 
@@ -587,52 +570,6 @@ ContentPage {
                 onTextChanged: {
                     Config.options.background.widgets.clock.quote.text = text;
                 }
-            }
-        }
-    }
-
-    ContentSection {
-        icon: "weather_mix"
-        title: Translation.tr("Widget: Weather")
-
-        ConfigRow {
-            Layout.fillWidth: true
-
-            ConfigSwitch {
-                Layout.fillWidth: false
-                buttonIcon: "check"
-                text: Translation.tr("Enable")
-                checked: Config.options.background.widgets.weather.enable
-                onCheckedChanged: {
-                    Config.options.background.widgets.weather.enable = checked;
-                }
-            }
-            Item {
-                Layout.fillWidth: true
-            }
-            ConfigSelectionArray {
-                Layout.fillWidth: false
-                currentValue: Config.options.background.widgets.weather.placementStrategy
-                onSelected: newValue => {
-                    Config.options.background.widgets.weather.placementStrategy = newValue;
-                }
-                options: [
-                    {
-                        displayName: Translation.tr("Draggable"),
-                        icon: "drag_pan",
-                        value: "free"
-                    },
-                    {
-                        displayName: Translation.tr("Least busy"),
-                        icon: "category",
-                        value: "leastBusy"
-                    },
-                    {
-                        displayName: Translation.tr("Most busy"),
-                        icon: "shapes",
-                        value: "mostBusy"
-                    },
-                ]
             }
         }
     }
