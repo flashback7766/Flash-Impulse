@@ -15,7 +15,29 @@ Item { // Bar content region
     property var screen: root.QsWindow.window?.screen
     property var brightnessMonitor: Brightness.getMonitorForScreen(screen)
     property real useShortenedForm: (Appearance.sizes.barHellaShortenScreenWidthThreshold >= screen?.width) ? 2 : (Appearance.sizes.barShortenScreenWidthThreshold >= screen?.width) ? 1 : 0
-    readonly property int centerSideModuleWidth: (useShortenedForm == 2) ? Appearance.sizes.barCenterSideModuleWidthHellaShortened : (useShortenedForm == 1) ? Appearance.sizes.barCenterSideModuleWidthShortened : Appearance.sizes.barCenterSideModuleWidth
+
+    readonly property var modules: Config.options.bar.modules
+
+    // Both capsules flanking the workspaces get the same width, which is what
+    // puts the workspaces on the screen's centre line rather than merely in the
+    // middle of whatever is left over.
+    //
+    // Measured, not hardcoded. The old value was a pair of constants picked
+    // when the resource row had three chips; VRAM and GPU joined it later and
+    // nothing re-tuned them, so the media title spent its life elided down to a
+    // couple of characters. Everything in here has a natural width except the
+    // track title, which elides — so that one gets a reserved allowance and the
+    // rest are asked how wide they are.
+    readonly property real centerSideModuleWidth: {
+        if (root.useShortenedForm === 2)
+            return Appearance.sizes.barCenterSideModuleWidthHellaShortened;
+
+        const mediaShown = root.modules.media && root.useShortenedForm < 2;
+        const left = (resourcesWidget.visible ? resourcesWidget.implicitWidth : 0) + (mediaShown ? (root.modules.mediaTitle ? Config.options.bar.mediaTitleWidth : 46) : 0);
+        const right = rightCenterGroupContent.contentWidth;
+        const floor = root.useShortenedForm === 1 ? Math.min(Config.options.bar.centerModuleMinWidth, Appearance.sizes.barCenterSideModuleWidthShortened) : Config.options.bar.centerModuleMinWidth;
+        return Math.max(left, right, floor);
+    }
 
     component VerticalBarSeparator: Rectangle {
         Layout.topMargin: Appearance.sizes.baseBarHeight / 3
@@ -87,6 +109,7 @@ Item { // Bar content region
                 id: leftSidebarButton
                 Layout.alignment: Qt.AlignVCenter
                 Layout.leftMargin: Appearance.rounding.screenRounding
+                visible: root.modules.leftSidebarButton
                 colBackground: barLeftSideMouseArea.hovered ? Appearance.colors.colLayer1Hover : ColorUtils.transparentize(Appearance.colors.colLayer1Hover, 1)
 
                 StandaloneBackdrop {
@@ -101,7 +124,7 @@ Item { // Bar content region
                 Layout.rightMargin: Appearance.rounding.screenRounding
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                visible: root.useShortenedForm === 0
+                visible: root.modules.activeWindow && root.useShortenedForm === 0
             }
         }
     }
@@ -119,14 +142,17 @@ Item { // Bar content region
             id: leftCenterGroup
             anchors.verticalCenter: parent.verticalCenter
             implicitWidth: root.centerSideModuleWidth
+            visible: root.modules.resources || root.modules.media
 
             Resources {
+                id: resourcesWidget
+                visible: root.modules.resources
                 alwaysShowAllResources: root.useShortenedForm === 2
                 Layout.fillWidth: root.useShortenedForm === 2
             }
 
             Media {
-                visible: root.useShortenedForm < 2
+                visible: root.modules.media && root.useShortenedForm < 2
                 Layout.fillWidth: true
                 // Without this, a RowLayout child's minimum width defaults to
                 // its implicitWidth — here, the circle plus the *unelided*
@@ -146,6 +172,7 @@ Item { // Bar content region
         BarGroup {
             id: middleCenterGroup
             anchors.verticalCenter: parent.verticalCenter
+            visible: root.modules.workspaces
             // No padding override: Workspaces has never had a widgetPadding, so
             // this read was always undefined and the group has always been
             // drawing with BarGroup's default. Kept the behaviour, dropped the
@@ -187,18 +214,19 @@ Item { // Bar content region
                 anchors.fill: parent
 
                 ClockWidget {
-                    showDate: (Config.options.bar.verbose && root.useShortenedForm < 2)
+                    visible: root.modules.clock
+                    showDate: (root.modules.clockDate && root.useShortenedForm < 2)
                     Layout.alignment: Qt.AlignVCenter
                     Layout.fillWidth: true
                 }
 
                 UtilButtons {
-                    visible: (Config.options.bar.verbose && root.useShortenedForm === 0)
+                    visible: (root.modules.utilButtons && root.useShortenedForm === 0)
                     Layout.alignment: Qt.AlignVCenter
                 }
 
                 BatteryIndicator {
-                    visible: (root.useShortenedForm < 2 && Battery.available)
+                    visible: (root.modules.battery && root.useShortenedForm < 2 && Battery.available)
                     Layout.alignment: Qt.AlignVCenter
                 }
             }
@@ -246,6 +274,7 @@ Item { // Bar content region
             RippleButton { // Right sidebar button
                 id: rightSidebarButton
 
+                visible: root.modules.statusIcons
                 Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
                 Layout.rightMargin: Appearance.rounding.screenRounding
                 Layout.fillWidth: false
@@ -346,7 +375,7 @@ Item { // Bar content region
             // while you are looking at the bar.
             Revealer {
                 id: sysTrayRevealer
-                reveal: root.useShortenedForm === 0 && sysTray.hasItems
+                reveal: root.modules.tray && root.useShortenedForm === 0 && sysTray.hasItems
                 Layout.fillHeight: true
                 // Sized explicitly rather than from childrenRect: the tray keeps
                 // its own width throughout and is clipped, so the icons slide

@@ -7,7 +7,7 @@ import QtQuick.Layouts
 Item {
     id: root
     property bool borderless: Config.options.bar.borderless
-    property bool showDate: Config.options.bar.verbose
+    property bool showDate: Config.options.bar.modules.clockDate
     implicitWidth: rowLayout.implicitWidth
     implicitHeight: Appearance.sizes.barHeight
 

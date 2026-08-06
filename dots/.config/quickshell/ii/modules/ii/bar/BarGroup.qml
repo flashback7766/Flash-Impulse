@@ -9,7 +9,10 @@ Item {
     property real padding: 5
     // A capsule needs its content kept clear of the rounded caps
     readonly property real sidePadding: (standalone && !vertical) ? padding + 5 : padding
-    implicitWidth: vertical ? Appearance.sizes.baseVerticalBarWidth : (gridLayout.implicitWidth + sidePadding * 2)
+    // What the contents want, readable even when a caller overrides implicitWidth
+    // to line this group up with another one.
+    readonly property real contentWidth: gridLayout.implicitWidth + sidePadding * 2
+    implicitWidth: vertical ? Appearance.sizes.baseVerticalBarWidth : contentWidth
     implicitHeight: vertical ? (gridLayout.implicitHeight + padding * 2) : Appearance.sizes.baseBarHeight
     default property alias items: gridLayout.children
 

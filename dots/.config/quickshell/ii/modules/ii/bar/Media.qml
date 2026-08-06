@@ -73,7 +73,7 @@ Item {
         }
 
         StyledText {
-            visible: Config.options.bar.verbose
+            visible: Config.options.bar.modules.mediaTitle
             // Used to also carry an explicit `width:` referencing
             // `CircularProgress.size` — CircularProgress is the component, not
             // an instance, so that property never existed and the binding

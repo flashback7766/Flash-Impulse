@@ -230,19 +230,7 @@ ContentPage {
 
     ContentSection {
         icon: "tune"
-        title: Translation.tr("Contents & screens")
-
-        ConfigSwitch {
-            buttonIcon: "expand_content"
-            text: Translation.tr("Verbose")
-            checked: Config.options.bar.verbose
-            onCheckedChanged: {
-                Config.options.bar.verbose = checked;
-            }
-            StyledToolTip {
-                text: Translation.tr("Shows the full resource chips and the media title. Off gives a much narrower bar.")
-            }
-        }
+        title: Translation.tr("Identity & screens")
 
         ConfigTextField {
             buttonIcon: "star"

@@ -282,8 +282,36 @@ Singleton {
                 property bool borderless: false // true for no grouping of items
                 property string topLeftIcon: "spark" // Options: "distro" or any icon name in ~/.config/quickshell/ii/assets/icons
                 property bool showBackground: false // Transparent bar; each group carries its own capsule instead
-                property bool verbose: true
                 property bool vertical: false
+                // What is actually on the bar. This replaces the old `verbose`
+                // boolean, which was one switch quietly driving four unrelated
+                // things — the capsule width, the media title, the clock's date
+                // and whether the utility buttons existed at all — so there was
+                // no way to keep the date and drop the buttons, or any of the
+                // other eleven combinations.
+                property JsonObject modules: JsonObject {
+                    property bool leftSidebarButton: true
+                    property bool activeWindow: true
+                    property bool resources: true
+                    property bool media: true
+                    property bool mediaTitle: true
+                    property bool workspaces: true
+                    property bool clock: true
+                    property bool clockDate: true
+                    property bool utilButtons: true
+                    property bool battery: true
+                    property bool tray: true
+                    property bool statusIcons: true // Network, Bluetooth, layout, mute, notifications
+                }
+                // The two capsules flanking the workspaces are kept the same
+                // width so the workspaces land on the screen's centre line.
+                // That width is measured from what is in them; this is only the
+                // floor, for when the contents are narrower than looks right.
+                property int centerModuleMinWidth: 140
+                // Room reserved for the track title, which is the one thing in
+                // the bar with no natural width — it elides, so left to size
+                // itself it would either take the whole screen or nothing.
+                property int mediaTitleWidth: 190
                 property JsonObject resources: JsonObject {
                     property bool alwaysShowSwap: true
                     property bool alwaysShowCpu: true
