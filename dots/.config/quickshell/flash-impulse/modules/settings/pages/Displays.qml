@@ -35,6 +35,11 @@ ContentPage {
         property bool disabled
         property var availableModes: []
         property string mode
+        // Explicit, not inferred from "mode isn't in availableModes". Picking
+        // Custom… seeds the fields from the mode that is currently set, which is
+        // normally one the panel does advertise — so an inferred flag switched
+        // itself straight back off and the fields never appeared.
+        property bool customMode
         property int vrr
         property int bitdepth
         property string cm
@@ -90,6 +95,7 @@ ContentPage {
                 "disabled": ipc.disabled ?? false,
                 "availableModes": modes,
                 "mode": mode,
+                "customMode": modes.indexOf(mode) < 0,
                 "vrr": ipc.vrr ? 1 : 0,
                 "bitdepth": (ipc.currentFormat ?? "").includes("2101010") ? 10 : 8,
                 "cm": ipc.colorManagementPreset ?? "auto",
@@ -365,14 +371,18 @@ ContentPage {
                 currentIndex: {
                     if (!page.selected)
                         return -1;
+                    if (page.selected.customMode)
+                        return page.selected.availableModes.length;
                     const i = page.selected.availableModes.indexOf(page.selected.mode);
                     return i >= 0 ? i : page.selected.availableModes.length;
                 }
                 onActivated: idx => {
                     if (idx < page.selected.availableModes.length) {
+                        page.selected.customMode = false;
                         page.selected.mode = page.selected.availableModes[idx];
                         page.touchCounter++;
                     } else {
+                        page.selected.customMode = true;
                         customModeRow.seedFromCurrent();
                     }
                 }
@@ -385,7 +395,7 @@ ContentPage {
                 Layout.fillWidth: true
                 Layout.topMargin: 4
                 spacing: 8
-                visible: page.selected && page.selected.availableModes.indexOf(page.selected.mode) < 0
+                visible: page.selected && page.selected.customMode
                 enabled: page.selected && !page.selected.disabled
 
                 function seedFromCurrent() {
@@ -497,15 +507,53 @@ ContentPage {
                 }
             }
 
+            // A Windows display panel has centred/stretched/aspect here. That is
+            // the DRM connector's "scaling mode" property, and this panel does
+            // expose it (None/Full/Center/Full aspect) — but only the DRM master
+            // may set it, that is the compositor, and neither Hyprland nor
+            // aquamarine touches it. So there is nothing honest to put in this
+            // spot except where the working answer actually lives.
+            StyledText {
+                Layout.fillWidth: true
+                Layout.leftMargin: 8
+                Layout.topMargin: 4
+                wrapMode: Text.Wrap
+                font.pixelSize: Appearance.font.pixelSize.smallest
+                color: Appearance.colors.colSubtext
+                text: Translation.tr("Scaling here changes how large things are drawn, not how the panel presents them — Hyprland has no centred/stretched mode to set. For a stretched resolution in a single app (a 1080×1080 game filling a 16:10 screen, say), launch it through gamescope:")
+            }
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.leftMargin: 8
+                Layout.rightMargin: 8
+                Layout.topMargin: 4
+                radius: Appearance.rounding.small
+                color: Appearance.colors.colSurfaceContainerHighest
+                implicitHeight: gamescopeHint.implicitHeight + 16
+
+                StyledText {
+                    id: gamescopeHint
+                    anchors {
+                        left: parent.left
+                        right: parent.right
+                        verticalCenter: parent.verticalCenter
+                        leftMargin: 10
+                        rightMargin: 10
+                    }
+                    wrapMode: Text.Wrap
+                    font.family: Appearance.font.family.monospace
+                    font.pixelSize: Appearance.font.pixelSize.smallest
+                    color: Appearance.colors.colOnLayer1
+                    text: "gamescope -W 1920 -H 1200 -w 1080 -h 1080 -S stretch -- <app>"
+                }
+            }
             StyledText {
                 Layout.fillWidth: true
                 Layout.leftMargin: 8
                 wrapMode: Text.Wrap
                 font.pixelSize: Appearance.font.pixelSize.smallest
                 color: Appearance.colors.colSubtext
-                // Worth being explicit, because this is the one thing on the page
-                // that a Windows display panel has and Hyprland genuinely does not.
-                text: Translation.tr("Wayland scales by drawing at a different size, not by stretching the panel — so there is no \"centred\" or \"stretched\" mode to pick. A non-native resolution is always presented by the display itself.")
+                text: Translation.tr("-W/-H is the real screen, -w/-h what the app renders at. -S takes stretch, fit, fill or integer — the same set a monitor OSD calls stretched, aspect, full and 1:1.")
             }
         }
 
