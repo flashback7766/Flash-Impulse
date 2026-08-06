@@ -8,7 +8,9 @@ fi
 
 # Variables
 SOURCE_IMG_PATH="$1"
-MODEL="${2:-${GEMINI_WALLPAPER_MODEL:-gemini-2.5-flash}}" # We use the flash variant so it's fast
+# Same dead model as the translator had: gemini-2.5-flash 404s now. The lite
+# variant is the fast one in the current roster.
+MODEL="${2:-${GEMINI_WALLPAPER_MODEL:-gemini-3.5-flash-lite}}"
 WALLPAPER_NAME="$(basename "$SOURCE_IMG_PATH")"
 PROMPT="${3:-${GEMINI_WALLPAPER_PROMPT:-Categorize the wallpaper. Its file name is $WALLPAPER_NAME}}"
 RESIZED_IMG_PATH="/tmp/quickshell/ai/wallpaper.jpg"
@@ -18,7 +20,12 @@ mkdir -p "$(dirname "$RESIZED_IMG_PATH")"
 magick "$SOURCE_IMG_PATH" -resize 200x -quality 50 "$RESIZED_IMG_PATH"
 
 # Get API key
-API_KEY=$("$(dirname "${BASH_SOURCE[0]}")/../keyring/lookup.sh" | jq -r '.apiKeys.gemini')
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+API_KEY=$("${SCRIPT_DIR}/../keyring/lookup.sh" 2> /dev/null | jq -r '.apiKeys.gemini // empty')
+if [[ -z "$API_KEY" ]]; then
+    echo "No Gemini API key in the keyring." >&2
+    exit 1
+fi
 
 # Encode image to base64
 if [[ "$(base64 --version 2>&1)" = *"FreeBSD"* ]]; then
