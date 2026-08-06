@@ -4,28 +4,30 @@ import qs.services
 import Quickshell
 import Quickshell.Io
 
+/**
+ * Manual game mode.
+ *
+ * The button used to own the state and apply the hyprctl keywords itself,
+ * reading its own toggled state back by asking Hyprland whether animations
+ * happened to be enabled. That is why this had to become a service: Feral
+ * GameMode now changes the same settings underneath it, and "are animations
+ * off" cannot tell you *who* turned them off — so quitting a game would leave
+ * the button lit with nothing behind it, or dark while the settings were still
+ * stripped.
+ */
 QuickToggleButton {
     id: root
     buttonIcon: "gamepad"
-    toggled: toggled
+    toggled: GameMode.active
 
     onClicked: {
-        root.toggled = !root.toggled
-        if (root.toggled) {
-            Quickshell.execDetached(["bash", "-c", `hyprctl --batch "keyword animations:enabled 0; keyword decoration:shadow:enabled 0; keyword decoration:blur:enabled 0; keyword general:gaps_in 0; keyword general:gaps_out 0; keyword general:border_size 1; keyword decoration:rounding 0; keyword general:allow_tearing 1"`])
-        } else {
-            Quickshell.execDetached(["hyprctl", "reload"])
-        }
+        // Only the manual half is ours to flip. While a game is running the
+        // service stays active regardless, which is the honest answer — turning
+        // it off here would be undone the moment gamemoded next said anything.
+        GameMode.manualEnabled = !GameMode.manualEnabled;
     }
-    Process {
-        id: fetchActiveState
-        running: true
-        command: ["bash", "-c", `test "$(hyprctl getoption animations:enabled -j | jq ".int")" -ne 0`]
-        onExited: (exitCode, exitStatus) => {
-            root.toggled = exitCode !== 0 // Inverted because enabled = nonzero exit
-        }
-    }
+
     StyledToolTip {
-        text: Translation.tr("Game mode")
+        text: GameMode.gamemodedActive ? Translation.tr("Game mode\nOn automatically — a game is running") : Translation.tr("Game mode")
     }
 }

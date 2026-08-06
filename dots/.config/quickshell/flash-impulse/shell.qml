@@ -38,6 +38,10 @@ ShellRoot {
         // A bare property read would do it, but reads that exist for their side
         // effects are exactly the kind of line someone deletes as dead code.
         DisplayManager.ensureLoaded()
+        // Same reason, plus one of its own: this singleton reconciles a
+        // leftover game-mode state at startup, which has to happen whether or
+        // not anything ever looks at a game-mode toggle this session.
+        GameMode.ensureLoaded()
     }
 
 

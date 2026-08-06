@@ -391,6 +391,21 @@ Singleton {
                 }
             }
 
+            // Game mode: what gets stripped down while a game is running. Every
+            // one of these is a live `hyprctl keyword`, undone by a reload — the
+            // one exception is performanceMode, which persists on purpose and is
+            // why GameMode keeps a restore record; see that service.
+            property JsonObject gameMode: JsonObject {
+                property bool followGamemoded: true // React to Feral GameMode starting a game
+                property bool performanceMode: true // Also switch on the low-end profile
+                property bool disableAnimations: true
+                property bool disableBlur: true
+                property bool disableShadows: true
+                property bool squareCorners: true
+                property bool noGaps: true
+                property bool allowTearing: true
+            }
+
             property JsonObject calendar: JsonObject {
                 property string locale: "en-GB"
             }

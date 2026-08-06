@@ -23,6 +23,11 @@ Singleton {
 
     property bool enabled: false
     property bool busy: false
+    // False until the first status read lands. `enabled` starts at false, which
+    // is indistinguishable from a real "off" — so anything that compares
+    // against it before then is comparing against a guess. GameMode's
+    // startup reconciliation did exactly that and silently did nothing.
+    property bool loaded: false
 
     Component.onCompleted: root.refresh()
 
@@ -46,6 +51,7 @@ Singleton {
             onStreamFinished: {
                 // "performance mode: on"
                 root.enabled = statusOut.text.trim().endsWith("on");
+                root.loaded = true;
             }
         }
     }
