@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
   pull_request:
+  # GitHub occasionally just does not create a run for a push — it happened to
+  # two commits here, with Actions enabled, the workflow active and the repo
+  # public, so no quota or config to blame. Without a manual trigger the only
+  # way to get CI onto that commit is an empty commit, which puts a lie in the
+  # history to work around someone else's dropped webhook.
+  workflow_dispatch:
 
 jobs:
   shellcheck:
