@@ -31,7 +31,38 @@ Button {
     property color colRippleToggled: Appearance?.colors.colPrimaryActive ?? "#D6CEE2"
 
     opacity: root.enabled ? 1 : 0.4
-    property color buttonColor: ColorUtils.transparentize(root.toggled ? 
+
+    /**
+     * The button gives under the press and springs back when let go.
+     *
+     * The ripple says "that click landed somewhere"; it does not say "this
+     * thing moved". A press that only changes colour reads as a state change,
+     * a press that dips reads as a physical object — and 122 call sites go
+     * through this component, so the whole shell answers the same way.
+     *
+     * Asymmetric on purpose. Going down is quick and has no overshoot: it has
+     * to keep up with the finger, and a bounce on the way *in* feels loose.
+     * Coming back rides expressiveFastSpatial, whose second control point sits
+     * at 1.67 — past the target and back — so the button overshoots a hair on
+     * release. That overshoot is the whole effect; without it this is a resize.
+     *
+     * 0.96 rather than something more obvious: the smallest bar icons are about
+     * 22px across, and anything deeper reads as the icon glitching rather than
+     * as the button responding.
+     */
+    property real pressScale: 0.96
+    scale: root.down ? root.pressScale : 1.0
+    Behavior on scale {
+        NumberAnimation {
+            duration: root.down ? 90 : (Appearance?.animationCurves.expressiveFastSpatialDuration ?? 350)
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: root.down
+                ? (Appearance?.animationCurves.expressiveEffects ?? [0.34, 0.80, 0.34, 1.00, 1, 1])
+                : (Appearance?.animationCurves.expressiveFastSpatial ?? [0.42, 1.67, 0.21, 0.90, 1, 1])
+        }
+    }
+
+    property color buttonColor: ColorUtils.transparentize(root.toggled ?
         (root.hovered ? colBackgroundToggledHover : 
             colBackgroundToggled) :
         (root.hovered ? colBackgroundHover : 
@@ -141,7 +172,23 @@ Button {
             animation: Appearance?.animation.elementMoveFast.colorAnimation.createObject(this)
         }
 
-        layer.enabled: true
+        // Only while there is a ripple to clip.
+        //
+        // This was unconditionally true, so every RippleButton in the shell —
+        // 122 call sites, many instantiated per item in a list and again per
+        // monitor — held its own framebuffer for as long as it existed, purely
+        // to round off a ripple that is on screen for a fraction of a second
+        // and absent the rest of the session. Measured at 6 MB of VRAM across
+        // the shell at rest (561768 KiB -> 555660 KiB), plus the per-button
+        // render-to-texture pass that came with it.
+        //
+        // Safe to switch off in between: the mask exists only to keep the
+        // expanding circle inside the button's corners, and at opacity 0 there
+        // is no circle to escape. The PropertyAction that starts a ripple sets
+        // opacity to 1 before the animation runs, and QML bindings evaluate
+        // synchronously, so the layer is back on in the same frame the ripple
+        // becomes visible.
+        layer.enabled: ripple.opacity > 0
         layer.effect: OpacityMask {
             maskSource: Rectangle {
                 width: buttonBackground.width
