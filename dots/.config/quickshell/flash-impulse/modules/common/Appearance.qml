@@ -284,6 +284,35 @@ Singleton {
             }
         }
 
+        /**
+         * How anything you can click answers being clicked.
+         *
+         * RippleButton covers most of the shell, but the things you press most
+         * often in the bar — tray icons, the clock, the media chip, the battery
+         * — are bare MouseAreas, and they were the ones giving no feedback at
+         * all. The depth lives here so those and RippleButton cannot drift
+         * apart; RippleButton keeps its own asymmetric timing, because a button
+         * large enough to have a ripple can afford a slower spring back than a
+         * 20px tray icon.
+         *
+         * The curve is expressiveFastSpatial, whose second control point is at
+         * 1.67 — it overshoots and settles, which is what makes this read as
+         * something springing back rather than something resizing.
+         */
+        property QtObject press: QtObject {
+            property real scale: 0.96
+            property int duration: animationCurves.expressiveFastSpatialDuration
+            property int type: Easing.BezierSpline
+            property list<real> bezierCurve: animationCurves.expressiveFastSpatial
+            property Component numberAnimation: Component {
+                NumberAnimation {
+                    duration: root.animation.press.duration
+                    easing.type: root.animation.press.type
+                    easing.bezierCurve: root.animation.press.bezierCurve
+                }
+            }
+        }
+
         property QtObject elementMoveSmall: QtObject {
             property int duration: animationCurves.expressiveFastSpatialDuration
             property int type: Easing.BezierSpline

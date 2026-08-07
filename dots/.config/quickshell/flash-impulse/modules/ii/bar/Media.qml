@@ -26,7 +26,13 @@ Item {
         onTriggered: activePlayer.positionChanged()
     }
 
+    // Same press response as every button in the shell; this was a bare
+    // MouseArea and gave none.
+    scale: mediaMouseArea.pressed ? Appearance.animation.press.scale : 1.0
+    Behavior on scale { animation: Appearance.animation.press.numberAnimation.createObject(this) }
+
     MouseArea {
+        id: mediaMouseArea
         anchors.fill: parent
         acceptedButtons: Qt.MiddleButton | Qt.BackButton | Qt.ForwardButton | Qt.RightButton | Qt.LeftButton
         onPressed: (event) => {

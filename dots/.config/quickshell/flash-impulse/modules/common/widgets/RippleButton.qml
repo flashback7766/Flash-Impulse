@@ -50,7 +50,7 @@ Button {
      * 22px across, and anything deeper reads as the icon glitching rather than
      * as the button responding.
      */
-    property real pressScale: 0.96
+    property real pressScale: Appearance?.animation.press.scale ?? 0.96
     scale: root.down ? root.pressScale : 1.0
     Behavior on scale {
         NumberAnimation {

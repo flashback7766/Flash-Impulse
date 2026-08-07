@@ -16,6 +16,11 @@ MouseArea {
     implicitWidth: batteryProgress.implicitWidth
     implicitHeight: Appearance.sizes.barHeight
 
+    // Same press response as every button in the shell; this was a bare
+    // MouseArea and gave none.
+    scale: root.pressed ? Appearance.animation.press.scale : 1.0
+    Behavior on scale { animation: Appearance.animation.press.numberAnimation.createObject(this) }
+
     hoverEnabled: !Config.options.bar.tooltips.clickToShow
 
     ClippedProgressBar {

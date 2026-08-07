@@ -37,6 +37,11 @@ Item {
         }
     }
 
+    // Same press response as every button in the shell; this was a bare
+    // MouseArea and gave none.
+    scale: mouseArea.pressed ? Appearance.animation.press.scale : 1.0
+    Behavior on scale { animation: Appearance.animation.press.numberAnimation.createObject(this) }
+
     MouseArea {
         id: mouseArea
         anchors.fill: parent

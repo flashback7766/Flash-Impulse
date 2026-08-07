@@ -21,6 +21,12 @@ MouseArea {
     acceptedButtons: Qt.LeftButton | Qt.RightButton
     implicitWidth: 20
     implicitHeight: 20
+
+    // Tray icons are the most-clicked thing in the bar and had no press
+    // feedback of any kind — the menu simply appeared. Same dip and spring as
+    // every RippleButton, sharing its depth from Appearance.
+    scale: root.pressed ? Appearance.animation.press.scale : 1.0
+    Behavior on scale { animation: Appearance.animation.press.numberAnimation.createObject(this) }
     onPressed: (event) => {
         switch (event.button) {
         case Qt.LeftButton:
