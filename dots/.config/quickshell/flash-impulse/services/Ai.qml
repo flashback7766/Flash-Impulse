@@ -548,7 +548,28 @@ Singleton {
         if (recalled.length > 0) {
             parts.push("", "Earlier conversations that look related:", recalled);
         }
-        return `[Context: ${parts.join("\n")}]`;
+        let block = `[Context: ${parts.join("\n")}]`;
+
+        // The language directive rides the newest turn, not the system prompt.
+        //
+        // As a rule in the prefix it lost, and it lost for a reason worth
+        // writing down: every persona ships a concrete example of its voice
+        // ("Sounds like: \"Ugh, *fine*. It's your PATH — ...\""), and those
+        // examples are English. A small model — this defaults to
+        // gemini-3.5-flash-lite — imitates a concrete example far more readily
+        // than it applies an abstract instruction sitting a thousand tokens
+        // earlier. "привет" came back in English, opening with the persona's
+        // own sample sentence.
+        //
+        // Naming the language removes the judgement call, and putting it last
+        // means nothing sits between it and the model's first token. It costs
+        // a handful of tokens and, unlike the prefix, this block is already
+        // expected to change every turn, so prompt caching is unaffected.
+        const language = CF.StringUtils.detectLanguage(question);
+        if (language.length > 0) {
+            block += `\n\n[Answer in ${language}. This outranks the persona above, whose voice samples are written in English — copy their manner, never their language.]`;
+        }
+        return block;
     }
 
     /**
@@ -608,6 +629,7 @@ Reply in the same language the user wrote to you in. Decide this per message, fr
 - The user switching language mid-conversation switches yours, starting with that reply. Don't carry the old one over, and don't remark on the change.
 - What the earlier turns in this conversation are written in decides nothing. Only the newest user message does.
 - This overrides the persona and anything in the prompt above about how to write. A persona with an English-sounding voice is still answered in the user's language.
+- The persona above shows a sample line of its voice. That sample is there for its *manner* — the grumbling, the brevity, the formality — and is written in English only because the prompt is. Never copy its language. Reproducing the sample's wording in English at the top of a reply to a non-English message is the single most common way this goes wrong.
 - If they ask you to reply in a specific language, that wins until they say otherwise.
 - Mixed-language messages follow the language of the request itself, not of a quoted error, log line, or pasted snippet. A Russian question about an English stack trace is answered in Russian.
 

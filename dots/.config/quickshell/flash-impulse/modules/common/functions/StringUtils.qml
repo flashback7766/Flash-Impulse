@@ -544,4 +544,103 @@ Singleton {
             }
         );
     }
+
+    /**
+     * Name the language a message is written in, for telling a model what to
+     * answer in.
+     *
+     * Returns an English language name ("Russian", "French", …) or "" when
+     * there is no confident answer. "" is a real result and the caller is meant
+     * to stay silent on language rather than guess — a directive naming the
+     * wrong language is worse than none, because the model will obey it.
+     *
+     * Naming the language beats asking a model to match it. A small model given
+     * a long English persona and one Russian word answers in English; given
+     * "Reply in Russian." it does not have to make the judgement at all.
+     *
+     * Code, paths and URLs are stripped before counting, so a Russian question
+     * about an English stack trace still reads as Russian.
+     */
+    function detectLanguage(text) {
+        if (!text || text.length === 0) return "";
+
+        const prose = text
+            .replace(/```[\s\S]*?```/g, " ")   // fenced code
+            .replace(/`[^`]*`/g, " ")          // inline code
+            .replace(/\bhttps?:\/\/\S+/g, " ") // urls
+            .replace(/(^|\s)[~./][^\s]*/g, " ")// paths
+            .replace(/\$\w+/g, " ");           // shell vars
+
+        // Dominant script first: it is the strongest signal there is, and for
+        // most of these one character is already conclusive.
+        const scripts = [
+            { re: /[Ѐ-ӿ]/g, resolve: function (s) {
+                if (/[іїєґ]/i.test(s)) return "Ukrainian";
+                if (/[ђћџљњ]/i.test(s)) return "Serbian";
+                return "Russian";
+            } },
+            { re: /[぀-ヿ]/g, name: "Japanese" },
+            { re: /[가-힯ᄀ-ᇿ]/g, name: "Korean" },
+            { re: /[一-鿿]/g, name: "Chinese" },
+            { re: /[֐-׿]/g, name: "Hebrew" },
+            { re: /[؀-ۿ]/g, name: "Arabic" },
+            { re: /[Ͱ-Ͽ]/g, name: "Greek" },
+            { re: /[ऀ-ॿ]/g, name: "Hindi" },
+            { re: /[฀-๿]/g, name: "Thai" },
+            { re: /[԰-֏]/g, name: "Armenian" },
+            { re: /[Ⴀ-ჿ]/g, name: "Georgian" }
+        ];
+
+        let best = null;
+        let bestCount = 0;
+        for (const script of scripts) {
+            const hits = prose.match(script.re);
+            const count = hits ? hits.length : 0;
+            if (count > bestCount) {
+                bestCount = count;
+                best = script;
+            }
+        }
+        if (best && bestCount > 0) {
+            return best.resolve ? best.resolve(prose) : best.name;
+        }
+
+        // Latin script: diacritics are near-conclusive, function words are the
+        // fallback. Checked most-distinctive-first so "ß" isn't outvoted by a
+        // stray "de".
+        // Latin letters only, so " the " matches at a word boundary. Spelled as
+        // an explicit range rather than \p{L}: unicode property escapes need the
+        // /u flag and ES2018, and this has to run in QML's JS engine.
+        const lower = " " + prose.toLowerCase().replace(/[^A-Za-zÀ-ɏ\s]/g, " ").replace(/\s+/g, " ") + " ";
+        const latin = [
+            { name: "Polish",     chars: /[łąężźśćń]/i, words: ["jest", "nie", "czy", "jak", "dziękuję"] },
+            { name: "Turkish",    chars: /[ğşı]/i,      words: ["bir", "için", "nasıl", "teşekkür"] },
+            { name: "German",     chars: /[ß]/i,        words: ["der", "die", "das", "und", "ist", "nicht", "ich", "wie"] },
+            { name: "Portuguese", chars: /[ãõ]/i,       words: ["você", "não", "obrigado", "está", "isso"] },
+            { name: "Spanish",    chars: /[ñ¿¡]/i,      words: ["que", "los", "una", "para", "cómo", "está", "gracias", "porque"] },
+            { name: "French",     chars: /[çœ]/i,       words: ["est", "les", "pour", "avec", "une", "comment", "merci", "vous", "je"] },
+            { name: "Italian",    chars: null,          words: ["che", "non", "sono", "come", "grazie", "perché", "questo"] },
+            { name: "English",    chars: null,          words: ["the", "is", "and", "you", "how", "what", "this", "with", "can", "for", "why", "does"] }
+        ];
+
+        for (const lang of latin) {
+            if (lang.chars && lang.chars.test(prose)) return lang.name;
+        }
+
+        let bestLang = "";
+        let bestHits = 0;
+        for (const lang of latin) {
+            let hits = 0;
+            for (const word of lang.words) {
+                if (lower.indexOf(" " + word + " ") >= 0) hits += 1;
+            }
+            if (hits > bestHits) {
+                bestHits = hits;
+                bestLang = lang.name;
+            }
+        }
+        // One shared function word is noise — "the" appears in French prose
+        // quoting an English error. Two is a language.
+        return bestHits >= 2 ? bestLang : "";
+    }
 }
