@@ -90,7 +90,10 @@ Item {
                 text: {
                     // application.name -> description -> name
                     const app = Audio.appNodeDisplayName(root.node);
-                    const media = root.node.properties["media.name"];
+                    // node goes null while this delegate is still on screen, in
+                    // the moment between the stream ending and the item being
+                    // torn down. Reading through it unguarded threw here.
+                    const media = root.node?.properties?.["media.name"];
                     return media != undefined ? `${app} • ${media}` : app;
                 }
             }

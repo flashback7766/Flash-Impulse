@@ -19,11 +19,18 @@ Singleton {
     property string audioTheme: Config.options.sounds.theme
     property real value: sink?.audio.volume ?? 0
     
+    // Both take a node that can be null. A delegate showing a stream keeps its
+    // binding alive for a moment after the stream goes away — modelData is
+    // already null while the item is still on screen — so these get called with
+    // nothing at all every time an app stops playing audio. That was the
+    // "Cannot read property 'properties' of null" in the log.
     function friendlyDeviceName(node) {
-        return (node.nickname || node.description || Translation.tr("Unknown"));
+        if (!node) return Translation.tr("Unknown");
+        return (node.nickname || node.description || node.name || Translation.tr("Unknown"));
     }
     function appNodeDisplayName(node) {
-        return (node.properties["application.name"] || node.description || node.name)
+        if (!node) return Translation.tr("Unknown");
+        return (node.properties?.["application.name"] || node.description || node.name || Translation.tr("Unknown"));
     }
 
     // Lists
@@ -49,24 +56,37 @@ Singleton {
     signal sinkProtectionTriggered(string reason);
 
     // Controls
+    // Every one of these is reachable from a global shortcut, so they fire
+    // whether or not there is a device to act on — during a Pipewire restart,
+    // or on a machine that genuinely has no sink, sink is null and these used
+    // to throw straight out of the keybind.
     function toggleMute() {
-        Audio.sink.audio.muted = !Audio.sink.audio.muted
+        if (!root.sink?.audio) return;
+        root.sink.audio.muted = !root.sink.audio.muted
     }
 
     function toggleMicMute() {
-        Audio.source.audio.muted = !Audio.source.audio.muted
+        if (!root.source?.audio) return;
+        root.source.audio.muted = !root.source.audio.muted
+    }
+
+    // Finer steps below 10%, where the same absolute change is far more audible.
+    function volumeStep() {
+        return root.value < 0.1 ? 0.01 : 0.02;
     }
 
     function incrementVolume() {
-        const currentVolume = Audio.value;
-        const step = currentVolume < 0.1 ? 0.01 : 0.02 || 0.2;
-        Audio.sink.audio.volume = Math.min(1, Audio.sink.audio.volume + step);
+        if (!root.sink?.audio) return;
+        root.sink.audio.volume = Math.min(1, root.sink.audio.volume + root.volumeStep());
     }
-    
+
     function decrementVolume() {
-        const currentVolume = Audio.value;
-        const step = currentVolume < 0.1 ? 0.01 : 0.02 || 0.2;
-        Audio.sink.audio.volume -= step;
+        if (!root.sink?.audio) return;
+        // Clamped at 0. The increment path had its Math.min from the start but
+        // this one just subtracted, so holding volume-down past silence drove
+        // the volume negative — after which the same number of presses back up
+        // did nothing audible, because it was climbing out of the hole first.
+        root.sink.audio.volume = Math.max(0, root.sink.audio.volume - root.volumeStep());
     }
 
     function setDefaultSink(node) {
