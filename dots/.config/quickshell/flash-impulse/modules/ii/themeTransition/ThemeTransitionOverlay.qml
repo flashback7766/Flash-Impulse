@@ -66,7 +66,13 @@ Variants {
             const h = overlayWindow.height;
             const dx = Math.max(overlayWindow.ox, w - overlayWindow.ox);
             const dy = Math.max(overlayWindow.oy, h - overlayWindow.oy);
-            return 2 * Math.ceil(Math.sqrt(dx * dx + dy * dy));
+            // Plus the feather, so that at the end of the animation it is the
+            // *solid* part of the mask that has reached the furthest corner and
+            // not the falloff. Without the extra margin the last frame leaves a
+            // faint wash of the old theme in that corner, which then vanishes
+            // when the overlay unmaps — a visible blink exactly where the eye
+            // has been following the edge to.
+            return 2 * Math.ceil(Math.sqrt(dx * dx + dy * dy) + revealMask.featherPx);
         }
 
         ScreencopyView {
@@ -137,14 +143,48 @@ Variants {
             visible: false
             layer.enabled: true
 
-            Rectangle {
-                readonly property real r: overlayWindow.revealDiameter / 2 * (ThemeTransition.phase === 2 ? ThemeTransition.reveal : 0)
-                x: overlayWindow.ox - r
-                y: overlayWindow.oy - r
-                width: r * 2
-                height: r * 2
-                radius: r
-                color: "black"
+            // The edge is feathered rather than cut.
+            //
+            // A hard-edged circle makes the boundary itself the thing you
+            // watch: a crisp ring sweeping over the desktop, with every icon
+            // and letter it crosses flipping colour in one frame. Softening it
+            // turns the boundary into a short cross-dissolve between the old
+            // theme and the new one, so what reads is the new theme arriving
+            // rather than a shape moving across the screen.
+            //
+            // The feather is a fixed width in pixels, not a fraction of the
+            // radius. As a fraction it starts as a blur wider than the circle
+            // itself and ends hundreds of pixels wide — soft at the start,
+            // mushy at the end. Holding it constant means the edge looks the
+            // same the whole way across, so the reveal keeps a consistent
+            // character instead of changing texture as it expands.
+            readonly property real featherPx: 140
+            readonly property real r: overlayWindow.revealDiameter / 2
+                * (ThemeTransition.phase === 2 ? ThemeTransition.reveal : 0)
+
+            // Below this the hole is fully open; between it and 1.0 the old
+            // desktop fades back in. Clamped so the very first frames, when the
+            // radius is still smaller than the feather, are all falloff and no
+            // hard core — that is what stops a hard dot appearing under the
+            // cursor on the first frame.
+            //
+            // Lives on the mask rather than inside the gradient: a Gradient is
+            // not an Item, so `parent` does not resolve from a GradientStop.
+            readonly property real solidStop: revealMask.r > 0
+                ? Math.max(0, Math.min(0.92, (revealMask.r - revealMask.featherPx) / revealMask.r))
+                : 0
+
+            RadialGradient {
+                anchors.fill: parent
+                horizontalOffset: overlayWindow.ox - width / 2
+                verticalOffset: overlayWindow.oy - height / 2
+                horizontalRadius: revealMask.r
+                verticalRadius: revealMask.r
+                gradient: Gradient {
+                    GradientStop { position: 0.0; color: "black" }
+                    GradientStop { position: revealMask.solidStop; color: "black" }
+                    GradientStop { position: 1.0; color: "transparent" }
+                }
             }
         }
     }
