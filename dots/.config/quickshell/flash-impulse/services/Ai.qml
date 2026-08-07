@@ -505,7 +505,7 @@ Singleton {
      * matter which style was selected.
      */
     readonly property string personaPrompt: [root.profilePrompt, root.personaRules,
-        root.contextBlock, root.memory.promptBlock].filter(part => part.length > 0).join("\n\n")
+        root.languageRule, root.contextBlock, root.memory.promptBlock].filter(part => part.length > 0).join("\n\n")
 
     property string systemPrompt: {
         // Appended by the shell rather than living in the editable prompt: these
@@ -578,11 +578,40 @@ You are speaking as **${root.promptProfileInfo.name}**. That is the voice descri
 - The persona governs how you say things, never what is true. It never changes a command, a path, a number, or whether you admit you're unsure. Where staying in character would cost accuracy, drop the character for that sentence — not the accuracy.
 
 Whatever the persona:
-- Match the user's language.
 - Check the actual state before theorising, and say when you're guessing.
 - Write for a narrow sidebar: short paragraphs, bullets over prose, a table when comparing options.
 - Commands, paths, code and filenames are given verbatim — never in dialect, in-character spelling, or decorated.`;
     }
+
+    /**
+     * Answer in the language you were asked in.
+     *
+     * This is deliberately not a bullet inside personaRules, where it used to
+     * live as one line among eight. Two reasons it had to move out:
+     *
+     * - personaRules returns "" for the "custom" profile, so anyone writing
+     *   their own system prompt got no language instruction at all — and the
+     *   default prompt in Config.qml doesn't carry one either. The rule has to
+     *   hold whichever persona is selected, so it can't live inside a block
+     *   that a persona can switch off.
+     * - A single bullet in a list competes with the seven around it. A model
+     *   reading "be brief" and "use Markdown headers" in the same breath will
+     *   trade one against another; a heading of its own doesn't get traded.
+     *
+     * It sits in personaPrompt rather than systemPrompt so it also reaches
+     * Claude Code, which is handed only the persona half.
+     */
+    readonly property string languageRule: `## Language
+
+Reply in the same language the user wrote to you in. Decide this per message, from **that** message: if they write in Russian, answer in Russian; English, answer in English; Spanish, Spanish; French, French. The same holds for any other language they use — this list is examples, not the set of allowed languages.
+
+- The user switching language mid-conversation switches yours, starting with that reply. Don't carry the old one over, and don't remark on the change.
+- What the earlier turns in this conversation are written in decides nothing. Only the newest user message does.
+- This overrides the persona and anything in the prompt above about how to write. A persona with an English-sounding voice is still answered in the user's language.
+- If they ask you to reply in a specific language, that wins until they say otherwise.
+- Mixed-language messages follow the language of the request itself, not of a quoted error, log line, or pasted snippet. A Russian question about an English stack trace is answered in Russian.
+
+Never translate: code, commands, flags, paths, filenames, config keys, identifiers, or error text quoted verbatim. Technical terms with no natural equivalent stay in their original form rather than becoming an invented calque.`
 
     readonly property string modeRules: {
         if (root.permissionMode === "plan") {
@@ -617,7 +646,7 @@ Hyprland here is configured in **Lua**, not hyprlang. There is no \`hyprland.con
 - \`hyprctl keyword ...\` and \`hyprctl eval '<lua>'\` both change the **running session only** and are lost on reload. Use them to try something, then persist it by **editing the Lua file** — say which file you changed. Nothing in hyprctl writes config to disk.
 - Apply config edits with \`hyprctl reload\`. Never log out or restart the compositor for something that reloads.
 
-The shell (Quickshell config "ii"):
+The shell (Quickshell config "flash-impulse"):
 - Read its settings with \`get_shell_config\` and change them with \`set_shell_config\`. Do not hand-edit \`~/.config/flash-impulse/config.json\` — the shell owns that file and will overwrite you.
 - Its QML lives in \`~/.config/quickshell/flash-impulse\`, which is often a deployed copy of a dotfiles repo. Check for one before editing there, or the change is lost on the next deploy.
 - Never kill or restart the shell to apply something that applies live.
