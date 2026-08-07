@@ -13,6 +13,10 @@ MouseArea {
     implicitWidth: rowLayout.implicitWidth + 10 * 2
     implicitHeight: Appearance.sizes.barHeight
 
+    // Same press response as every other clickable thing in the shell.
+    scale: root.pressed ? Appearance.animation.press.scale : 1.0
+    Behavior on scale { animation: Appearance.animation.press.numberAnimation.createObject(this) }
+
     acceptedButtons: Qt.LeftButton | Qt.RightButton
     hoverEnabled: !Config.options.bar.tooltips.clickToShow
 

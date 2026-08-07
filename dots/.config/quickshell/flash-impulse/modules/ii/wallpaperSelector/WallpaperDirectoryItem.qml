@@ -12,6 +12,10 @@ MouseArea {
     property bool isDirectory: fileModelData.fileIsDir
     property bool useThumbnail: Images.isValidImageByName(fileModelData.fileName)
 
+    // Same press response as every other clickable thing in the shell.
+    scale: root.pressed ? Appearance.animation.press.scale : 1.0
+    Behavior on scale { animation: Appearance.animation.press.numberAnimation.createObject(this) }
+
     property alias colBackground: background.color
     property alias colText: wallpaperItemName.color
     property alias radius: background.radius

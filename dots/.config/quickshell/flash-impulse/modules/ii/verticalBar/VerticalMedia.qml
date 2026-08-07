@@ -16,6 +16,10 @@ MouseArea {
     readonly property MprisPlayer activePlayer: MprisController.activePlayer
     readonly property string cleanedTitle: StringUtils.cleanMusicTitle(activePlayer?.trackTitle) || Translation.tr("No media")
 
+    // Same press response as every other clickable thing in the shell.
+    scale: root.pressed ? Appearance.animation.press.scale : 1.0
+    Behavior on scale { animation: Appearance.animation.press.numberAnimation.createObject(this) }
+
     Layout.fillHeight: true
     implicitHeight: mediaCircProg.implicitHeight
     implicitWidth: Appearance.sizes.verticalBarWidth
