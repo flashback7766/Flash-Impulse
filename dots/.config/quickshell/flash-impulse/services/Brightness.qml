@@ -248,12 +248,18 @@ Singleton {
     IpcHandler {
         target: "brightness"
 
-        function increment() {
-            onPressed: root.increaseBrightness()
+        // These were written as `onPressed: root.increaseBrightness()`, copied
+        // from the GlobalShortcut blocks below where that is a signal handler.
+        // Inside a plain function body it is a labelled statement — the label
+        // `onPressed` on the expression — so it did call through and the IPC
+        // worked, by accident. It would have stopped working the moment anyone
+        // added a second line, since only the labelled expression runs.
+        function increment(): void {
+            root.increaseBrightness();
         }
 
-        function decrement() {
-            onPressed: root.decreaseBrightness()
+        function decrement(): void {
+            root.decreaseBrightness();
         }
     }
 
