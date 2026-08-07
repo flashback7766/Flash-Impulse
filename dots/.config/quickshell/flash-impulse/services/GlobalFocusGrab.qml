@@ -52,12 +52,31 @@ Singleton {
         }
     }
 
+    /**
+     * Does this item, or anything under it, hold focus?
+     *
+     * Was `element?.activeFocus || Array.from(element?.children).some(...)`.
+     * The optional chaining guarded the property read but not the call around
+     * it: with no element, `element?.children` is undefined and Array.from
+     * throws "Value is undefined and could not be converted to an object". The
+     * only caller passes `w?.contentItem`, which is undefined for any
+     * dismissable window that has not built its content yet — so this threw out
+     * of the `windows` binding below, leaving the focus grab watching the wrong
+     * set and panels not dismissing when they should.
+     *
+     * The explicit loop also stops allocating: the old form built a throwaway
+     * array at every level of the recursion, on every re-evaluation of a
+     * binding that re-runs whenever anything gains or loses focus.
+     */
     function hasActive(element) {
-        return element?.activeFocus || Array.from(
-            element?.children
-        ).some(
-            (child) => hasActive(child)
-        );
+        if (!element) return false;
+        if (element.activeFocus) return true;
+        const children = element.children;
+        if (!children) return false;
+        for (let i = 0; i < children.length; i++) {
+            if (root.hasActive(children[i])) return true;
+        }
+        return false;
     }
 
     HyprlandFocusGrab {
