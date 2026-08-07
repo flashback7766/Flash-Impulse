@@ -37,26 +37,47 @@ LockScreen {
         context: root.context
     }
 
-    // Single batch for lock and unlock so we don't race multiple hyprctl calls
+    // Single batch for lock and unlock so we don't race multiple hyprctl calls.
+    //
+    // The batch used to open with `keyword animation workspaces,1,7,menu_decel,slidevert; `
+    // to give the lock-time workspace switch a vertical slide. It never once ran:
+    // the fragment had no `hyprctl` in front of it, so bash reported
+    // "keyword: command not found" and moved on to the next `;`. Adding the prefix
+    // would not have saved it either — this Hyprland is configured in Lua, and
+    // `hyprctl keyword` answers "keyword can't work with non-legacy parsers. Use eval."
+    //
+    // So it is dropped rather than translated to `hyprctl eval`. Every lock this
+    // desktop has ever done used the default workspace animation, that is the
+    // behaviour known to work, and the lock screen is the last surface worth
+    // testing a new animation on. Re-adding it means an `hl.animation{...}` table
+    // via eval *plus* a revert on unlock, since eval changes outlive the unlock.
     Connections {
         target: GlobalStates
         function onScreenLockedChanged() {
             if (GlobalStates.screenLocked) {
                 // Lock: save workspace per monitor and move all to temp workspace in one batch
                 var next = {}
-                var batch = "keyword animation workspaces,1,7,menu_decel,slidevert; "
+                var batch = ""
                 for (var i = 0; i < Quickshell.screens.length; ++i) {
                     var mon = Quickshell.screens[i].name
                     var mData = HyprlandData.monitors.find(m => m.name === mon)
+                    // Skip just this monitor. This used to `return`, abandoning
+                    // the whole batch because one screen was missing from
+                    // HyprlandData — so no workspace was hidden on *any* screen,
+                    // and savedWorkspaces kept the values from the previous lock.
+                    // Unlocking then restored that stale map and threw the user
+                    // onto whatever workspaces they had been on two locks ago.
                     if (mData?.activeWorkspace == undefined) {
-                        return;
+                        continue;
                     }
-                    var ws = (mData?.activeWorkspace?.id ?? 1)
+                    var ws = mData.activeWorkspace.id
                     next[mon] = ws
                     batch += `hyprctl dispatch 'hl.dsp.focus({monitor="${mon}"})'; hyprctl dispatch 'hl.dsp.focus({workspace=${2147483647 - ws}})';`
                 }
+                // Assigned even when empty, so unlock never replays an older map.
                 root.savedWorkspaces = next
-                Quickshell.execDetached(["bash", "-c", batch])
+                if (batch.length > 0)
+                    Quickshell.execDetached(["bash", "-c", batch])
             } else {
                 restoreTimer.start()
             }
