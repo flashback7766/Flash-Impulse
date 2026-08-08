@@ -93,7 +93,11 @@ Item { // Window
     ScreencopyView {
         id: windowPreview
         anchors.fill: parent
-        captureSource: GlobalStates.overviewOpen ? root.toplevel : null
+        // Both conditions, not just the first. Hyprland segfaults constructing a
+        // capture frame in this same protocol (CImageCopyCaptureFrame ->
+        // Screenshare::CScreenshareFrame::transform), and a window closing while
+        // the overview is open leaves this pointing at a toplevel that is gone.
+        captureSource: (GlobalStates.overviewOpen && root.toplevel) ? root.toplevel : null
         live: true
 
         // Color overlay for interactions

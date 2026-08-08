@@ -75,10 +75,33 @@ Variants {
             return 2 * Math.ceil(Math.sqrt(dx * dx + dy * dy) + revealMask.featherPx);
         }
 
+        /**
+         * The screen to capture, or nothing at all when no transition is running.
+         *
+         * This used to be bound straight to modelData, which meant every screen
+         * held a live screencopy context for the entire session — this overlay
+         * is a Variants over Quickshell.screens, so the windows exist all the
+         * time and only their visibility is toggled. Unplugging a monitor then
+         * segfaulted the shell inside
+         * ScreencopyView::createContext -> captureOutput -> QScreen::handle(),
+         * dereferencing a QScreen that Qt had already torn down.
+         *
+         * Two guards, and the second is the one that matters. Dropping the
+         * source when modelData goes null closes the obvious hole; dropping it
+         * whenever a transition is not running means that for virtually the
+         * whole life of the process there is no capture context on any screen
+         * for a hotplug to race against. OverviewWindow already does exactly
+         * this — `captureSource: overviewOpen ? toplevel : null` — and the other
+         * two ScreencopyViews in the tree live inside Loaders, so this was the
+         * only one holding a context permanently.
+         */
+        readonly property var captureTarget: (ThemeTransition.covering && overlayWindow.modelData)
+            ? overlayWindow.modelData : null
+
         ScreencopyView {
             id: frozen
             anchors.fill: parent
-            captureSource: overlayWindow.modelData
+            captureSource: overlayWindow.captureTarget
             // Transparent until the frame is actually in hand. The window maps
             // a frame or two before the capture arrives, and painting an empty
             // view in that gap put a black flash on screen at the exact moment
@@ -118,8 +141,16 @@ Variants {
             Connections {
                 target: ThemeTransition
                 function onPhaseChanged() {
+                    // Deferred by one turn of the event loop. captureSource is
+                    // now a binding on ThemeTransition.covering, which is
+                    // derived from the very property this handler fires on —
+                    // and the order of "dependent binding re-evaluates" versus
+                    // "signal handler runs" is not guaranteed. Grabbing inline
+                    // could therefore call captureFrame() while the source was
+                    // still null. The transition already waits on framesReady
+                    // before doing anything, so a frame of slack costs nothing.
                     if (ThemeTransition.phase === 1)
-                        frozen.grab();
+                        Qt.callLater(frozen.grab);
                 }
             }
 
