@@ -79,6 +79,56 @@ ContentPage {
         return `${m[1]} × ${m[2]}, ${Math.round(parseFloat(m[3]))} Hz`;
     }
 
+    /**
+     * The advertised mode that best matches what the monitor is actually doing.
+     *
+     * Returns null when the panel advertises nothing at this resolution, so the
+     * caller can fall back to describing the live mode instead.
+     */
+    function closestMode(modes, width, height, rate) {
+        const prefix = `${width}x${height}@`;
+        let best = null;
+        let bestDiff = Infinity;
+        for (const s of modes) {
+            if (!s.startsWith(prefix))
+                continue;
+            const advertised = parseFloat(s.slice(prefix.length));
+            if (isNaN(advertised))
+                continue;
+            const diff = Math.abs(advertised - rate);
+            if (diff < bestDiff) {
+                bestDiff = diff;
+                best = s;
+            }
+        }
+        return best;
+    }
+
+    /**
+     * Scales this monitor can actually take, rather than a fixed step.
+     *
+     * Hyprland refuses a scale that does not divide the resolution into a whole
+     * number of logical pixels — it reports "failed to find a clean divisor" and
+     * keeps the old value, which from the page looks like the setting silently
+     * not applying. A plain 0.2 step walks straight into that: 1920/1.4 is
+     * 1371.43. So the control offers the divisors that exist for this panel and
+     * nothing else, and everything shown is guaranteed to apply.
+     */
+    function validScalesFor(width, height) {
+        const out = [];
+        // 1/120 steps covers every scale Hyprland and the common HiDPI advice
+        // use (1.25, 1.2, 4/3, 1.5, 1.75, 2, 2.4 ...) without inventing values
+        // nobody wants at three decimal places.
+        for (let i = 60; i <= 360; i++) {
+            const s = i / 120;
+            const w = width / s;
+            const h = height / s;
+            if (Math.abs(w - Math.round(w)) < 1e-6 && Math.abs(h - Math.round(h)) < 1e-6)
+                out.push(Math.round(s * 1000) / 1000);
+        }
+        return out;
+    }
+
     function seedDrafts() {
         // The outgoing drafts are *not* destroyed here. They are still the
         // Repeater delegates' `modelData` at this instant, and destroy() on a
@@ -94,7 +144,18 @@ ContentPage {
             const modes = ipc.availableModes ?? [];
             const rr = (ipc.refreshRate ?? 60).toFixed(2);
             const currentGuess = `${m.width}x${m.height}@${rr}Hz`;
-            const mode = modes.find(s => s.startsWith(`${m.width}x${m.height}@`)) ?? modes[0] ?? currentGuess;
+            // Matched on refresh rate as well as resolution.
+            //
+            // This used to be `modes.find(s => s.startsWith("WxH@"))`, which
+            // takes whichever entry for that resolution happens to come first.
+            // On this HDMI panel the list starts 1920x1080@60.00Hz,
+            // 1920x1080@144.00Hz, ... — so after setting 144 and applying, the
+            // monitor ran at 144 and the dropdown snapped back to 60. The
+            // setting was right and only the page was lying about it.
+            //
+            // Nearest rather than exact: the compositor reports the live rate as
+            // 144.00101, and the mode string says 144.00.
+            const mode = page.closestMode(modes, m.width, m.height, ipc.refreshRate ?? 60) ?? currentGuess;
             list.push(draftComponent.createObject(page, {
                 "output": m.name,
                 "description": ipc.description || m.name,
@@ -339,7 +400,13 @@ ContentPage {
         Item {
             id: arrangementArea
             Layout.fillWidth: true
-            implicitHeight: 240
+            implicitHeight: 320
+            // The toolbar sits in its own strip along the top rather than
+            // floating over the canvas. Anchored to the corner it overlapped the
+            // monitors as soon as the layout was wide enough to fill the box,
+            // and no amount of extra height fixes that on its own — a wider
+            // arrangement just scales up to meet the buttons again.
+            readonly property real toolbarStrip: 48
 
             readonly property real minX: page.drafts.length ? Math.min(...page.drafts.map(d => d.x)) : 0
             readonly property real minY: page.drafts.length ? Math.min(...page.drafts.map(d => d.y)) : 0
@@ -347,7 +414,8 @@ ContentPage {
             readonly property real maxY: page.drafts.length ? Math.max(...page.drafts.map(d => d.y + d.dispH)) : 1
             readonly property real totalW: Math.max(1, maxX - minX)
             readonly property real totalH: Math.max(1, maxY - minY)
-            readonly property real fitScale: Math.max(0.02, Math.min((width - 48) / totalW, (height - 48) / totalH)) * 0.9
+            readonly property real fitScale: Math.max(0.02, Math.min((width - 48) / totalW,
+                (height - 48 - toolbarStrip) / totalH)) * 0.9
 
             Rectangle {
                 anchors.fill: parent
@@ -398,6 +466,8 @@ ContentPage {
             Item {
                 id: canvasOrigin
                 anchors.centerIn: parent
+                // Pushed below the toolbar strip so the two never share space.
+                anchors.verticalCenterOffset: arrangementArea.toolbarStrip / 2
                 width: arrangementArea.totalW * arrangementArea.fitScale
                 height: arrangementArea.totalH * arrangementArea.fitScale
 
@@ -644,6 +714,7 @@ ContentPage {
             }
 
             ConfigSlider {
+                id: scaleSlider
                 enabled: page.selected && !page.selected.disabled && !page.selected.scaleAuto
                 buttonIcon: "photo_size_select_large"
                 text: Translation.tr("Scale")
@@ -653,14 +724,55 @@ ContentPage {
                 valueSuffix: "%"
                 from: 100
                 to: 250
-                stepSize: 5
+                // 1, not 5. The value is snapped to a real divisor anyway, and a
+                // step of 5 cannot represent most of them — the handle sat at
+                // 135% while the monitor was actually on 133%, so the control
+                // and the line under it disagreed about the same number.
+                stepSize: 1
                 value: page.selected ? Math.round(page.selected.scale * 100) : 100
+
+                // The divisors this panel actually has, recomputed when the
+                // selection changes.
+                readonly property var options: page.selected
+                    ? page.validScalesFor(page.selected.width, page.selected.height) : [1]
+
                 onValueChanged: {
-                    if (page.selected && Math.round(page.selected.scale * 100) !== value) {
-                        page.selected.scale = value / 100;
+                    if (!page.selected)
+                        return;
+                    // Snapped to the nearest scale that divides the resolution
+                    // into whole logical pixels. A free 5% step mostly does not:
+                    // Hyprland answers "failed to find a clean divisor", keeps
+                    // the previous value, and from here that looks like the
+                    // setting quietly refusing to take.
+                    const wanted = value / 100;
+                    let best = wanted;
+                    let bestDiff = Infinity;
+                    for (const s of scaleSlider.options) {
+                        const diff = Math.abs(s - wanted);
+                        if (diff < bestDiff) {
+                            bestDiff = diff;
+                            best = s;
+                        }
+                    }
+                    if (Math.abs(page.selected.scale - best) > 0.0005) {
+                        page.selected.scale = best;
                         page.touchCounter++;
                     }
                 }
+            }
+
+            StyledText {
+                Layout.fillWidth: true
+                Layout.leftMargin: 8
+                visible: page.selected && !page.selected.scaleAuto
+                wrapMode: Text.Wrap
+                font.pixelSize: Appearance.font.pixelSize.smallest
+                color: Appearance.colors.colSubtext
+                text: page.selected
+                    ? Translation.tr("Snaps to scales this screen can take — %1 logical pixels wide at %2%.")
+                        .arg(Math.round(page.selected.width / page.selected.effectiveScale))
+                        .arg(Math.round(page.selected.scale * 100))
+                    : ""
             }
 
             // A Windows display panel has centred/stretched/aspect here. That is
