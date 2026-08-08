@@ -47,8 +47,21 @@ ContentPage {
         // Rotated 90/270 swaps what reads as "width" on screen — the arrangement
         // canvas needs to know that or a portrait monitor draws sideways.
         readonly property bool rotated: transform === 1 || transform === 3 || transform === 5 || transform === 7
-        readonly property real dispW: rotated ? height : width
-        readonly property real dispH: rotated ? width : height
+
+        /**
+         * The space this monitor actually occupies in the layout.
+         *
+         * Hyprland positions monitors in *logical* coordinates, so a 3840x2160
+         * panel at scale 2 takes up 1920x1080 and its neighbour sits at x=1920,
+         * not x=3840. These used to be the raw resolution, which meant the
+         * arrangement drew a scaled monitor at several times its real size and,
+         * worse, snapped its neighbours to the wrong edge — the layout the page
+         * showed and the layout Hyprland applied disagreed for anyone not on
+         * scale 1.
+         */
+        readonly property real effectiveScale: scale > 0 ? scale : 1
+        readonly property real dispW: (rotated ? height : width) / effectiveScale
+        readonly property real dispH: (rotated ? width : height) / effectiveScale
     }
     Component {
         id: draftComponent
@@ -135,24 +148,110 @@ ContentPage {
     property int touchCounter: 0
     readonly property bool hasChanges: (touchCounter, page.draftsDiffer())
 
+    // {x, y, w, h} in layout coordinates while a drag is in progress, or null.
+    property var dragPreview: null
+
+    /**
+     * Where a monitor should land, given where it was dropped.
+     *
+     * The old version nudged an edge when it happened to be within 24px of
+     * another, independently per axis, and left the result alone otherwise. That
+     * let you build layouts Hyprland does not cope with: two monitors overlapping,
+     * or separated by a gap the pointer then has to cross in one jump because
+     * there is nothing in between.
+     *
+     * This one is exhaustive instead of incremental. Every position that puts
+     * the monitor flush against one of its neighbours is enumerated — four sides,
+     * and for each side the three alignments people actually want (flush at the
+     * near edge, flush at the far edge, centred) — anything that would overlap a
+     * third monitor is discarded, and the survivor closest to where the pointer
+     * let go wins. So the result is always touching something and never on top of
+     * anything, and dragging still feels like it goes where you aimed.
+     *
+     * Returns null for the only monitor in the layout: with nothing to be flush
+     * against, any position is as good as another.
+     */
+    function snapTarget(d, fromX, fromY) {
+        const others = page.drafts.filter(o => o !== d && !o.disabled);
+        if (others.length === 0)
+            return null;
+
+        const overlaps = (x, y) => others.some(o =>
+            x < o.x + o.dispW && x + d.dispW > o.x &&
+            y < o.y + o.dispH && y + d.dispH > o.y);
+
+        let best = null;
+        let bestDist = Infinity;
+        for (const o of others) {
+            // Alignments along the shared edge, for a side-by-side placement and
+            // for a stacked one.
+            const ys = [o.y, o.y + o.dispH - d.dispH, o.y + (o.dispH - d.dispH) / 2];
+            const xs = [o.x, o.x + o.dispW - d.dispW, o.x + (o.dispW - d.dispW) / 2];
+            const candidates = [];
+            for (const y of ys) {
+                candidates.push({ x: o.x + o.dispW, y: y });   // to its right
+                candidates.push({ x: o.x - d.dispW, y: y });   // to its left
+            }
+            for (const x of xs) {
+                candidates.push({ x: x, y: o.y + o.dispH });   // below it
+                candidates.push({ x: x, y: o.y - d.dispH });   // above it
+            }
+            for (const c of candidates) {
+                if (overlaps(c.x, c.y))
+                    continue;
+                const dx = c.x - fromX;
+                const dy = c.y - fromY;
+                const dist = dx * dx + dy * dy;
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    best = c;
+                }
+            }
+        }
+        return best;
+    }
+
     function snap(d) {
-        const threshold = 24;
-        for (const other of page.drafts) {
-            if (other === d)
-                continue;
-            // Horizontal: snap this edge to that edge when close.
-            if (Math.abs(d.x - (other.x + other.dispW)) < threshold)
-                d.x = other.x + other.dispW;
-            else if (Math.abs((d.x + d.dispW) - other.x) < threshold)
-                d.x = other.x - d.dispW;
-            // Vertical
-            if (Math.abs(d.y - (other.y + other.dispH)) < threshold)
-                d.y = other.y + other.dispH;
-            else if (Math.abs((d.y + d.dispH) - other.y) < threshold)
-                d.y = other.y - d.dispH;
+        const target = page.snapTarget(d, d.x, d.y);
+        if (target) {
+            d.x = target.x;
+            d.y = target.y;
         }
         d.x = Math.round(d.x);
         d.y = Math.round(d.y);
+        page.touchCounter++;
+    }
+
+    /**
+     * Put every enabled monitor in a row or a column, in their current order.
+     *
+     * Dragging is fine for two screens and tedious for more, and "just put them
+     * side by side, aligned, touching" is what most rearranging is actually
+     * after.
+     */
+    function autoArrange(direction) {
+        const list = page.drafts.filter(d => !d.disabled);
+        if (list.length === 0)
+            return;
+        // Left-to-right or top-to-bottom by where they already are, so the
+        // arrangement keeps the order the user has in their head rather than
+        // whatever order the compositor happened to enumerate them in.
+        list.sort((a, b) => direction === "row" ? (a.x - b.x) : (a.y - b.y));
+
+        let cursor = 0;
+        for (const d of list) {
+            if (direction === "row") {
+                d.x = cursor;
+                d.y = 0;
+                cursor += d.dispW;
+            } else {
+                d.x = 0;
+                d.y = cursor;
+                cursor += d.dispH;
+            }
+            d.x = Math.round(d.x);
+            d.y = Math.round(d.y);
+        }
         page.touchCounter++;
     }
 
@@ -256,16 +355,44 @@ ContentPage {
                 color: Appearance.colors.colSurfaceContainerHighest
             }
 
-            RippleButtonWithIcon {
+            RowLayout {
                 anchors {
                     top: parent.top
                     right: parent.right
                     margins: 10
                 }
-                materialIcon: "tag"
-                mainText: Translation.tr("Identify")
-                buttonRadius: Appearance.rounding.full
-                onClicked: page.identify()
+                spacing: 6
+
+                // Only worth offering with something to arrange.
+                RippleButtonWithIcon {
+                    visible: page.drafts.filter(d => !d.disabled).length > 1
+                    materialIcon: "view_column"
+                    mainText: Translation.tr("Row")
+                    buttonRadius: Appearance.rounding.full
+                    onClicked: page.autoArrange("row")
+                }
+                RippleButtonWithIcon {
+                    visible: page.drafts.filter(d => !d.disabled).length > 1
+                    materialIcon: "table_rows"
+                    mainText: Translation.tr("Column")
+                    buttonRadius: Appearance.rounding.full
+                    onClicked: page.autoArrange("column")
+                }
+                // Throws away the draft and re-reads what Hyprland is actually
+                // running, without having to leave the page and come back.
+                RippleButtonWithIcon {
+                    visible: page.hasChanges
+                    materialIcon: "undo"
+                    mainText: Translation.tr("Reset")
+                    buttonRadius: Appearance.rounding.full
+                    onClicked: page.seedDrafts()
+                }
+                RippleButtonWithIcon {
+                    materialIcon: "tag"
+                    mainText: Translation.tr("Identify")
+                    buttonRadius: Appearance.rounding.full
+                    onClicked: page.identify()
+                }
             }
 
             Item {
@@ -273,6 +400,21 @@ ContentPage {
                 anchors.centerIn: parent
                 width: arrangementArea.totalW * arrangementArea.fitScale
                 height: arrangementArea.totalH * arrangementArea.fitScale
+
+                // Where the monitor being dragged will actually land. Drawn under
+                // the monitors so it never hides the one you are moving.
+                Rectangle {
+                    id: snapGhost
+                    visible: page.dragPreview !== null
+                    x: page.dragPreview ? (page.dragPreview.x - arrangementArea.minX) * arrangementArea.fitScale : 0
+                    y: page.dragPreview ? (page.dragPreview.y - arrangementArea.minY) * arrangementArea.fitScale : 0
+                    width: page.dragPreview ? Math.max(28, page.dragPreview.w * arrangementArea.fitScale) : 0
+                    height: page.dragPreview ? Math.max(28, page.dragPreview.h * arrangementArea.fitScale) : 0
+                    radius: Appearance.rounding.normal
+                    color: ColorUtils.transparentize(Appearance.colors.colPrimary, 0.85)
+                    border.width: 2
+                    border.color: Appearance.colors.colPrimary
+                }
 
                 Repeater {
                     model: page.drafts
@@ -331,11 +473,25 @@ ContentPage {
                                     page.selectedIndex = monitorRect.index;
                                 } else {
                                     page.snap(monitorRect.modelData);
+                                    page.dragPreview = null;
                                 }
                             }
                             onTranslationChanged: {
-                                monitorRect.modelData.x = monitorRect.dragStartX + translation.x / arrangementArea.fitScale;
-                                monitorRect.modelData.y = monitorRect.dragStartY + translation.y / arrangementArea.fitScale;
+                                const nx = monitorRect.dragStartX + translation.x / arrangementArea.fitScale;
+                                const ny = monitorRect.dragStartY + translation.y / arrangementArea.fitScale;
+                                monitorRect.modelData.x = nx;
+                                monitorRect.modelData.y = ny;
+                                // Where releasing right now would put it. Since
+                                // the drop is always snapped, showing the free
+                                // position alone would be showing the one place
+                                // it definitely will not end up.
+                                const t = page.snapTarget(monitorRect.modelData, nx, ny);
+                                page.dragPreview = t ? {
+                                    "x": t.x,
+                                    "y": t.y,
+                                    "w": monitorRect.modelData.dispW,
+                                    "h": monitorRect.modelData.dispH
+                                } : null;
                             }
                         }
                     }
