@@ -90,9 +90,12 @@ LockScreen {
         delegate: Scope {
             required property ShellScreen modelData
             property bool shouldPush: GlobalStates.screenLocked
-            property string targetMonitorName: modelData.name
-            property int verticalMovementDistance: modelData.height
-            property int horizontalSqueeze: modelData.width * 0.2
+            // modelData goes null while the delegate is still alive when a
+            // screen is unplugged, and these bindings re-evaluate once more
+            // before it is torn down.
+            property string targetMonitorName: modelData?.name ?? ""
+            property int verticalMovementDistance: modelData?.height ?? 0
+            property int horizontalSqueeze: (modelData?.width ?? 0) * 0.2
         }
     }
 }

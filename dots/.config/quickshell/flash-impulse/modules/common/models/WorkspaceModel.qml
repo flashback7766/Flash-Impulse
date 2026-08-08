@@ -8,7 +8,9 @@ NestableObject {
     id: root
 
     required property HyprlandMonitor monitor
-    readonly property var liveMonitorData: HyprlandData.monitors.find(m => m.id === monitor.id)
+    // monitor is required, but it still reads null for a moment when the screen
+    // it describes goes away before this object does.
+    readonly property var liveMonitorData: HyprlandData.monitors.find(m => m.id === monitor?.id)
     readonly property Toplevel activeWindow: ToplevelManager.activeToplevel
     // A monitor coming out of the lock screen can briefly report a phantom
     // workspace id near INT32_MAX (HyprlandData.recoverPhantomWorkspaces()
