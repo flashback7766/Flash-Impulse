@@ -186,6 +186,8 @@ ContentPage {
     // their own between reads, and comparing those too would make the button
     // flicker enabled with nothing for the user to have changed.
     function draftsDiffer() {
+        if (page.primaryOutput !== page.primaryAtSeed)
+            return true;
         for (const d of page.drafts) {
             const m = Hyprland.monitors.values.find(mm => mm.name === d.output);
             if (!m) continue;
@@ -227,6 +229,30 @@ ContentPage {
      * cannot cost a feature that would have worked.
      */
     property var capabilities: ({})
+
+    /**
+     * Which screen workspace 1 opens on. "" for none.
+     *
+     * Read back from the shell rather than parsed here: DisplayManager owns
+     * monitors.lua, and two processes deciding independently what the file says
+     * is how the two ends drift apart.
+     */
+    property string primaryOutput: ""
+    property string primaryAtSeed: ""
+
+    Process {
+        id: primaryProc
+        running: true
+        command: ["qs", "-c", "flash-impulse", "ipc", "call", "display", "primary"]
+        stdout: StdioCollector {
+            id: primaryOut
+            onStreamFinished: {
+                const value = primaryOut.text.trim();
+                page.primaryOutput = value;
+                page.primaryAtSeed = value;
+            }
+        }
+    }
 
     function capsFor(output) {
         return page.capabilities[output] ?? {};
@@ -374,7 +400,11 @@ ContentPage {
         // copy of DisplayManager that the confirmation overlay cannot see — and
         // would die with this window, which is exactly what a bad mode is
         // likely to take out.
-        Quickshell.execDetached(["qs", "-c", "flash-impulse", "ipc", "call", "display", "apply", Qt.btoa(JSON.stringify(edited))]);
+        Quickshell.execDetached(["qs", "-c", "flash-impulse", "ipc", "call", "display", "apply",
+            Qt.btoa(JSON.stringify({
+                "monitors": edited,
+                "primary": page.primaryOutput
+            }))]);
     }
 
     // Reseed whenever Hyprland has actually re-read its config, rather than on a
@@ -910,6 +940,33 @@ ContentPage {
             }
             StyledToolTip {
                 text: Translation.tr("At least one screen has to stay on")
+            }
+        }
+
+        ConfigSwitch {
+            // Hyprland has no primary-monitor field — hl.monitor rejects it and
+            // an unknown field is a hard parse error for the whole config. The
+            // setting is written as a workspace rule instead, which is where the
+            // idea actually lives: workspace 1 is the one you land on.
+            enabled: page.selected && !page.selected.disabled
+            text: Translation.tr("Main screen")
+            checked: page.selected ? page.primaryOutput === page.selected.output : false
+            onCheckedChanged: {
+                if (!page.selected)
+                    return;
+                const wanted = checked ? page.selected.output : "";
+                // Only one screen can be it, so ticking a second unticks the
+                // first; unticking clears the rule entirely.
+                if (checked && page.primaryOutput !== page.selected.output) {
+                    page.primaryOutput = wanted;
+                    page.touchCounter++;
+                } else if (!checked && page.primaryOutput === page.selected.output) {
+                    page.primaryOutput = "";
+                    page.touchCounter++;
+                }
+            }
+            StyledToolTip {
+                text: Translation.tr("Workspace 1 opens here, and new windows land here by default")
             }
         }
     }
