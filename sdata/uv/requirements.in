@@ -18,3 +18,5 @@ numpy
 opencv-contrib-python
 google-auth
 requests
+ddgs
+lxml

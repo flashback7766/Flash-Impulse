@@ -546,6 +546,32 @@ Singleton {
     }
 
     /**
+     * A URL cut down to something that fits on a chip in a narrow sidebar.
+     *
+     * Keeps the host, which is the part that tells you whether the assistant
+     * read the vendor's own docs or somebody's blog, and enough of the path to
+     * distinguish two pages on the same site. Drops the scheme and a leading
+     * "www." because neither ever disambiguates anything.
+     */
+    function shortenUrl(url, maxLength) {
+        const limit = maxLength ?? 42;
+        let s = String(url).replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/$/, "");
+        if (s.length <= limit) return s;
+
+        const slash = s.indexOf("/");
+        if (slash < 0) return s.slice(0, limit - 1) + "…";
+
+        const host = s.slice(0, slash);
+        const path = s.slice(slash);
+        // A host alone longer than the budget means nothing else will fit.
+        if (host.length >= limit - 2) return host.slice(0, limit - 1) + "…";
+        // Keep the tail of the path: the identifying part of a long URL is
+        // almost always the slug at the end, not the section names in front.
+        const room = limit - host.length - 2;
+        return host + "/…" + path.slice(Math.max(0, path.length - room));
+    }
+
+    /**
      * Name the language a message is written in, for telling a model what to
      * answer in.
      *

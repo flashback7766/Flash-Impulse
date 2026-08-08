@@ -557,6 +557,7 @@ Item {
                 delegate: SearchQueryButton {
                     required property var modelData
                     query: modelData
+                    busy: (root.messageData?.pendingToolQueries ?? []).includes(modelData)
                 }
             }
         }

@@ -986,11 +986,19 @@ The shell (Quickshell config "flash-impulse"):
         },
         {
             "name": "web_search_preview", "label": "Search",
-            "description": "Search the web and get a short summary of the top results.",
+            "description": "Search the web. Returns a numbered list of results, each with a title, URL and a short snippet. Snippets are usually too short to answer from — when the answer depends on the contents of a page rather than on its existence, follow up with `fetch_url` on the most promising result and read it.",
             "properties": {
                 "query": {"type": "string", "description": "The search query"}
             },
             "required": ["query"]
+        },
+        {
+            "name": "fetch_url", "label": "Fetch",
+            "description": "Fetch a web page and read its text. Use after `web_search_preview` to actually read a result instead of answering from its snippet, or directly on a URL the user gives you. Returns the page title and its readable text with navigation and scripts stripped; long pages are truncated.",
+            "properties": {
+                "url": {"type": "string", "description": "Full URL including https://"}
+            },
+            "required": ["url"]
         },
         {
             "name": "ask_user_question", "label": "Question",
@@ -1025,7 +1033,10 @@ The shell (Quickshell config "flash-impulse"):
                 "input_schema": {"type": "object", "properties": s.properties ?? {}, "required": s.required ?? []}
             })
         };
-        const searchOnly = specs.filter(s => s.name === "web_search_preview");
+        // Search mode gets fetch_url too: a search that can only ever return
+        // snippets is half a tool, and the model needs to be able to open what
+        // it found without leaving the mode.
+        const searchOnly = specs.filter(s => s.name === "web_search_preview" || s.name === "fetch_url");
         return {
             "gemini": {
                 "functions": [{"functionDeclarations": specs.map(render["gemini"])}],
@@ -3149,26 +3160,104 @@ The shell (Quickshell config "flash-impulse"):
         }
     }
 
-    // Web search process for OpenAI web_search_preview tool
+    /**
+     * Web search, for the function-calling tool set.
+     *
+     * The command here used to be a curl of html.duckduckgo.com piped through
+     * grep for `<a class="result__snippet">`. That endpoint now answers a bare
+     * landing page to GET and a 202 challenge to POST, so the pipeline matched
+     * nothing and every single search reported "No results found" — the tool
+     * ran, which is why something flickered in the UI, and then handed the model
+     * an empty answer. lite.duckduckgo and the public SearXNG instances are
+     * blocked or rate-limited the same way, so the fix is a maintained client
+     * rather than a different site to scrape.
+     *
+     * StdioCollector rather than SplitParser: the script emits one JSON object,
+     * and SplitParser is line-oriented — it happens to work for a single line
+     * and silently loses the delimiters the moment the payload contains any.
+     */
     Process {
         id: webSearchProc
         property string query: ""
         property AiMessageData message
         property string functionName: "web_search_preview"
-        property string collectedOutput: ""
 
-        stdout: SplitParser {
-            onRead: (output) => { webSearchProc.collectedOutput += output; }
+        stdout: StdioCollector {
+            id: webSearchOut
+            onStreamFinished: {
+                let response;
+                try {
+                    const parsed = JSON.parse(webSearchOut.text);
+                    if (parsed.error) {
+                        response = Translation.tr("Search failed: %1").arg(parsed.error);
+                    } else if (!parsed.results || parsed.results.length === 0) {
+                        response = Translation.tr("No results found for \"%1\".").arg(webSearchProc.query);
+                    } else {
+                        // Numbered, with the URL on its own line, so the model can
+                        // quote a result back to fetch_url without reconstructing
+                        // it out of prose.
+                        const lines = parsed.results.map((r, i) =>
+                            `${i + 1}. ${r.title}\n   ${r.url}\n   ${r.snippet}`);
+                        response = Translation.tr("Search results for \"%1\":\n\n%2")
+                            .arg(webSearchProc.query).arg(lines.join("\n\n"))
+                            + "\n\n" + Translation.tr("Use fetch_url on whichever of these actually answers the question — the snippets above are previews, not the page.");
+                    }
+                } catch (e) {
+                    // A crashed helper must still produce something the model can
+                    // act on; silence reads to it as "the web has nothing".
+                    response = Translation.tr("Search failed: the helper returned nothing usable.");
+                }
+                // Cleared on every path, including the failures — a chip stuck
+                // spinning forever is worse than one that stops on a bad result.
+                if (webSearchProc.message) {
+                    webSearchProc.message.pendingToolQueries =
+                        webSearchProc.message.pendingToolQueries.filter(q => q !== webSearchProc.query);
+                }
+                root.addFunctionOutputMessage(webSearchProc.functionName, response);
+                if (root.aborted) { root.aborted = false; return; }
+                requester.makeRequest();
+            }
         }
-        onExited: (exitCode, exitStatus) => {
-            const results = webSearchProc.collectedOutput.trim();
-            const response = results.length > 0
-                ? Translation.tr("Search results for \"%1\":\n\n%2").arg(webSearchProc.query).arg(results)
-                : Translation.tr("No results found for \"%1\".").arg(webSearchProc.query);
-            root.addFunctionOutputMessage(webSearchProc.functionName, response);
-            webSearchProc.collectedOutput = "";
-            if (root.aborted) { root.aborted = false; return; }
-            requester.makeRequest();
+    }
+
+    /**
+     * Read a page the search turned up — the second half of the search/fetch
+     * pair every assistant with web access has, and the half this one was
+     * missing. Without it the model could only ever answer from three-line
+     * snippets, which is why its web answers were vague even when the search
+     * worked.
+     */
+    Process {
+        id: fetchUrlProc
+        property string url: ""
+        property AiMessageData message
+        property string functionName: "fetch_url"
+
+        stdout: StdioCollector {
+            id: fetchUrlOut
+            onStreamFinished: {
+                let response;
+                try {
+                    const parsed = JSON.parse(fetchUrlOut.text);
+                    if (parsed.error) {
+                        response = Translation.tr("Could not read %1: %2").arg(fetchUrlProc.url).arg(parsed.error);
+                    } else if (!parsed.text || parsed.text.length === 0) {
+                        response = Translation.tr("%1 returned no readable text.").arg(fetchUrlProc.url);
+                    } else {
+                        response = `${parsed.title || fetchUrlProc.url}\n${parsed.url}\n\n${parsed.text}`
+                            + (parsed.truncated ? "\n\n" + Translation.tr("[truncated]") : "");
+                    }
+                } catch (e) {
+                    response = Translation.tr("Could not read %1: the helper returned nothing usable.").arg(fetchUrlProc.url);
+                }
+                if (fetchUrlProc.message) {
+                    fetchUrlProc.message.pendingToolQueries =
+                        fetchUrlProc.message.pendingToolQueries.filter(q => q !== fetchUrlProc.url);
+                }
+                root.addFunctionOutputMessage(fetchUrlProc.functionName, response);
+                if (root.aborted) { root.aborted = false; return; }
+                requester.makeRequest();
+            }
         }
     }
 
@@ -3224,12 +3313,30 @@ The shell (Quickshell config "flash-impulse"):
             }
             // Show the query as a chip, the same way provider-side search is shown.
             message.searchQueries = [...message.searchQueries, query];
-            // Use xdg-open or a simple curl-based DDG search summary
+            message.pendingToolQueries = [...message.pendingToolQueries, query];
             webSearchProc.query = query;
             webSearchProc.message = message;
             webSearchProc.functionName = name;
-            webSearchProc.command = ["bash", "-c", `curl -s -A 'Mozilla/5.0' 'https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}' | grep -oP '(?<=<a class="result__snippet">)[^<]+' | head -5 | tr '\n' ' '`];
+            webSearchProc.command = ["bash", Quickshell.shellPath("scripts/ai/web-search-venv.sh"),
+                query, "--max-results", "6"];
             webSearchProc.running = true;
+        } else if (name === "fetch_url") {
+            const url = args?.url;
+            if (!url || url.length === 0) {
+                addFunctionOutputMessage(name, Translation.tr("No URL provided."));
+                requester.makeRequest();
+                return;
+            }
+            // Same chip as a search, so the transcript shows the page being read
+            // rather than a silent gap while the model waits on it.
+            message.searchQueries = [...message.searchQueries, url];
+            message.pendingToolQueries = [...message.pendingToolQueries, url];
+            fetchUrlProc.message = message;
+            fetchUrlProc.url = url;
+            fetchUrlProc.functionName = name;
+            fetchUrlProc.command = ["bash", Quickshell.shellPath("scripts/ai/fetch-url-venv.sh"),
+                url, "--max-chars", "6000"];
+            fetchUrlProc.running = true;
         } else if (name === "get_shell_config") {
             const configJson = CF.ObjectUtils.toPlainObject(Config.options)
             addFunctionOutputMessage(name, JSON.stringify(configJson));

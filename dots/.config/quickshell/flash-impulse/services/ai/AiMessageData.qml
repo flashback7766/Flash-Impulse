@@ -35,6 +35,11 @@ QtObject {
     property var annotations: []
     property var annotationSources: []
     property list<string> searchQueries: []
+    // The subset of searchQueries whose helper process is still running. Without
+    // this a search chip appeared the instant the tool was called and looked
+    // identical whether the search was in flight, finished, or had failed — so a
+    // multi-second lookup read as a flicker and then a stall.
+    property list<string> pendingToolQueries: []
     property string functionName
     property var functionCall
     property string functionResponse
