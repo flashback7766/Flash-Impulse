@@ -1854,6 +1854,14 @@ The shell (Quickshell config "flash-impulse"):
         if ((message.localFilePath ?? "").length > 0) return;
         if ((message.askQuestions?.length ?? 0) > 0) return;
         if ((message.toolCalls?.length ?? 0) > 0) return;
+        // Search and fetch chips are the whole visible content of this message.
+        //
+        // A model that decides to search emits a bare functionCall and no text,
+        // so the turn carrying it has empty content by every other test here and
+        // was hidden — taking the chip with it. That is why a search never
+        // showed anything: the chip was being created correctly and then thrown
+        // away one call later, leaving only the pause while the lookup ran.
+        if ((message.searchQueries?.length ?? 0) > 0) return;
         message.visibleToUser = false;
     }
 
