@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import Quickshell
+import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Hyprland
 import qs.services
@@ -211,6 +212,43 @@ ContentPage {
 
     // {x, y, w, h} in layout coordinates while a drag is in progress, or null.
     property var dragPreview: null
+
+    /**
+     * What each panel says about itself, keyed by connector name.
+     *
+     * hyprctl reports what a monitor is currently doing and nothing about what
+     * it can do, so the only source for this is the EDID. Read once at load and
+     * again whenever the set of connected outputs changes.
+     *
+     * A missing entry, or a null field inside one, means the display did not say
+     * — which is not the same as "cannot", and is never treated as one. The
+     * controls below stay usable either way and only gain a line saying the
+     * monitor did not advertise it, so a display that under-reports its EDID
+     * cannot cost a feature that would have worked.
+     */
+    property var capabilities: ({})
+
+    function capsFor(output) {
+        return page.capabilities[output] ?? {};
+    }
+
+    Process {
+        id: capabilitiesProc
+        running: true
+        command: [Quickshell.shellPath("scripts/hyprland/display_capabilities.py")]
+        stdout: StdioCollector {
+            id: capabilitiesOut
+            onStreamFinished: {
+                try {
+                    page.capabilities = JSON.parse(capabilitiesOut.text);
+                } catch (e) {
+                    // No edid-decode, or an EDID nothing could read. Everything
+                    // then reports "not stated", which is the honest answer.
+                    page.capabilities = ({});
+                }
+            }
+        }
+    }
 
     /**
      * Where a monitor should land, given where it was dropped.
@@ -914,6 +952,23 @@ ContentPage {
                     }
                 ]
             }
+
+            StyledText {
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                font.pixelSize: Appearance.font.pixelSize.smallest
+                color: Appearance.colors.colSubtext
+                text: {
+                    if (!page.selected)
+                        return "";
+                    const caps = page.capsFor(page.selected.output);
+                    if (caps.vrr !== true)
+                        return Translation.tr("This screen doesn't advertise adaptive sync. It may still work — the setting is left available.");
+                    if (caps.vrrMin && caps.vrrMax)
+                        return Translation.tr("Adaptive sync supported, %1–%2 Hz.").arg(caps.vrrMin).arg(caps.vrrMax);
+                    return Translation.tr("Adaptive sync supported.");
+                }
+            }
         }
 
         ContentSubsection {
@@ -935,6 +990,23 @@ ContentPage {
                         value: 10
                     }
                 ]
+            }
+
+            StyledText {
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                font.pixelSize: Appearance.font.pixelSize.smallest
+                color: Appearance.colors.colSubtext
+                text: {
+                    if (!page.selected)
+                        return "";
+                    const depth = page.capsFor(page.selected.output).bitDepth;
+                    if (!depth)
+                        return Translation.tr("This screen doesn't state a colour depth. 10-bit is left available in case it works.");
+                    if (depth < 10)
+                        return Translation.tr("This screen reports %1 bits per channel, so 10-bit will most likely be ignored.").arg(depth);
+                    return Translation.tr("This screen reports %1 bits per channel.").arg(depth);
+                }
             }
         }
 
@@ -973,6 +1045,21 @@ ContentPage {
                         value: "hdredid"
                     }
                 ]
+            }
+
+            StyledText {
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                font.pixelSize: Appearance.font.pixelSize.smallest
+                color: Appearance.colors.colSubtext
+                text: {
+                    if (!page.selected)
+                        return "";
+                    const caps = page.capsFor(page.selected.output);
+                    if (caps.hdr === true)
+                        return Translation.tr("This screen advertises HDR.");
+                    return Translation.tr("This screen doesn't advertise HDR, so the HDR profiles will probably do nothing. They're left available anyway.");
+                }
             }
         }
 
