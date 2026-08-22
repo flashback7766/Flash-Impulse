@@ -1,4 +1,4 @@
-_commit='7511545ee20664e3b8b8d3322c0ffe7567c56f7a'
+_commit='1a4716cde794a59928d9d9fc15f2afc7a95de360'
 # Useful links:
 # https://git.outfoxxed.me/quickshell/quickshell/commits/branch/master
 # https://aur.archlinux.org/packages/quickshell-git
@@ -8,7 +8,7 @@ _prefix='flash-impulse'
 _pkgname=quickshell
 pkgname="$_prefix-$_pkgname-git"
 pkgver=0.1.0.r1
-pkgrel=9
+pkgrel=10
 pkgdesc="$_pkgname-git pinned commit and extra deps for $_prefix"
 arch=(x86_64 aarch64)
 # Renamed from illogical-impulse-*. `replaces` is what makes pacman swap the old
