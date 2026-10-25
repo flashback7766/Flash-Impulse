@@ -10,6 +10,16 @@ import qs.modules.common.widgets
 ContentPage {
     forceWidth: true
 
+    // Palette and accent writes are flushed by Config's own deferred timer,
+    // while execDetached forks right now — the script could jq-read the
+    // previous palette and regenerate from that. A short one-shot lets the
+    // write land first, and coalesces a burst of pokes into one regeneration.
+    Timer {
+        id: paletteRegenTimer
+        interval: 60
+        onTriggered: Quickshell.execDetached(["bash", "-c", `${Directories.wallpaperSwitchScriptPath} --noswitch`])
+    }
+
     ContentSection {
         icon: "contrast"
         title: Translation.tr("Light or dark")
@@ -159,7 +169,7 @@ ContentPage {
             currentValue: Config.options.appearance.palette.type
             onSelected: newValue => {
                 Config.options.appearance.palette.type = newValue;
-                Quickshell.execDetached(["bash", "-c", `${Directories.wallpaperSwitchScriptPath} --noswitch`]);
+                paletteRegenTimer.restart();
             }
             options: [
                 {
@@ -238,7 +248,7 @@ ContentPage {
                 }
                 onEditingFinished: {
                     Config.options.appearance.palette.accentColor = text.trim();
-                    Quickshell.execDetached(["bash", "-c", `${Directories.wallpaperSwitchScriptPath} --noswitch`]);
+                    paletteRegenTimer.restart();
                 }
                 StyledToolTip {
                     text: Translation.tr("A #rrggbb color to build the palette around. Leave empty to take it from the wallpaper instead.")

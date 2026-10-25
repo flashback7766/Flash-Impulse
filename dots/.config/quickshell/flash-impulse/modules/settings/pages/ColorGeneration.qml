@@ -13,6 +13,19 @@ import qs.modules.common.widgets
 ContentPage {
     forceWidth: true
 
+    // Nothing in the shell watches these keys — only switchwall.sh reads
+    // them — so a toggle here used to do precisely nothing until the next
+    // theme flip happened to run the script. Regenerate on change instead.
+    // pageReady keeps the spinboxes' initial binding evaluation (0 → stored
+    // value) from counting as a change.
+    property bool pageReady: false
+    Component.onCompleted: Qt.callLater(() => pageReady = true)
+    Timer {
+        id: colorGenRegenTimer
+        interval: 80
+        onTriggered: Quickshell.execDetached(["bash", "-c", `${Directories.wallpaperSwitchScriptPath} --noswitch`])
+    }
+
     ContentSection {
         icon: "colors"
         title: Translation.tr("Generation")
@@ -23,6 +36,7 @@ ContentPage {
             checked: Config.options.appearance.wallpaperTheming.enableAppsAndShell
             onCheckedChanged: {
                 Config.options.appearance.wallpaperTheming.enableAppsAndShell = checked;
+                colorGenRegenTimer.restart();
             }
         }
         ConfigSwitch {
@@ -31,6 +45,7 @@ ContentPage {
             checked: Config.options.appearance.wallpaperTheming.enableQtApps
             onCheckedChanged: {
                 Config.options.appearance.wallpaperTheming.enableQtApps = checked;
+                colorGenRegenTimer.restart();
             }
             StyledToolTip {
                 text: Translation.tr("Shell & utilities theming must also be enabled")
@@ -42,6 +57,7 @@ ContentPage {
             checked: Config.options.appearance.wallpaperTheming.enableTerminal
             onCheckedChanged: {
                 Config.options.appearance.wallpaperTheming.enableTerminal = checked;
+                colorGenRegenTimer.restart();
             }
             StyledToolTip {
                 text: Translation.tr("Shell & utilities theming must also be enabled")
@@ -55,6 +71,7 @@ ContentPage {
                 checked: Config.options.appearance.wallpaperTheming.terminalGenerationProps.forceDarkMode
                 onCheckedChanged: {
                      Config.options.appearance.wallpaperTheming.terminalGenerationProps.forceDarkMode= checked;
+                colorGenRegenTimer.restart();
                 }
                 StyledToolTip {
                     text: Translation.tr("Ignored if terminal theming is not enabled")
@@ -71,6 +88,7 @@ ContentPage {
             stepSize: 10
             onValueChanged: {
                 Config.options.appearance.wallpaperTheming.terminalGenerationProps.harmony = value / 100;
+                if (pageReady) colorGenRegenTimer.restart();
             }
         }
         ConfigSpinBox {
@@ -82,6 +100,7 @@ ContentPage {
             stepSize: 10
             onValueChanged: {
                 Config.options.appearance.wallpaperTheming.terminalGenerationProps.harmonizeThreshold = value;
+                if (pageReady) colorGenRegenTimer.restart();
             }
         }
         ConfigSpinBox {
@@ -93,6 +112,7 @@ ContentPage {
             stepSize: 10
             onValueChanged: {
                 Config.options.appearance.wallpaperTheming.terminalGenerationProps.termFgBoost = value / 100;
+                if (pageReady) colorGenRegenTimer.restart();
             }
         }
     }
