@@ -21,6 +21,23 @@ ContentPage {
     property bool autoSwitchProfiles: true
     property int chargeThreshold: 100
     property bool adaptiveCharging: false
+    // Guards the adaptive switch's handler: every programmatic write of
+    // adaptiveCharging re-enters it through the checked binding, which used to
+    // double-fire the threshold write and, on page load, force the limit to
+    // the loaded mode before the user had touched anything.
+    property bool adaptiveGuard: false
+
+    /** The one path every writer of the adaptive switch takes. */
+    function setAdaptive(on: bool) {
+        adaptiveGuard = true;
+        adaptiveCharging = on;
+        if (on && chargeThreshold > 80)
+            setChargeLimit(80);
+        else if (!on)
+            setChargeLimit(100);
+        savePowerConfig();
+        adaptiveGuard = false;
+    }
 
     function loadPowerConfig() {
         queryProfileProc.running = true;
@@ -89,6 +106,7 @@ ContentPage {
         id: powerConfigFile
         path: Qt.resolvedUrl(page.powerConfigPath)
         onLoaded: {
+            page.adaptiveGuard = true;
             try {
                 const cfg = JSON.parse(powerConfigFile.text());
                 if (cfg.profiles) {
@@ -100,7 +118,10 @@ ContentPage {
                     if (cfg.battery.chargeThreshold) page.chargeThreshold = cfg.battery.chargeThreshold;
                     if (cfg.battery.adaptive !== undefined) page.adaptiveCharging = cfg.battery.adaptive;
                 }
-            } catch (e) {}
+            } catch (e) {
+            } finally {
+                page.adaptiveGuard = false;
+            }
         }
     }
 
@@ -114,7 +135,7 @@ ContentPage {
             spacing: 12
 
             StyledText {
-                text: Translation.tr("Active profile: ") + (page.activeProfile === "power-saver" ? Translation.tr("Power Saver (Quiet fan)") : (page.activeProfile === "performance" ? Translation.tr("Performance (Turbo fan)") : Translation.tr("Balanced (Standard fan)")))
+                text: Translation.tr("Active profile:") + " " + (page.activeProfile === "power-saver" ? Translation.tr("Power Saver (Quiet fan)") : (page.activeProfile === "performance" ? Translation.tr("Performance (Turbo fan)") : Translation.tr("Balanced (Standard fan)")))
                 font.pixelSize: Appearance.font.pixelSize.normal
                 color: Appearance.colors.colPrimary
             }
@@ -167,30 +188,30 @@ ContentPage {
             ConfigRow {
                 uniform: true
                 visible: page.autoSwitchProfiles
+                // ConfigSelectionArray reads displayName and fires `selected`;
+                // the options used `name` and the handler listened for a signal
+                // that does not exist, so both selectors rendered blank and no
+                // click ever saved a default profile.
                 ConfigSelectionArray {
-                    icon: "battery_saver"
-                    text: Translation.tr("On Battery")
                     options: [
-                        { name: Translation.tr("Power saver"), value: "power-saver" },
-                        { name: Translation.tr("Balanced"), value: "balanced" },
-                        { name: Translation.tr("Performance"), value: "performance" }
+                        { displayName: Translation.tr("Power saver"), value: "power-saver" },
+                        { displayName: Translation.tr("Balanced"), value: "balanced" },
+                        { displayName: Translation.tr("Performance"), value: "performance" }
                     ]
                     currentValue: page.defaultBatteryProfile
-                    onSelectionChanged: value => {
+                    onSelected: (value) => {
                         page.defaultBatteryProfile = value;
                         page.savePowerConfig();
                     }
                 }
                 ConfigSelectionArray {
-                    icon: "power"
-                    text: Translation.tr("On AC / Charger")
                     options: [
-                        { name: Translation.tr("Power saver"), value: "power-saver" },
-                        { name: Translation.tr("Balanced"), value: "balanced" },
-                        { name: Translation.tr("Performance"), value: "performance" }
+                        { displayName: Translation.tr("Power saver"), value: "power-saver" },
+                        { displayName: Translation.tr("Balanced"), value: "balanced" },
+                        { displayName: Translation.tr("Performance"), value: "performance" }
                     ]
                     currentValue: page.defaultAcProfile
-                    onSelectionChanged: value => {
+                    onSelected: (value) => {
                         page.defaultAcProfile = value;
                         page.savePowerConfig();
                     }
@@ -213,13 +234,8 @@ ContentPage {
                 text: Translation.tr("Adaptive battery health protection")
                 checked: page.adaptiveCharging
                 onCheckedChanged: {
-                    page.adaptiveCharging = checked;
-                    if (checked && page.chargeThreshold > 80) {
-                        page.setChargeLimit(80);
-                    } else if (!checked) {
-                        page.setChargeLimit(100);
-                    }
-                    page.savePowerConfig();
+                    if (page.adaptiveGuard) return;
+                    page.setAdaptive(checked);
                 }
                 StyledToolTip {
                     text: Translation.tr("Limits charging to 80% to maximize ThinkPad battery lifespan. On reaching 80%, charger powers internal hardware directly (AC passthrough).")
@@ -235,11 +251,7 @@ ContentPage {
                     buttonIcon: "shield"
                     text: Translation.tr("80% (Preserve Lifespan)")
                     checked: page.chargeThreshold === 80
-                    onClicked: {
-                        page.adaptiveCharging = true;
-                        page.setChargeLimit(80);
-                        page.savePowerConfig();
-                    }
+                    onClicked: page.setAdaptive(true)
                 }
 
                 SecondaryTabButton {
@@ -247,11 +259,7 @@ ContentPage {
                     buttonIcon: "battery_full"
                     text: Translation.tr("100% (Full Capacity)")
                     checked: page.chargeThreshold === 100
-                    onClicked: {
-                        page.adaptiveCharging = false;
-                        page.setChargeLimit(100);
-                        page.savePowerConfig();
-                    }
+                    onClicked: page.setAdaptive(false)
                 }
             }
 

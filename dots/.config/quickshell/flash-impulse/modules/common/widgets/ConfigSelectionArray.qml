@@ -26,6 +26,7 @@ Flow {
     signal selected(var newValue)
 
     Repeater {
+        id: optionsRepeater
         model: root.options
         delegate: SelectionGroupButton {
             id: paletteButton
@@ -35,10 +36,17 @@ Flow {
                 if (index === 0) {
                     paletteButton.leftmost = true
                 } else {
-                    var prev = root.children[index - 1]
+                    // The previous delegate is not children[index - 1]:
+                    // children[0] is the Repeater itself, so delegates sit one
+                    // slot later and that lookup resolved to the button two
+                    // places back (or to the Repeater, which has no y of its
+                    // own) — the wrap detection read the wrong pair on every
+                    // row but the first.
+                    var prev = optionsRepeater.itemAt(index - 1)
                     var thisIsOnNewLine = prev && prev.y !== paletteButton.y
                     paletteButton.leftmost = thisIsOnNewLine
-                    prev.rightmost = thisIsOnNewLine
+                    if (prev)
+                        prev.rightmost = thisIsOnNewLine
                 }
             }
             leftmost: index === 0
