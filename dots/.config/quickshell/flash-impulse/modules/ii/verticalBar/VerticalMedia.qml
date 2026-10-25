@@ -28,18 +28,20 @@ MouseArea {
         running: activePlayer?.playbackState == MprisPlaybackState.Playing
         interval: Config.options.resources.updateInterval
         repeat: true
-        onTriggered: activePlayer.positionChanged()
+        onTriggered: activePlayer?.positionChanged()
     }
 
     acceptedButtons: Qt.MiddleButton | Qt.BackButton | Qt.ForwardButton | Qt.RightButton | Qt.LeftButton
     hoverEnabled: !Config.options.bar.tooltips.clickToShow
     onPressed: (event) => {
+        // No MPRIS player at all is normal (nothing playing); the widget
+        // stays, the buttons must not throw on it.
         if (event.button === Qt.MiddleButton) {
-            activePlayer.togglePlaying();
+            activePlayer?.togglePlaying();
         } else if (event.button === Qt.BackButton) {
-            activePlayer.previous();
+            activePlayer?.previous();
         } else if (event.button === Qt.ForwardButton || event.button === Qt.RightButton) {
-            activePlayer.next();
+            activePlayer?.next();
         } else if (event.button === Qt.LeftButton) {
             GlobalStates.mediaControlsOpen = !GlobalStates.mediaControlsOpen
         }

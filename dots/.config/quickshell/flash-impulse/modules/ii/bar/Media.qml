@@ -23,7 +23,7 @@ Item {
         running: activePlayer?.playbackState == MprisPlaybackState.Playing
         interval: Config.options.resources.updateInterval
         repeat: true
-        onTriggered: activePlayer.positionChanged()
+        onTriggered: activePlayer?.positionChanged()
     }
 
     // Same press response as every button in the shell; this was a bare
@@ -36,12 +36,14 @@ Item {
         anchors.fill: parent
         acceptedButtons: Qt.MiddleButton | Qt.BackButton | Qt.ForwardButton | Qt.RightButton | Qt.LeftButton
         onPressed: (event) => {
+            // No MPRIS player at all is normal (nothing playing); the widget
+            // stays, the buttons must not throw on it.
             if (event.button === Qt.MiddleButton) {
-                activePlayer.togglePlaying();
+                activePlayer?.togglePlaying();
             } else if (event.button === Qt.BackButton) {
-                activePlayer.previous();
+                activePlayer?.previous();
             } else if (event.button === Qt.ForwardButton || event.button === Qt.RightButton) {
-                activePlayer.next();
+                activePlayer?.next();
             } else if (event.button === Qt.LeftButton) {
                 GlobalStates.mediaControlsOpen = !GlobalStates.mediaControlsOpen
             }

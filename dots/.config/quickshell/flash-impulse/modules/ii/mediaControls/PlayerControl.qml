@@ -55,12 +55,14 @@ Item { // Player instance
         interval: Config.options.resources.updateInterval
         repeat: true
         onTriggered: {
-            root.player.positionChanged()
+            root.player?.positionChanged()
         }
     }
 
     onArtFilePathChanged: {
-        if (root.artUrl.length == 0) {
+        // The player can quit while the popup is open; artUrl goes undefined
+        // and the unguarded length read threw.
+        if ((root.artUrl ?? "").length == 0) {
             root.artDominantColor = Appearance.m3colors.m3secondaryContainer
             return;
         }
