@@ -69,6 +69,8 @@ hl.window_rule({match = {class = "^(plasma-changeicons)$" }, move = {999999, 999
 hl.window_rule({match = {title = "^(Copying — Dolphin)$" }, move = {40, 80}})
 
 -- Tiling
+-- Ignore app maximize requests so restored window states do not override tiling.
+hl.window_rule({match = {class = ".*" }, suppress_event = "maximize"})
 hl.window_rule({match = {class = "^dev\\.warp\\.Warp$" }, tile = true})
 
 -- Picture-in-Picture
@@ -142,6 +144,9 @@ hl.layer_rule({ match = { namespace = "osk[0-9]*" }, ignore_alpha = 0.6})
 hl.layer_rule({ match = { namespace = "quickshell:.*" }, blur_popups = true})
 hl.layer_rule({ match = { namespace = "quickshell:.*" }, blur = true})
 hl.layer_rule({ match = { namespace = "quickshell:.*" }, ignore_alpha = 0.79})
+-- The wallpaper is a fullscreen opaque layer; blurring behind it is pure
+-- wasted GPU (port of upstream 8bbcc4f6).
+hl.layer_rule({ match = { namespace = "quickshell:background" }, blur = false})
 hl.layer_rule({ match = { namespace = "quickshell:bar" }, animation = "slide"})
 hl.layer_rule({ match = { namespace = "quickshell:actionCenter" }, no_anim = true})
 hl.layer_rule({ match = { namespace = "quickshell:cheatsheet" }, animation = "slide bottom"})
