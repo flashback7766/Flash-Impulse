@@ -88,13 +88,13 @@ Singleton {
         }
         stdout: StdioCollector {
             onStreamFinished: {
-                    root.directory = Qt.resolvedUrl(validateDirProc.nicePath)
                 const result = text.trim()
                 if (result === "dir") {
+                    root.directory = Qt.resolvedUrl(validateDirProc.nicePath);
                 } else if (result === "file") {
-                    root.directory = Qt.resolvedUrl(FileUtils.parentDirectory(validateDirProc.nicePath))
+                    root.directory = Qt.resolvedUrl(FileUtils.parentDirectory(validateDirProc.nicePath));
                 } else {
-                    // Ignore
+                    // Ignore invalid path
                 }
             }
         }

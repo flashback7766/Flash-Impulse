@@ -9,8 +9,8 @@ import Quickshell.Io
 
 Singleton {
     id: root
-    property bool available: UPower.displayDevice.isLaptopBattery
-    property var chargeState: UPower.displayDevice.state
+    property bool available: UPower.displayDevice?.isLaptopBattery ?? false
+    property var chargeState: UPower.displayDevice?.state ?? UPowerDeviceState.Unknown
     property bool isCharging: chargeState == UPowerDeviceState.Charging
     property bool isPluggedIn: isCharging || chargeState == UPowerDeviceState.PendingCharge
     property real percentage: UPower.displayDevice?.percentage ?? 1
@@ -27,9 +27,9 @@ Singleton {
     property bool isSuspendingAndNotCharging: allowAutomaticSuspend && isSuspending && !isCharging
     property bool isFullAndCharging: isFull && isCharging
 
-    property real energyRate: UPower.displayDevice.changeRate
-    property real timeToEmpty: UPower.displayDevice.timeToEmpty
-    property real timeToFull: UPower.displayDevice.timeToFull
+    property real energyRate: UPower.displayDevice?.changeRate ?? 0
+    property real timeToEmpty: UPower.displayDevice?.timeToEmpty ?? 0
+    property real timeToFull: UPower.displayDevice?.timeToFull ?? 0
 
     property real health: (function() {
         const devList = UPower.devices.values;

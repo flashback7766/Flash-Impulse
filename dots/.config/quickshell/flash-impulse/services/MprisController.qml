@@ -34,7 +34,7 @@ Singleton {
         }
         return (
             // Remove native browser buses only if plasma-browser-integration is actually active on D-Bus
-            !(hasActivePlasmaIntegration && player.dbusName.startsWith('org.mpris.MediaPlayer2.firefox')) && !(hasActivePlasmaIntegration && player.dbusName.startsWith('org.mpris.MediaPlayer2.chromium')) &&
+            !(hasActivePlasmaIntegration && player.dbusName?.startsWith('org.mpris.MediaPlayer2.firefox')) && !(hasActivePlasmaIntegration && player.dbusName?.startsWith('org.mpris.MediaPlayer2.chromium')) &&
             // playerctld just copies other buses and we don't need duplicates
             !player.dbusName?.startsWith('org.mpris.MediaPlayer2.playerctld') &&
             // Non-instance mpd bus
@@ -58,7 +58,7 @@ Singleton {
 			Component.onDestruction: {
 				if (root.trackedPlayer == null || !root.trackedPlayer.isPlaying) {
 					for (const player of Mpris.players.values) {
-						if (player.playbackState.isPlaying) {
+						if (player.isPlaying) {
 							root.trackedPlayer = player;
 							break;
 						}

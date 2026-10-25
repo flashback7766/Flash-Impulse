@@ -118,7 +118,7 @@ Singleton {
             }
         }
         onMultipliedBrightnessChanged: {
-            if (monitor.animationEnabled) syncBrightness();
+            if (monitor.animateChanges) syncBrightness();
             else setTimer.restart();
         }
 
@@ -233,7 +233,6 @@ Singleton {
                 stdout: StdioCollector {
                     id: lightnessCollector
                     onStreamFinished: {
-                        Quickshell.execDetached(["rm", screenScope.screenshotPath]); // Cleanup
                         const lightness = lightnessCollector.text
                         const newMultiplier = root.brightnessMultiplierForLightness(parseFloat(lightness))
                         Brightness.getMonitorForScreen(screenScope.modelData).setBrightnessMultiplier(newMultiplier)
