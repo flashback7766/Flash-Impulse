@@ -66,14 +66,26 @@ Scope {
     }
 
     function tryFingerUnlock() {
-        if (root.fingerprintsConfigured) {
+        if (root.fingerprintsConfigured && !fingerPam.active) {
             fingerPam.start();
         }
     }
 
     function stopFingerPam() {
+        fingerRetryTimer.stop();
         if (fingerPam.active) {
             fingerPam.abort();
+        }
+    }
+
+    Timer {
+        id: fingerRetryTimer
+        interval: 1500
+        repeat: false
+        onTriggered: {
+            if (root.fingerprintsConfigured && !root.unlockInProgress) {
+                root.tryFingerUnlock();
+            }
         }
     }
 
@@ -129,8 +141,10 @@ Scope {
             if (result == PamResult.Success) {
                 root.unlocked(root.targetAction);
                 stopFingerPam();
-            } else if (result == PamResult.Error) { // if timeout or etc..
-                tryFingerUnlock()
+            } else if (result == PamResult.Error) {
+                if (root.fingerprintsConfigured) {
+                    fingerRetryTimer.restart();
+                }
             }
         }
     }
