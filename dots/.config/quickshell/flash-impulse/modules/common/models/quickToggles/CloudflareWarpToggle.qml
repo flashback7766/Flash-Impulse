@@ -41,7 +41,7 @@ QuickToggleModel {
         id: registrationProc
         command: ["warp-cli", "registration", "new"]
         onExited: (exitCode, exitStatus) => {
-            console.log("Warp registration exited with code and status:", exitCode, exitStatus)
+            console.debug("Warp registration exited with code and status:", exitCode, exitStatus)
             if (exitCode === 0) {
                 connectProc.running = true
             } else {
@@ -57,7 +57,7 @@ QuickToggleModel {
     Process {
         id: fetchActiveState
         running: true
-        command: ["bash", "-c", "warp-cli status"]
+        command: ["warp-cli", "status"]
         stdout: StdioCollector {
             id: warpStatusCollector
             onStreamFinished: {
