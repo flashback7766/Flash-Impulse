@@ -10,8 +10,9 @@ RippleButton {
     property bool showPing: false
     // Generation carries on with the sidebar closed, so say so: a steady dot for
     // an answer that's waiting to be read, a pulsing one for an answer still
-    // being written.
-    readonly property bool workingUnseen: Ai.isGenerating && !GlobalStates.sidebarLeftOpen
+    // being written. Read via the GlobalStates mirror: binding to Ai here is
+    // what used to construct the whole AI stack at shell startup.
+    readonly property bool workingUnseen: GlobalStates.aiGenerating && !GlobalStates.sidebarLeftOpen
 
     visible: Config.options.policies.ai !== 0
 

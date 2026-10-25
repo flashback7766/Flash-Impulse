@@ -90,10 +90,13 @@ Scope { // Scope
     // the tree we'd be destroying: a half-written message, a queued one, an
     // attachment picked but not sent, a command waiting for approval, an answer
     // still streaming in. Detached or pinned means it's on screen regardless.
+    // The Ai reads go through the GlobalStates mirrors so this wrapper — which
+    // exists from shell startup — does not construct the AI service before
+    // the sidebar has ever been opened.
     readonly property bool contentBusy: root.detach || root.pin
-        || !Ai.conversationIdle
-        || (Ai.queuedMessages?.length ?? 0) > 0
-        || Ai.pendingFilePath.length > 0
+        || !GlobalStates.aiConversationIdle
+        || GlobalStates.aiQueuedMessages > 0
+        || GlobalStates.aiPendingFilePathLength > 0
         || (root.sidebarContent?.composerBusy ?? false)
 
     readonly property int contentUnloadDelay: (Config?.options.sidebar.unloadDelaySeconds ?? 300) * 1000

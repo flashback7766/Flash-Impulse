@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 
 import qs.modules.common.functions as CF
 import qs.modules.common
+import qs
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
@@ -33,6 +34,11 @@ Singleton {
     signal responseFinished()
 
     property bool isGenerating: requester.running || commandExecutionProc.running
+    // Mirrored into GlobalStates for the bar button and the sidebar wrapper:
+    // they would otherwise be the reason this singleton (and with it the
+    // ollama probe, the MCP subprocesses and the chat-store index) exists at
+    // every shell startup, before anyone has opened the chat at all.
+    onIsGeneratingChanged: GlobalStates.aiGenerating = isGenerating
     property bool aborted: false
     property string sessionSummary: "" // Accumulated summary of compressed conversation
     property bool condensing: false // Indicates background summarization is active
@@ -42,6 +48,7 @@ Singleton {
     // interrupting it. Pressing Enter used to abort the running turn, throwing
     // away a half-finished answer nobody had read yet.
     property var queuedMessages: []
+    onQueuedMessagesChanged: GlobalStates.aiQueuedMessages = queuedMessages?.length ?? 0
 
     /**
      * @returns true if the message was queued rather than sent immediately.
@@ -74,6 +81,7 @@ Singleton {
         }
         return true;
     }
+    onConversationIdleChanged: GlobalStates.aiConversationIdle = conversationIdle
 
     function clearQueue() {
         root.queuedMessages = [];
@@ -1294,6 +1302,7 @@ The shell (Quickshell config "flash-impulse"):
     }
 
     property string pendingFilePath: ""
+    onPendingFilePathChanged: GlobalStates.aiPendingFilePathLength = pendingFilePath.length
 
     Component.onCompleted: {
         // Ensure temporary directory exists
