@@ -48,7 +48,9 @@ Singleton {
             if (minutes > 0 || !formatted)
                 formatted += `${formatted ? ", " : ""}${minutes}m`;
             uptime = formatted;
-            interval = Config.options?.resources?.updateInterval ?? 3000;
+            // The string's finest unit is minutes, so re-arming with the
+            // resources poll interval just re-reads an unchanged file.
+            interval = 60000;
         }
     }
 

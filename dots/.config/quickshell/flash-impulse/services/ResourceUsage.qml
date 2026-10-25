@@ -185,8 +185,8 @@ Singleton {
             const mv = parseInt(fileGpuVolt.text());
             if (!isNaN(mv)) root.gpuVoltage = mv / 1000;
         }
-        if (fileCpuGovernor.path.length > 0) root.cpuGovernor = fileCpuGovernor.text().trim();
-        if (fileVramTotal.path.length > 0) {
+        if (fileVramTotal.path.length > 0 && root.vramTotal === 0) {
+            // The carve-out is fixed for the whole boot, so parse it once.
             const total = parseInt(fileVramTotal.text());
             if (!isNaN(total)) root.vramTotal = total;
         }
@@ -194,6 +194,14 @@ Singleton {
             const used = parseInt(fileVramUsed.text());
             if (!isNaN(used)) root.vramUsed = used;
         }
+        root.systemPowerW = root.readPower();
+        root.cpuPowerW = root.readCpuPower();
+    }
+
+    /** Slow-tier reads: values that sit still between popup openings. */
+    function readSlowSensors() {
+        if (!root.sensorsReady) return;
+        if (fileCpuGovernor.path.length > 0) root.cpuGovernor = fileCpuGovernor.text().trim();
         if (fileVramMclk.path.length > 0) {
             const mclk = fileVramMclk.text();
             root.vramFreqMhz = root.parseDpmClock(mclk);
@@ -206,8 +214,6 @@ Singleton {
                 if (maxMclk > 0) root.memorySpeedMts = maxMclk * 2;
             }
         }
-        root.systemPowerW = root.readPower();
-        root.cpuPowerW = root.readCpuPower();
         root.updateSwapType();
         root.updateZramRatio();
     }
@@ -339,7 +345,7 @@ Singleton {
             // Reload files
             fileMeminfo.reload()
             fileStat.reload()
-            root.reloadSensorFiles()
+            root.reloadFastSensorFiles()
 
             // Parse memory and swap usage
             const textMeminfo = fileMeminfo.text()
@@ -368,9 +374,22 @@ Singleton {
             root.updatePerCoreUsage(textStat)
             root.readSensors()
             root.updateHistories()
-            interval = Config.options?.resources?.updateInterval ?? 3000
+
+            // Slow tier: values that never move at the bar's cadence — swap
+            // type, zram ratio, the governor, the DRAM rate, the VRAM
+            // carve-out. Every tenth tick is far fresher than any popup asks
+            // for, and keeps the fast tick down to the files the bar shows.
+            root.slowTick = (root.slowTick + 1) % 10
+            if (root.slowTick === 0) {
+                root.reloadSlowSensorFiles()
+                root.readSlowSensors()
+            }
+
+            interval = Config.options?.resources?.updateInterval ?? 1000
         }
     }
+
+    property int slowTick: 0
 
     /**
      * Sum of every logical core's utilisation (0..coreCount), the number htop
@@ -404,7 +423,8 @@ Singleton {
         root.previousCoreStats = newStats;
     }
 
-    function reloadSensorFiles() {
+    /** Files the bar renders: reloaded every tick. */
+    function reloadFastSensorFiles() {
         if (!root.sensorsReady) return;
         if (fileCpuTemp.path.length > 0) fileCpuTemp.reload();
         if (fileCpuFreq.path.length > 0) fileCpuFreq.reload();
@@ -414,17 +434,22 @@ Singleton {
         if (fileGpuPower.path.length > 0) fileGpuPower.reload();
         if (fileGpuVolt.path.length > 0) fileGpuVolt.reload();
         if (fileGpuSclk.path.length > 0 && root.gpuMaxFreqMhz === 0) fileGpuSclk.reload();
-        if (fileCpuGovernor.path.length > 0) fileCpuGovernor.reload();
-        if (fileZramStat.path.length > 0) fileZramStat.reload();
-        if (fileVramTotal.path.length > 0) fileVramTotal.reload();
         if (fileVramUsed.path.length > 0) fileVramUsed.reload();
-        if (fileVramMclk.path.length > 0) fileVramMclk.reload();
-        fileSwaps.reload();
         if (fileBatStatus.path.length > 0) fileBatStatus.reload();
         if (fileBatPower.path.length > 0) fileBatPower.reload();
         if (fileBatCurrent.path.length > 0) fileBatCurrent.reload();
         if (fileBatVoltage.path.length > 0) fileBatVoltage.reload();
         if (fileRaplEnergy.path.length > 0) fileRaplEnergy.reload();
+    }
+
+    /** Files nothing on the bar watches: every tenth tick is plenty. */
+    function reloadSlowSensorFiles() {
+        if (!root.sensorsReady) return;
+        if (fileCpuGovernor.path.length > 0) fileCpuGovernor.reload();
+        if (fileVramTotal.path.length > 0 && root.vramTotal === 0) fileVramTotal.reload();
+        if (fileVramMclk.path.length > 0) fileVramMclk.reload();
+        if (fileZramStat.path.length > 0) fileZramStat.reload();
+        fileSwaps.reload();
     }
 
     FileView { id: fileMeminfo; path: "/proc/meminfo" }

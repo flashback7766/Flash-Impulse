@@ -556,7 +556,11 @@ Singleton {
             }
 
             property JsonObject resources: JsonObject {
-                property int updateInterval: 3000
+                // A tick is ~a dozen tiny sysfs reads with no process spawn,
+                // so a fresh-feeling 1 s cadence costs next to nothing; slow
+                // values (governor, zram ratio, DRAM rate) sit on a separate
+                // every-tenth-tick tier in ResourceUsage.
+                property int updateInterval: 1000
                 property int historyLength: 60
             }
 
