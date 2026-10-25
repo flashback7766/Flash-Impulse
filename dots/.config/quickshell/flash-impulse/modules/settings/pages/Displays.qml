@@ -171,7 +171,11 @@ ContentPage {
                 "availableModes": modes,
                 "mode": mode,
                 "customMode": modes.indexOf(mode) < 0,
-                "vrr": ipc.vrr ? 1 : 0,
+                // Hyprland's vrr is 0-3 (2 = fullscreen only); the boolean
+                // fold here collapsed 2 and 3 onto "always on", so opening the
+                // page on a fullscreen-only monitor and hitting Apply silently
+                // switched it to always-on.
+                "vrr": Math.max(0, Math.min(3, ipc.vrr ?? 0)),
                 "bitdepth": (ipc.currentFormat ?? "").includes("2101010") ? 10 : 8,
                 "cm": ipc.colorManagementPreset ?? "auto",
                 "mirror": ipc.mirrorOf && ipc.mirrorOf !== "none" ? ipc.mirrorOf : ""
@@ -197,11 +201,20 @@ ContentPage {
             if (Math.abs(d.scale - m.scale) > 0.001) return true;
             if (d.transform !== (ipc.transform ?? 0)) return true;
             if (d.disabled !== (ipc.disabled ?? false)) return true;
-            if (d.vrr !== (ipc.vrr ? 1 : 0)) return true;
+            if (d.vrr !== Math.max(0, Math.min(3, ipc.vrr ?? 0))) return true;
             if (d.bitdepth !== ((ipc.currentFormat ?? "").includes("2101010") ? 10 : 8)) return true;
             if (d.cm !== (ipc.colorManagementPreset ?? "auto")) return true;
             if (d.mirror !== (ipc.mirrorOf && ipc.mirrorOf !== "none" ? ipc.mirrorOf : "")) return true;
-            if (!d.disabled && d.mode !== `${m.width}x${m.height}@${(ipc.refreshRate ?? 60).toFixed(2)}Hz`) return true;
+            // Compare against the closest advertised mode, the same way the
+            // draft was seeded one screen up. The live rate is not the mode
+            // string (144.00101 vs "144.00Hz"), so comparing the draft to a
+            // string rebuilt from the live rate made the page open claiming
+            // unapplied changes nobody had made.
+            if (!d.disabled) {
+                const liveModes = ipc.availableModes ?? [];
+                const liveMode = page.closestMode(liveModes, m.width, m.height, ipc.refreshRate ?? 60);
+                if (liveMode !== null && d.mode !== liveMode) return true;
+            }
         }
         return false;
     }
