@@ -15,3 +15,7 @@ __pycache__/
 
 # Emacs auto backup file
 *~
+
+# Machine-local state: display layout and the pre-install backup
+dots/.config/hypr/monitors.lua
+dots/.config/hypr/custom.pre-flash-impulse/
