@@ -23,11 +23,25 @@ if status is-interactive
     alias celar "printf '\033[2J\033[3J\033[1;1H'"
     alias claer "printf '\033[2J\033[3J\033[1;1H'"
     alias pamcan pacman
+    alias prod 'ssh prod'
     alias q 'qs -c flash-impulse'
     if test "$TERM" != "linux"
         alias ls 'eza --icons=auto'
+        alias cat 'bat --paging=never'
     end
     if test "$TERM" = "xterm-kitty"
         alias ssh 'kitten ssh'
     end
+
+    # Zoxide fast navigation
+    if command -q zoxide
+        zoxide init fish | source
+    end
 end
+
+# FlashAgent
+fish_add_path /home/flashback/.local/bin
+
+
+# Added by Antigravity CLI installer
+set -gx PATH "/home/flashback/.local/bin" $PATH

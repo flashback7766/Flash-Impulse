@@ -1,6 +1,9 @@
 [DetailsMode]
 PreviewSize=32
 
+[ExtractDialog]
+1600x1000 screen: Window-Maximized=true
+
 [General]
 GlobalViewProps=false
 ShowFullPath=true
