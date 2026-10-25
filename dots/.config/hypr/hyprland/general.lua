@@ -31,18 +31,13 @@ hl.monitor({
 
 hl.gesture({
     fingers = 3,
-    direction = "swipe",
-    action = "move"
+    direction = "horizontal",
+    action = "workspace"
 })
 hl.gesture({
     fingers = 3,
     direction = "pinch",
     action = "fullscreen"
-})
-hl.gesture({
-    fingers = 4,
-    direction = "horizontal",
-    action = "workspace"
 })
 hl.gesture({
     fingers = 4,
@@ -61,12 +56,13 @@ hl.gesture({
 
 hl.config({
     gestures = {
-        workspace_swipe_distance = 700,
-        workspace_swipe_cancel_ratio = 0.2,
-        workspace_swipe_min_speed_to_force = 5,
+        workspace_swipe_distance = 300,
+        workspace_swipe_invert = true,
+        workspace_swipe_min_speed_to_force = 30,
+        workspace_swipe_cancel_ratio = 0.5,
+        workspace_swipe_create_new = true,
         workspace_swipe_direction_lock = true,
-        workspace_swipe_direction_lock_threshold = 10,
-        workspace_swipe_create_new = true
+        workspace_swipe_direction_lock_threshold = 10
     },
     general = {
         -- Gaps and border (slightly roomier than upstream — M3 Expressive
@@ -98,6 +94,9 @@ hl.config({
         rounding_power = 3.0,
         rounding = 26,
 
+        active_opacity = 1.0,
+        inactive_opacity = 0.94,
+
         blur = {
             enabled = true,
             xray = true,
@@ -126,7 +125,7 @@ hl.config({
         },
         -- Dim
         dim_inactive = true,
-        dim_strength = 0.05,
+        dim_strength = 0.08,
         dim_special = 0.2
     },
     animations = {
@@ -258,16 +257,16 @@ hl.animation({
 hl.animation({
     leaf = "specialWorkspaceIn",
     enabled = true,
-    speed = aspeed(2.8),
-    bezier = "emphasizedDecel",
-    style = "slidevert"
+    speed = aspeed(2.6),
+    bezier = "expressiveFastSpatial",
+    style = "slidevert top 50%"
 })
 hl.animation({
     leaf = "specialWorkspaceOut",
     enabled = true,
-    speed = aspeed(1.2),
+    speed = aspeed(2.0),
     bezier = "emphasizedAccel",
-    style = "slidevert"
+    style = "slidevert bottom 50%"
 })
 -- zoom
 hl.animation({
@@ -299,7 +298,7 @@ hl.config({
     misc = {
         disable_hyprland_logo = true,
         disable_splash_rendering = true,
-        vrr = 0,
+        vrr = 2,
         mouse_move_enables_dpms = true,
         key_press_enables_dpms = true,
         animate_manual_resizes = false,

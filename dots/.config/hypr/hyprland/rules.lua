@@ -179,3 +179,16 @@ hl.layer_rule({ match = { namespace = "quickshell:wallpaperSelector" }, animatio
 
 -- Launchers need to be FAST
 hl.layer_rule({ match = { namespace = "gtk4-layer-shell" }, no_anim = true})
+
+-- Quake-style dropdown terminal
+hl.window_rule({ match = { class = "^(dropdown-terminal)$" }, float = true })
+hl.window_rule({ match = { class = "^(dropdown-terminal)$" }, size = {"(monitor_w*0.46)", "(monitor_h*0.40)"} })
+hl.window_rule({ match = { class = "^(dropdown-terminal)$" }, move = {"(monitor_w*0.27)", "60"} })
+hl.window_rule({ match = { class = "^(dropdown-terminal)$" }, animation = "slide top" })
+hl.window_rule({ match = { class = "^(dropdown-terminal)$" }, rounding = 16 })
+hl.window_rule({ match = { class = "^(dropdown-terminal)$" }, workspace = "special:dropdown" })
+
+-- Fullscreen games immediate (Tearing support)
+hl.window_rule({ match = { class = "^(steam_app_.*)$" }, immediate = true })
+hl.window_rule({ match = { class = "^(cs2|dota2|gamescope)$" }, immediate = true })
+

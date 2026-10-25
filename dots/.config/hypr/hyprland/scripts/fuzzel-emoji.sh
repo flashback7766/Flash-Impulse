@@ -3,26 +3,8 @@ set -euo pipefail
 
 MODE="${1:-type}"
 
-emoji="$(sed '1,/^### DATA ###$/d' "$0" | fuzzel --match-mode fzf --dmenu | cut -d ' ' -f 1 | tr -d '\n')"
-
-case "$MODE" in
-    type)
-        wtype "${emoji}" || wl-copy "${emoji}"
-        ;;
-    copy)
-        wl-copy "${emoji}"
-        ;;
-    both)
-        wtype "${emoji}" || true
-        wl-copy "${emoji}"
-        ;;
-    *)
-        echo "Usage: $0 [type|copy|both]"
-        exit 1
-        ;;
-esac
-exit
-### DATA ###
+get_emojis() {
+cat << 'EOF'
 😀 grinning face face smile happy joy :D grin
 😃 grinning face with big eyes face happy joy haha :D :) smile funny
 😄 grinning face with smiling eyes face happy joy funny haha laugh like :D :) smile
@@ -1951,3 +1933,26 @@ AH↗️HA↘️HA↗️HA↘️ pekora arrows hahaha rabbit
 🛘 landslide rockfall disaster
 🪊 trombone instrument music
 🪎 treasure chest gold loot pirate
+EOF
+}
+
+emoji="$(get_emojis | fuzzel --match-mode fzf --dmenu | cut -d ' ' -f 1 | tr -d '\n')"
+
+[[ -z "${emoji}" ]] && exit 0
+
+case "$MODE" in
+    type)
+        wtype "${emoji}" || wl-copy "${emoji}"
+        ;;
+    copy)
+        wl-copy "${emoji}"
+        ;;
+    both)
+        wtype "${emoji}" || true
+        wl-copy "${emoji}"
+        ;;
+    *)
+        echo "Usage: $0 [type|copy|both]"
+        exit 1
+        ;;
+esac

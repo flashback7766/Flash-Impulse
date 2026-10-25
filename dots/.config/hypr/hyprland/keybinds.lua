@@ -33,7 +33,7 @@ hl.bind("SUPER + V", hl.dsp.global("quickshell:overviewClipboardToggle"))
 hl.bind("SUPER + Period", hl.dsp.global("quickshell:overviewEmojiToggle"))
 hl.bind("SUPER + A", hl.dsp.global("quickshell:sidebarLeftToggle"), { description = "Shell: Toggle left sidebar" })
 hl.bind("SUPER + ALT + A", hl.dsp.global("quickshell:sidebarLeftToggleDetach"))
-hl.bind("SUPER + B", hl.dsp.global("quickshell:sidebarLeftToggle"))
+-- hl.bind("SUPER + B", hl.dsp.global("quickshell:sidebarLeftToggle")) -- disabled in favor of lm-studio-fast
 hl.bind("SUPER + O", hl.dsp.global("quickshell:sidebarLeftToggle"))
 -- Copilot key. Microsoft's spec has the firmware emit Shift+Super+F23, and the
 -- OEM variants (plain F23, Ctrl+Shift+F23) differ only in modifiers — F23 is not
@@ -360,7 +360,8 @@ hl.bind("CTRL + SHIFT + ALT + SUPER + Delete", hl.dsp.exec_cmd("systemctl powero
 --##! Apps
 hl.bind("SUPER + Return", hl.dsp.exec_cmd(terminal), { description = "App: Terminal" })
 hl.bind("SUPER + T", hl.dsp.exec_cmd(terminal))
-hl.bind("CTRL + ALT + T", hl.dsp.exec_cmd(terminal))
+hl.bind("SUPER + grave", hl.dsp.exec_cmd(hyprScripts .. "/toggle_dropdown_terminal.sh"), { description = "App: Quake dropdown terminal" })
+hl.bind("SUPER + Cyrillic_io", hl.dsp.exec_cmd(hyprScripts .. "/toggle_dropdown_terminal.sh"))
 hl.bind("SUPER + E", hl.dsp.exec_cmd(fileManager), { description = "App: File manager" })
 hl.bind("SUPER + W", hl.dsp.exec_cmd(browser), { description = "App: Browser" })
 hl.bind("SUPER + C", hl.dsp.exec_cmd(codeEditor), { description = "App: Code editor" })

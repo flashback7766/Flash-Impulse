@@ -19,3 +19,5 @@ hl.env("XDG_MENU_PREFIX", "plasma-")
 -- colour-generation script that silently cannot find its interpreter.
 hl.env("FLASH_IMPULSE_VENV", home_dir .. "/.local/state/quickshell/.venv")
 hl.env("ILLOGICAL_IMPULSE_VIRTUAL_ENV", home_dir .. "/.local/state/quickshell/.venv")
+hl.env("LIBVA_DRIVER_NAME", "radeonsi")
+hl.env("VDPAU_DRIVER", "radeonsi")
