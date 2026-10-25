@@ -135,25 +135,30 @@ Singleton {
     }
 
     function playSystemSound(soundName) {
-        const ogaPath = `/usr/share/sounds/${root.audioTheme}/stereo/${soundName}.oga`;
-        const oggPath = `/usr/share/sounds/${root.audioTheme}/stereo/${soundName}.ogg`;
-
-        // Try playing .oga first
-        let command = [
-            "ffplay",
-            "-nodisp",
-            "-autoexit",
-            ogaPath
-        ];
-        Quickshell.execDetached(command);
-
-        // Also try playing .ogg (ffplay will just fail silently if file doesn't exist)
-        command = [
-            "ffplay",
-            "-nodisp",
-            "-autoexit",
-            oggPath
-        ];
-        Quickshell.execDetached(command);
+        if (!soundName) return;
+        const theme = root.audioTheme || "freedesktop";
+        const cmd = `
+            theme="${theme}"
+            name="${soundName}"
+            file=""
+            for ext in oga ogg wav; do
+                f="/usr/share/sounds/$theme/stereo/$name.$ext"
+                if [ -f "$f" ]; then file="$f"; break; fi
+                f="/usr/share/sounds/freedesktop/stereo/$name.$ext"
+                if [ -f "$f" ]; then file="$f"; break; fi
+            done
+            if [ -n "$file" ]; then
+                if command -v canberra-gtk-play >/dev/null 2>&1; then
+                    canberra-gtk-play -f "$file"
+                elif command -v pw-play >/dev/null 2>&1; then
+                    pw-play "$file"
+                elif command -v paplay >/dev/null 2>&1; then
+                    paplay "$file"
+                elif command -v ffplay >/dev/null 2>&1; then
+                    ffplay -nodisp -autoexit "$file" >/dev/null 2>&1
+                fi
+            fi
+        `;
+        Quickshell.execDetached(["bash", "-c", cmd]);
     }
 }
