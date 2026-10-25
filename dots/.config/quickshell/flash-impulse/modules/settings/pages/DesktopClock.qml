@@ -343,9 +343,6 @@ ContentPage {
                     buttonIcon: "brightness_7"
                     text: Translation.tr("Hour marks")
                     checked: Config.options.background.widgets.clock.cookie.hourMarks
-                    onEnabledChanged: {
-                        checked = Config.options.background.widgets.clock.cookie.hourMarks;
-                    }
                     onCheckedChanged: {
                         Config.options.background.widgets.clock.cookie.hourMarks = checked;
                     }
@@ -359,9 +356,6 @@ ContentPage {
                     buttonIcon: "timer_10"
                     text: Translation.tr("Digits in the middle")
                     checked: Config.options.background.widgets.clock.cookie.timeIndicators
-                    onEnabledChanged: {
-                        checked = Config.options.background.widgets.clock.cookie.timeIndicators;
-                    }
                     onCheckedChanged: {
                         Config.options.background.widgets.clock.cookie.timeIndicators = checked;
                     }
