@@ -6,6 +6,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Hyprland
+import qs
 
 /**
  * Provides access to some Hyprland data not available in Quickshell.Hyprland.
@@ -101,13 +102,32 @@ Singleton {
     // off Hyprland's own event stream (onRawEvent). Right after an unlock the
     // compositor may sit on a phantom workspace for a while before anything
     // else happens to trigger an event, so this is the backstop that notices
-    // regardless. Monitor polling is cheap — a couple of monitors' worth of
-    // JSON — so 4s is frequent enough to matter without being wasteful.
+    // regardless — but only while it can matter: an armed ~90 s burst of 4 s
+    // ticks after each unlock, not a hyprctl fork every 4 s forever.
     Timer {
+        id: unlockBackstop
         interval: 4000
-        running: true
         repeat: true
-        onTriggered: root.updateMonitors()
+        running: false
+        property int remaining: 0
+        onTriggered: {
+            root.updateMonitors()
+            remaining -= 1
+            if (remaining <= 0)
+                unlockBackstop.stop()
+        }
+        function armBurst() {
+            remaining = 23
+            unlockBackstop.restart()
+        }
+    }
+
+    Connections {
+        target: GlobalStates
+        function onScreenLockedChanged() {
+            if (!GlobalStates.screenLocked)
+                unlockBackstop.armBurst()
+        }
     }
 
     // Convenient stuff
@@ -171,13 +191,25 @@ Singleton {
         updateAll();
     }
 
+    // Hyprland's socket bursts dozens of events per second while windows are
+    // dragged, resized or switched, and updateAll() forks a hyprctl process
+    // per JSON query — five per event, so a burst meant a fork storm. Let the
+    // burst settle first: restart a short one-shot and query once at the end.
+    // Widgets that need instant feedback read Quickshell.Hyprland's own
+    // objects, which this debounce never touches.
+    Timer {
+        id: updateAllDebounce
+        interval: 60
+        onTriggered: root.updateAll()
+    }
+
     Connections {
         target: Hyprland
 
         function onRawEvent(event) {
             // console.log("Hyprland raw event:", event.name);
             if (["openlayer", "closelayer", "screencast"].includes(event.name)) return;
-            updateAll()
+            updateAllDebounce.restart()
         }
     }
 
