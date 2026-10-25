@@ -414,9 +414,13 @@ ApplicationWindow {
     }
 
     function stepPage(delta: int): void {
-        const i = root.pages.findIndex(p => p.id === root.currentPageId);
-        const next = (i + delta + root.pages.length) % root.pages.length;
-        root.goToPage(root.pages[next].id);
+        // Step through what the list is showing: with a search filter active,
+        // cycling every page in declaration order jumped to places the
+        // filtered list was not displaying.
+        const list = root.visiblePages;
+        const i = list.findIndex(p => p.id === root.currentPageId);
+        const next = (i + delta + list.length) % list.length;
+        root.goToPage(list[next].id);
     }
 
     visible: true
@@ -425,7 +429,10 @@ ApplicationWindow {
 
     Component.onCompleted: {
         MaterialThemeLoader.reapplyTheme();
-        Config.readWriteDelay = 0; // Settings app always only sets one var at a time so delay isn't needed
+        // Keep Config's own debounce. Setting it to 0 here made every slider
+        // tick serialize and write config.json to disk — and the shell process
+        // reloads the file per change, restarting hypridle for every distinct
+        // value while a drag is still in progress.
     }
 
     minimumWidth: 750
@@ -550,8 +557,11 @@ ApplicationWindow {
                             // Enter on a filtered list is unambiguous when only
                             // one thing survived the filter.
                             Keys.onReturnPressed: {
-                                if (root.visiblePages.length > 0)
+                                if (root.visiblePages.length > 0) {
                                     root.goToPage(root.visiblePages[0].id);
+                                    root.search = "";
+                                    searchField.text = "";
+                                }
                             }
                         }
 
