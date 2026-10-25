@@ -46,7 +46,7 @@ ButtonMouseArea {
     }
 
     // Interactions
-    acceptedButtons: Qt.LeftButton | Qt.RightButton
+    acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
     hoverEnabled: true
     property int hoverIndex: {
         const position = root.vertical ? mouseY : mouseX;
@@ -57,10 +57,17 @@ ButtonMouseArea {
         Hyprland.dispatch(`hl.dsp.focus({workspace = ${wsModel.getWorkspaceIdAt(hoverIndex)}})`);
     }
     onPressed: mouse => {
-        if (mouse.button == Qt.LeftButton)
-            switchWorkspaceToHovered();
-        else if (mouse.button == Qt.RightButton)
+        if (mouse.button == Qt.LeftButton) {
+            if (wsModel.specialWorkspaceActive) {
+                Hyprland.dispatch(`hl.dsp.workspace.toggle_special("${wsModel.specialWorkspaceName}")`);
+            } else {
+                switchWorkspaceToHovered();
+            }
+        } else if (mouse.button == Qt.RightButton) {
             GlobalStates.overviewOpen = !GlobalStates.overviewOpen;
+        } else if (mouse.button == Qt.MiddleButton) {
+            Hyprland.dispatch('hl.dsp.workspace.toggle_special("dropdown")');
+        }
     }
     onWheel: event => {
         if (event.angleDelta.y < 0)
@@ -74,6 +81,9 @@ ButtonMouseArea {
         id: regularWorkspaces
         anchors.fill: parent
 
+        y: (!root.vertical ? root.specialBlur * 12 : 0)
+        x: (root.vertical ? root.specialBlur * 12 : 0)
+        opacity: 1 - root.specialBlur * 0.9
         scale: 1 - 0.08 * root.specialBlur
         layer.smooth: true
         layer.enabled: root.specialBlur > 0
@@ -82,6 +92,16 @@ ButtonMouseArea {
             blurEnabled: true
             blur: root.specialBlur
             blurMax: 32
+        }
+
+        Behavior on y {
+            animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+        }
+        Behavior on x {
+            animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+        }
+        Behavior on opacity {
+            animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
         }
 
         /////////////////// Occupied indicators ///////////////////
@@ -279,31 +299,53 @@ ButtonMouseArea {
     FadeLoader {
         anchors.centerIn: parent
         shown: wsModel.specialWorkspaceActive
-        scale: 0.8 + 0.2 * root.specialBlur
+        scale: 0.85 + 0.15 * root.specialBlur
+        y: (!root.vertical ? (1 - root.specialBlur) * -10 : 0)
+        x: (root.vertical ? (1 - root.specialBlur) * -10 : 0)
+
+        Behavior on y {
+            animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+        }
+        Behavior on x {
+            animation: Appearance.animation.elementMoveFast.numberAnimation.createObject(this)
+        }
 
         opacity: root.specialBlur
         Behavior on opacity {} // Don't animate, as specialBlur is already animated
 
         sourceComponent: Pill {
+            id: specialPill
             anchors.centerIn: parent
+            readonly property bool isDropdown: wsModel.specialWorkspaceName === "dropdown"
             property real undirectionalWidth: root.activeWorkspaceSize
             property real undirectionalLength: {
-                const base = root.workspaceButtonWidth * Math.min(1.35, wsModel.shownCount); // Who tf only configures only 2 workspaces shown anyway?
                 if (root.vertical)
-                    return base;
-                return specialWsText.implicitWidth + undirectionalWidth;
+                    return root.workspaceButtonWidth * Math.min(1.35, wsModel.shownCount);
+                return specialContentRow.implicitWidth + undirectionalWidth;
             }
             color: Appearance.colors.colPrimary
 
             implicitWidth: root.vertical ? undirectionalWidth : undirectionalLength
             implicitHeight: root.vertical ? undirectionalLength : undirectionalWidth
 
-            StyledText {
-                id: specialWsText
+            RowLayout {
+                id: specialContentRow
                 anchors.centerIn: parent
-                text: (!root.vertical ? wsModel.specialWorkspaceName : "S")
-                color: Appearance.colors.colOnPrimary
-                font.pixelSize: root.specialTextSize
+                spacing: 4
+
+                MaterialSymbol {
+                    visible: !root.vertical && specialPill.isDropdown
+                    text: "terminal"
+                    iconSize: root.specialTextSize * 1.15
+                    color: Appearance.colors.colOnPrimary
+                }
+
+                StyledText {
+                    id: specialWsText
+                    text: (!root.vertical ? (specialPill.isDropdown ? Translation.tr("Terminal") : wsModel.specialWorkspaceName) : "S")
+                    color: Appearance.colors.colOnPrimary
+                    font.pixelSize: root.specialTextSize
+                }
             }
 
             Behavior on undirectionalLength {

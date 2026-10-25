@@ -124,7 +124,11 @@ Item {
                 GridLayout {
                     id: trayOverflowLayout
                     anchors.centerIn: parent
-                    columns: Math.ceil(Math.sqrt(root.unpinnedItems.length))
+                    // At least one column: the layout is created by a LazyLoader that
+                    // only needs a tick, and unpinnedItems can empty out before the
+                    // incubator reaches componentComplete. A GridLayout asked for
+                    // zero columns dereferences null grid data inside sizeHint().
+                    columns: Math.max(1, Math.ceil(Math.sqrt(root.unpinnedItems.length)))
                     columnSpacing: 10
                     rowSpacing: 10
 
