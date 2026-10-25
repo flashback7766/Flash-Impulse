@@ -20,7 +20,10 @@ Item {
     readonly property int effectiveActiveWorkspaceId: Math.max(1, Math.min(100, monitor?.activeWorkspace?.id ?? 1))
     readonly property int workspacesShown: Config.options.overview.rows * Config.options.overview.columns
     readonly property int workspaceGroup: Math.floor((effectiveActiveWorkspaceId - 1) / workspacesShown)
-    property bool monitorIsFocused: (Hyprland.focusedMonitor?.name == monitor.name)
+    // monitor is Hyprland.monitorFor(screen) and can be null for a screen
+    // that just went away or is not known yet — the unguarded reads below
+    // were binding-TypeErrors until it came back.
+    property bool monitorIsFocused: (Hyprland.focusedMonitor?.name == monitor?.name)
     property var windows: HyprlandData.windowList
     property var windowByAddress: HyprlandData.windowByAddress
     property var windowAddresses: HyprlandData.addresses
@@ -28,17 +31,17 @@ Item {
     property real scale: Config.options.overview.scale
     property color activeBorderColor: Appearance.colors.colSecondary
 
-    property real workspaceImplicitWidth: (monitorData?.transform % 2 === 1) ? 
-        ((monitor.height - monitorData?.reserved[0] - monitorData?.reserved[2]) * root.scale / monitor.scale) :
-        ((monitor.width - monitorData?.reserved[0] - monitorData?.reserved[2]) * root.scale / monitor.scale)
-    property real workspaceImplicitHeight: (monitorData?.transform % 2 === 1) ? 
-        ((monitor.width - monitorData?.reserved[1] - monitorData?.reserved[3]) * root.scale / monitor.scale) :
-        ((monitor.height - monitorData?.reserved[1] - monitorData?.reserved[3]) * root.scale / monitor.scale)
+    property real workspaceImplicitWidth: (monitorData?.transform % 2 === 1) ?
+        (((monitor?.height ?? 0) - monitorData?.reserved[0] - monitorData?.reserved[2]) * root.scale / (monitor?.scale ?? 1)) :
+        (((monitor?.width ?? 0) - monitorData?.reserved[0] - monitorData?.reserved[2]) * root.scale / (monitor?.scale ?? 1))
+    property real workspaceImplicitHeight: (monitorData?.transform % 2 === 1) ?
+        (((monitor?.width ?? 0) - monitorData?.reserved[1] - monitorData?.reserved[3]) * root.scale / (monitor?.scale ?? 1)) :
+        (((monitor?.height ?? 0) - monitorData?.reserved[1] - monitorData?.reserved[3]) * root.scale / (monitor?.scale ?? 1))
     property real largeWorkspaceRadius: Appearance.rounding.large
     property real smallWorkspaceRadius: Appearance.rounding.verysmall
 
     property real workspaceNumberMargin: 80
-    property real workspaceNumberSize: 250 * monitor.scale
+    property real workspaceNumberSize: 250 * (monitor?.scale ?? 1)
     property int workspaceZ: 0
     property int windowZ: 1
     property int windowDraggingZ: 99999
