@@ -6,11 +6,12 @@ battery_charging=false
 
 ####### Check availability ########
 for battery in /sys/class/power_supply/*BAT*; do
-  if [[ -f "$battery/uevent" ]]; then
+  if [[ -f "$battery/uevent" && -f "$battery/capacity" ]]; then
     enable_battery=true
-    if [[ $(cat /sys/class/power_supply/*/status | head -1) == "Charging" ]]; then
+    if [[ $(cat "$battery/status" 2>/dev/null) == "Charging" ]]; then
       battery_charging=true
     fi
+    battery_path="$battery"
     break
   fi
 done
@@ -20,7 +21,7 @@ if [[ $enable_battery == true ]]; then
   if [[ $battery_charging == true ]]; then
     echo -n "(+) "
   fi
-  echo -n "$(cat /sys/class/power_supply/*/capacity | head -1)"%
+  echo -n "$(cat "$battery_path/capacity" 2>/dev/null)"%
   if [[ $battery_charging == false ]]; then
     echo -n " remaining"
   fi
