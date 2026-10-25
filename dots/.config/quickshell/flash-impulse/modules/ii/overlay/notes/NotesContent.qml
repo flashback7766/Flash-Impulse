@@ -262,11 +262,15 @@ OverlayBackground {
         id: noteFile
         path: Qt.resolvedUrl(Directories.notesPath)
         onLoaded: {
-            root.content = noteFile.text();
-            if (root.content !== root.content) {
+            // Compare against what is on screen before overwriting: an
+            // external edit (another notes client, sync) has to keep the
+            // cursor and selection where the user left them. The old code
+            // compared root.content with itself, so the branch never ran.
+            const loaded = noteFile.text();
+            if (loaded !== root.content) {
                 const previousCursor = textInput.cursorPosition;
                 const previousAnchor = textInput.selectionStart;
-                root.content = root.content;
+                root.content = loaded;
                 applySelection(previousCursor, previousAnchor);
             }
             if (pendingReload) {
