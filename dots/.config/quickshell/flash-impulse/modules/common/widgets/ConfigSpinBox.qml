@@ -41,6 +41,8 @@ RowLayout {
     StyledSpinBox {
         id: spinBoxWidget
         Layout.fillWidth: false
-        value: root.value
+        // `value` forwards through the alias on root; binding it to root.value
+        // here as well made the property depend on itself — a binding-loop
+        // warning at every creation until a page's assignment overwrote it.
     }
 }
