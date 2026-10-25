@@ -89,7 +89,7 @@ Scope {
         description: "Toggles right sidebar on press"
 
         onPressed: {
-            GlobalStates.sidebarRightOpen = !GlobalStates.sidebarRightOpen;
+            // Disabled: let hyprland/ipc handle it to avoid duplicate press toggling
         }
     }
     GlobalShortcut {
