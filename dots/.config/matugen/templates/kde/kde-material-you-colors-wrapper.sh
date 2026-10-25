@@ -44,5 +44,9 @@ case "$scheme_variant_str" in
 esac
 
 source "$(eval echo ${FLASH_IMPULSE_VENV:-$ILLOGICAL_IMPULSE_VIRTUAL_ENV})/bin/activate"
-kde-material-you-colors "$mode_flag" --color "$color" -sv "$sv_num"
+# The colors and kdeglobals land fine, but the tool's last step is a D-Bus
+# call telling KWin to live-reload — on Hyprland there is no KWin, so it
+# exits non-zero with a python traceback after the useful work is done.
+# Keep the work, drop the noise.
+kde-material-you-colors "$mode_flag" --color "$color" -sv "$sv_num" 2>/dev/null || true
 deactivate

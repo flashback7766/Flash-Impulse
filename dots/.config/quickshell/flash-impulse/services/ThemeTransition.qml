@@ -153,6 +153,7 @@ Singleton {
     // The colours have landed. Wait one more beat before animating: applyColors
     // sets its fifty properties in a loop, and starting the reveal in the middle
     // of that means animating across exactly the frames that are being dropped.
+    // Three frames at 60 Hz is that beat; the old 90 ms was five.
     Connections {
         target: Appearance.m3colors
         enabled: root.phase === 1
@@ -164,7 +165,7 @@ Singleton {
 
     Timer {
         id: settleTimer
-        interval: 90
+        interval: 50
         onTriggered: {
             if (root.phase !== 1)
                 return;

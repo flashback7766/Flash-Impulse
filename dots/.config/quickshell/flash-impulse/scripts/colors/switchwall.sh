@@ -198,17 +198,9 @@ switch() {
     color="$5"
 
     # Start Gemini auto-categorization if enabled
-    aiStylingEnabled=$(jq -r '.background.widgets.clock.cookie.aiStyling' "$SHELL_CONFIG_FILE")
-    if [[ "$aiStylingEnabled" == "true" ]]; then
+    if [[ "$CFG_AI_STYLING" == "true" ]]; then
         categorize_wallpaper "$imgpath" &
     fi
-
-    read scale screenx screeny screensizey < <(hyprctl monitors -j | jq '.[] | select(.focused) | .scale, .x, .y, .height' | xargs)
-    cursorposx=$(hyprctl cursorpos -j | jq '.x' 2>/dev/null) || cursorposx=960
-    cursorposx=$(bc <<< "scale=0; ($cursorposx - $screenx) * $scale / 1")
-    cursorposy=$(hyprctl cursorpos -j | jq '.y' 2>/dev/null) || cursorposy=540
-    cursorposy=$(bc <<< "scale=0; ($cursorposy - $screeny) * $scale / 1")
-    cursorposy_inverted=$((screensizey - cursorposy))
 
     matugen_args=(--source-color-index 0)
 
@@ -327,7 +319,7 @@ switch() {
     # enforce dark mode for terminal
     if [[ -n "$mode_flag" ]]; then
         matugen_args+=(--mode "$mode_flag")
-        if [[ $(jq -r '.appearance.wallpaperTheming.terminalGenerationProps.forceDarkMode' "$SHELL_CONFIG_FILE") == "true" ]]; then
+        if [[ "$CFG_FORCE_DARK" == "true" ]]; then
             generate_colors_material_args+=(--mode "dark")
         else
             generate_colors_material_args+=(--mode "$mode_flag")
@@ -339,30 +331,14 @@ switch() {
 
     pre_process "$mode_flag"
 
-    # One jq for every value read out of the shell config.
-    #
-    # This was four separate invocations of jq over the same file — the theming
-    # switch, then harmony, harmonizeThreshold and termFgBoost — each paying for
-    # its own process spawn and its own parse of the whole document, about 8ms
-    # apiece on a switch that is now well under half a second in total.
-    if [ -f "$SHELL_CONFIG_FILE" ]; then
-        IFS=$'\t' read -r enable_apps_shell harmony harmonize_threshold term_fg_boost < <(
-            jq -r '[.appearance.wallpaperTheming.enableAppsAndShell,
-                    .appearance.wallpaperTheming.terminalGenerationProps.harmony,
-                    .appearance.wallpaperTheming.terminalGenerationProps.harmonizeThreshold,
-                    .appearance.wallpaperTheming.terminalGenerationProps.termFgBoost]
-                   | map(if . == null then "null" else tostring end) | @tsv' "$SHELL_CONFIG_FILE"
-        )
-
-        if [ "$enable_apps_shell" == "false" ]; then
-            echo "App and shell theming disabled, skipping matugen and color generation"
-            return
-        fi
-
-        [[ "$harmony" != "null" && -n "$harmony" ]] && generate_colors_material_args+=(--harmony "$harmony")
-        [[ "$harmonize_threshold" != "null" && -n "$harmonize_threshold" ]] && generate_colors_material_args+=(--harmonize_threshold "$harmonize_threshold")
-        [[ "$term_fg_boost" != "null" && -n "$term_fg_boost" ]] && generate_colors_material_args+=(--term_fg_boost "$term_fg_boost")
+    if [[ "$CFG_ENABLE_APPS" == "false" ]]; then
+        echo "App and shell theming disabled, skipping matugen and color generation"
+        return
     fi
+
+    [[ "$CFG_HARMONY" != "null" && -n "$CFG_HARMONY" ]] && generate_colors_material_args+=(--harmony "$CFG_HARMONY")
+    [[ "$CFG_HARMONIZE_THRESHOLD" != "null" && -n "$CFG_HARMONIZE_THRESHOLD" ]] && generate_colors_material_args+=(--harmonize_threshold "$CFG_HARMONIZE_THRESHOLD")
+    [[ "$CFG_TERM_FG_BOOST" != "null" && -n "$CFG_TERM_FG_BOOST" ]] && generate_colors_material_args+=(--term_fg_boost "$CFG_TERM_FG_BOOST")
 
     matugen "${matugen_args[@]}"
     source "$(eval echo ${FLASH_IMPULSE_VENV:-$ILLOGICAL_IMPULSE_VIRTUAL_ENV})/bin/activate"
@@ -392,12 +368,6 @@ main() {
     color=""
     noswitch_flag=""
 
-    get_type_from_config() {
-        jq -r '.appearance.palette.type' "$SHELL_CONFIG_FILE" 2>/dev/null || echo "auto"
-    }
-    get_accent_color_from_config() {
-        jq -r '.appearance.palette.accentColor' "$SHELL_CONFIG_FILE" 2>/dev/null || echo ""
-    }
     set_accent_color() {
         local color="$1"
         jq --arg color "$color" '.appearance.palette.accentColor = $color' "$SHELL_CONFIG_FILE" > "$SHELL_CONFIG_FILE.tmp" && mv "$SHELL_CONFIG_FILE.tmp" "$SHELL_CONFIG_FILE"
@@ -460,7 +430,6 @@ main() {
                 ;;
             --noswitch)
                 noswitch_flag="1"
-                imgpath=$(jq -r '.background.wallpaperPath' "$SHELL_CONFIG_FILE" 2>/dev/null || echo "")
                 shift
                 ;;
             *)
@@ -472,8 +441,35 @@ main() {
         esac
     done
 
+    # One jq for every value this switch reads out of the shell config. It used
+    # to be six separate spawns — accent, palette type, wallpaper path, ai
+    # styling, force-dark-terminal and the terminal tuning quartet — each ~8ms
+    # of process spawn plus a full parse of the document, on a path whose whole
+    # job is to feel instant. Read after argument parsing so --color's write of
+    # accentColor is already on disk.
+    CFG_ACCENT="null"; CFG_TYPE="null"; CFG_WALLPAPER="null"
+    CFG_AI_STYLING="null"; CFG_FORCE_DARK="null"; CFG_ENABLE_APPS="null"
+    CFG_HARMONY="null"; CFG_HARMONIZE_THRESHOLD="null"; CFG_TERM_FG_BOOST="null"
+    if [ -f "$SHELL_CONFIG_FILE" ]; then
+        IFS=$'\t' read -r CFG_ACCENT CFG_TYPE CFG_WALLPAPER CFG_AI_STYLING CFG_FORCE_DARK CFG_ENABLE_APPS CFG_HARMONY CFG_HARMONIZE_THRESHOLD CFG_TERM_FG_BOOST < <(
+            jq -r '[.appearance.palette.accentColor,
+                    .appearance.palette.type,
+                    .background.wallpaperPath,
+                    .background.widgets.clock.cookie.aiStyling,
+                    .appearance.wallpaperTheming.terminalGenerationProps.forceDarkMode,
+                    .appearance.wallpaperTheming.enableAppsAndShell,
+                    .appearance.wallpaperTheming.terminalGenerationProps.harmony,
+                    .appearance.wallpaperTheming.terminalGenerationProps.harmonizeThreshold,
+                    .appearance.wallpaperTheming.terminalGenerationProps.termFgBoost]
+                   | map(if . == null then "null" else tostring end) | @tsv' "$SHELL_CONFIG_FILE"
+        )
+    fi
+    if [[ -n "$noswitch_flag" && -z "$imgpath" && "$CFG_WALLPAPER" != "null" ]]; then
+        imgpath="$CFG_WALLPAPER"
+    fi
+
     # If accentColor is set in config, use it
-    config_color="$(get_accent_color_from_config)"
+    config_color="$CFG_ACCENT"
     if [[ "$config_color" =~ ^#?[A-Fa-f0-9]{6}$ ]]; then
         color_flag="1"
         color="$config_color"
@@ -481,8 +477,9 @@ main() {
 
     # If type_flag is not set, get it from config
     if [[ -z "$type_flag" ]]; then
-        type_flag="$(get_type_from_config)"
+        type_flag="$CFG_TYPE"
     fi
+    [[ "$type_flag" == "null" ]] && type_flag="auto"
 
     # Validate type_flag (allow 'auto' as well)
     allowed_types=(scheme-content scheme-expressive scheme-fidelity scheme-fruit-salad scheme-monochrome scheme-neutral scheme-rainbow scheme-tonal-spot auto)
