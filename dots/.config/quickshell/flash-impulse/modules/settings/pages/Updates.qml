@@ -39,6 +39,22 @@ ContentPage {
     }
 
     ContentSection {
+        icon: "cloud_download"
+        title: Translation.tr("Dotfiles (Flash-Impulse) OTA")
+        description: Translation.tr("Safely updates your system configurations from Git while keeping your local tweaks intact.")
+
+        RippleButtonWithIcon {
+            mainText: Translation.tr("Run OTA Update")
+            materialIcon: "downloading"
+            onClicked: {
+                // Execute the update asynchronously
+                // Running in a terminal allows the user to see the output and sudo prompts if needed
+                CF.executeCommand("kitty --title 'OTA Update' --hold -e bash -c 'cd ~/Flash-Impulse && ./dots-manager.sh update || ./dots-backup.sh update; echo; echo \"Done! You can close this window.\"'");
+            }
+        }
+    }
+
+    ContentSection {
         icon: "priority_high"
         title: Translation.tr("Nagging thresholds")
         description: Translation.tr("How many pending packages before the shell starts suggesting you update")

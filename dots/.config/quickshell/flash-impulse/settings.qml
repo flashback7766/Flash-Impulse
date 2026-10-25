@@ -212,11 +212,11 @@ ApplicationWindow {
         },
         {
             id: "battery",
-            name: Translation.tr("Battery"),
+            name: Translation.tr("Power & Battery"),
             icon: "battery_android_full",
             category: Translation.tr("System"),
-            description: Translation.tr("Low-battery warnings and charge limiting"),
-            keywords: "battery power charge low critical suspend automatic suspend",
+            description: Translation.tr("Power profiles, adaptive charging, and cooling modes"),
+            keywords: "battery power charge low critical suspend automatic suspend threshold fan cooling ppd",
             component: "modules/settings/pages/Battery.qml"
         },
         {
