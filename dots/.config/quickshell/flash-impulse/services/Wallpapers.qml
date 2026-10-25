@@ -217,7 +217,20 @@ Singleton {
      */
     function applyThemeWallpaper(darkMode) {
         if (!root.themeWallpaperEnabled) return;
-        const current = FileUtils.trimFileProtocol(Config.options?.background.wallpaperPath ?? "");
+        let current = FileUtils.trimFileProtocol(Config.options?.background.wallpaperPath ?? "");
+        // The switch script rewrites config.json before the colours land, but
+        // the shell's Config copy reloads on its own schedule — reading it
+        // here still sees the pre-switch path, the equality check below
+        // concludes the swap has not happened, and every mode toggle spawns a
+        // second full switch (matugen and all) over an image the first one
+        // already handled. Ask the file instead: by the time darkmode flips,
+        // the script's write has long been on disk and inotify has delivered
+        // it to this view.
+        try {
+            const onDisk = JSON.parse(shellConfigView.text())?.background?.wallpaperPath ?? "";
+            if (onDisk.length > 0)
+                current = FileUtils.trimFileProtocol(onDisk);
+        } catch (e) {}
         // The opt-out, and it's derived rather than remembered: swapping only
         // happens while one of the pair is actually on screen. Set a wallpaper
         // of your own and there is nothing here to swap, so the theme stops
@@ -234,6 +247,12 @@ Singleton {
         if (current === FileUtils.trimFileProtocol(wanted)) return;
         Quickshell.execDetached([Directories.wallpaperSwitchScriptPath,
             "--mode", darkMode ? "dark" : "light", "--image", FileUtils.trimFileProtocol(wanted)]);
+    }
+
+    FileView {
+        id: shellConfigView
+        path: Directories.shellConfigPath
+        watchChanges: true
     }
 
     Connections {
