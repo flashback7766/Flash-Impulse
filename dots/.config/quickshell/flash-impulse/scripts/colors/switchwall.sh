@@ -212,6 +212,14 @@ switch() {
             echo 'Aborted'
             exit 0
         fi
+        # Last line of defence: no matter where a bogus path came from
+        # (a clobbered config, a removed file), abort honestly instead of
+        # letting matugen fail halfway through a switch that then reports
+        # success.
+        if [[ ! -f "$imgpath" ]]; then
+            echo "[switchwall] Wallpaper file does not exist: $imgpath" >&2
+            exit 1
+        fi
 
         check_and_prompt_upscale "$imgpath" &
         kill_existing_mpvpaper
@@ -447,12 +455,18 @@ main() {
     # of process spawn plus a full parse of the document, on a path whose whole
     # job is to feel instant. Read after argument parsing so --color's write of
     # accentColor is already on disk.
+    #
+    # The fields are joined with NUL and read with mapfile -d '', not with a
+    # tab-separated `read`: an empty FIRST value (accentColor is "" for most
+    # people) makes read treat the leading separator as whitespace and eat it,
+    # silently shifting every field one slot to the left — which fed `false`
+    # to matugen as a wallpaper path and made every toggle abort with exit 0.
     CFG_ACCENT="null"; CFG_TYPE="null"; CFG_WALLPAPER="null"
     CFG_AI_STYLING="null"; CFG_FORCE_DARK="null"; CFG_ENABLE_APPS="null"
     CFG_HARMONY="null"; CFG_HARMONIZE_THRESHOLD="null"; CFG_TERM_FG_BOOST="null"
     if [ -f "$SHELL_CONFIG_FILE" ]; then
-        IFS=$'\t' read -r CFG_ACCENT CFG_TYPE CFG_WALLPAPER CFG_AI_STYLING CFG_FORCE_DARK CFG_ENABLE_APPS CFG_HARMONY CFG_HARMONIZE_THRESHOLD CFG_TERM_FG_BOOST < <(
-            jq -r '[.appearance.palette.accentColor,
+        mapfile -t -d '' CFG_VALUES < <(
+            jq -j '[.appearance.palette.accentColor,
                     .appearance.palette.type,
                     .background.wallpaperPath,
                     .background.widgets.clock.cookie.aiStyling,
@@ -461,11 +475,23 @@ main() {
                     .appearance.wallpaperTheming.terminalGenerationProps.harmony,
                     .appearance.wallpaperTheming.terminalGenerationProps.harmonizeThreshold,
                     .appearance.wallpaperTheming.terminalGenerationProps.termFgBoost]
-                   | map(if . == null then "null" else tostring end) | @tsv' "$SHELL_CONFIG_FILE"
+                   | map(if . == null then "null" else tostring end) | join("\u0000")' "$SHELL_CONFIG_FILE" 2>/dev/null
         )
+        CFG_ACCENT="${CFG_VALUES[0]:-null}"
+        CFG_TYPE="${CFG_VALUES[1]:-null}"
+        CFG_WALLPAPER="${CFG_VALUES[2]:-null}"
+        CFG_AI_STYLING="${CFG_VALUES[3]:-null}"
+        CFG_FORCE_DARK="${CFG_VALUES[4]:-null}"
+        CFG_ENABLE_APPS="${CFG_VALUES[5]:-null}"
+        CFG_HARMONY="${CFG_VALUES[6]:-null}"
+        CFG_HARMONIZE_THRESHOLD="${CFG_VALUES[7]:-null}"
+        CFG_TERM_FG_BOOST="${CFG_VALUES[8]:-null}"
     fi
-    if [[ -n "$noswitch_flag" && -z "$imgpath" && "$CFG_WALLPAPER" != "null" ]]; then
-        imgpath="$CFG_WALLPAPER"
+    if [[ -n "$noswitch_flag" && -z "$imgpath" ]]; then
+        # wallpaperPath has to be a string starting with / — a boolean or a
+        # number here comes from a broken write and means "no wallpaper" just
+        # as much as null does.
+        [[ "$CFG_WALLPAPER" == /* ]] && imgpath="$CFG_WALLPAPER"
     fi
 
     # If accentColor is set in config, use it
