@@ -91,7 +91,11 @@ Scope {
 
     Process {
         id: fingerprintCheckProc
-        running: true
+        // The lock panel is constructed at shell startup and lives forever,
+        // so running: true forked fprintd-list on every boot for an answer
+        // nobody reads until locking. Re-check on each lock instead — which
+        // is also correct when a finger gets enrolled mid-session.
+        running: GlobalStates.screenLocked
         command: ["bash", "-c", "fprintd-list $(whoami)"]
         stdout: StdioCollector {
             id: fingerprintOutputCollector
