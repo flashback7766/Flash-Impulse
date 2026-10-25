@@ -37,12 +37,17 @@ Singleton {
     readonly property string generatedConf: {
         const p = root.activeProfile;
         let listeners = "";
-        if (p.lockEnable)
-            listeners += root.listener(Math.max(1, p.lockMinutes) * 60, "loginctl lock-session");
+        if (p.lockEnable) {
+            const lockSeconds = Math.max(1, p.lockMinutes) * 60;
+            if (lockSeconds > 45) {
+                listeners += root.listener(lockSeconds - 30, "brightnessctl -s set 30%", "brightnessctl -r");
+            }
+            listeners += root.listener(lockSeconds, "loginctl lock-session");
+        }
         if (p.screenOffEnable)
             listeners += root.listener(Math.max(1, p.screenOffMinutes) * 60,
-                `hyprctl dispatch 'hl.dsp.dpms({ action = "disable" })'`,
-                `hyprctl dispatch 'hl.dsp.dpms({ action = "enable" })'`);
+                "hyprctl dispatch dpms off",
+                "hyprctl dispatch dpms on");
         if (p.suspendEnable)
             listeners += root.listener(Math.max(1, p.suspendMinutes) * 60, "$suspend_cmd");
 
