@@ -10,6 +10,10 @@ ApiStrategy {
     readonly property string fileUriSubstitutionString: "{{ fileUriVarName }}"
     readonly property string fileMimeTypeSubstitutionString: "{{ fileMimeTypeVarName }}"
     property string buffer: ""
+    // Whether the request being built referenced the server-side head cache.
+    // Read back by the caller when a 404 arrives: a cache reference the
+    // server no longer knows is worth one silent rebuild, not an error bubble.
+    property bool cacheWasReferenced: false
     
     function buildEndpoint(model: AiModel): string {
         const result = model.endpoint + `?key=\$\{${apiKeyEnvVarName}\}`
@@ -106,6 +110,23 @@ ApiStrategy {
 
         if (tools && tools.length > 0) {
             requestData.tools = tools;
+        }
+
+        // The server-side head cache (system instruction + tools, cached
+        // explicitly by the caller) rides on the request like any other field
+        // — and then those two fields must go, because the API rejects a
+        // request that repeats them beside a cache reference. The reference
+        // applies only while the head still matches the fingerprint it was
+        // cached from: the summarizer passes a system prompt of its own and
+        // must not inherit the chat's cached one. A stale reference is
+        // reported back as cacheMiss so the caller rebuilds and retries.
+        if (model.cachedContentName && model.cachedContentKey === Qt.md5(systemPrompt + "|" + JSON.stringify(tools ?? []))) {
+            requestData.cachedContents = model.cachedContentName;
+            delete requestData.system_instruction;
+            delete requestData.tools;
+            root.cacheWasReferenced = true;
+        } else {
+            root.cacheWasReferenced = false;
         }
 
         print("[AI] Gemini Request: " + alternatingContents.length + " messages");
@@ -242,6 +263,28 @@ ApiStrategy {
 
             // Error response handling
             if (dataJson.error) {
+                // A 429 from a free-tier model is a "wait", not a failure: the
+                // error carries the server's own wait under a RetryInfo entry
+                // in details[] ("23s"). It is handed back here instead of
+                // being painted into the message, because the retry that
+                // follows replaces the turn wholesale — an error paragraph
+                // written now would sit above the real answer.
+                let retryDelay = -1;
+                if (dataJson.error.code === 429 && Array.isArray(dataJson.error.details)) {
+                    for (let i = 0; i < dataJson.error.details.length; i++) {
+                        const d = dataJson.error.details[i];
+                        if (d && typeof d["@type"] === "string" && d["@type"].endsWith("RetryInfo") && typeof d.retryDelay === "string") {
+                            const secs = parseFloat(d.retryDelay);
+                            if (!isNaN(secs) && secs >= 0) retryDelay = secs;
+                        }
+                    }
+                }
+                if (dataJson.error.code === 429) {
+                    return { finished: true, errorCode: 429, retryDelay: retryDelay, errorMessage: dataJson.error.message };
+                }
+                if (dataJson.error.code === 404 && root.cacheWasReferenced) {
+                    return { finished: true, errorCode: 404, cacheMiss: true, errorMessage: dataJson.error.message };
+                }
                 const errorMsg = `**Error ${dataJson.error.code}**: ${dataJson.error.message}`;
                 message.rawContent += errorMsg;
                 return { finished: true, errorCode: dataJson.error.code };
@@ -264,6 +307,7 @@ ApiStrategy {
                             output: usageMetadata.candidatesTokenCount ?? -1,
                             total: usageMetadata.totalTokenCount ?? -1,
                             reasoningTokens: usageMetadata.thoughtsTokenCount ?? 0,
+                            cacheRead: usageMetadata.cachedContentTokenCount ?? 0,
                         }
                     };
                 }
@@ -341,7 +385,9 @@ ApiStrategy {
                 return { functionCall: { name: functionCall.name, args: functionCall.args }, finished: finished };
             }
 
-            // Token Usage
+            // Token Usage. cachedContentTokenCount is what the prompt cache
+            // actually served — without reading it, a working cache displays
+            // as zero and nobody can tell.
             if (usageMetadata) {
                 return {
                     tokenUsage: {
@@ -349,6 +395,7 @@ ApiStrategy {
                         output: usageMetadata.candidatesTokenCount ?? -1,
                         total: usageMetadata.totalTokenCount ?? -1,
                         reasoningTokens: usageMetadata.thoughtsTokenCount ?? 0,
+                        cacheRead: usageMetadata.cachedContentTokenCount ?? 0,
                     },
                     finished: finished
                 };

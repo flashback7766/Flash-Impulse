@@ -2006,6 +2006,63 @@ Inline w/ backslash and round brackets \\(e^{i\\pi} + 1 = 0\\)
                     }
                 }
 
+                // Context window gauge: what the conversation has spent of
+                // the model's window. Green while there is room, amber past
+                // three quarters, red near the edge — the same thresholds the
+                // auto-compaction acts at. Clicking it says what a compaction
+                // is and offers the summary, since it is not a control.
+                RippleButton {
+                    id: contextGauge
+                    implicitWidth: contextGaugeRow.implicitWidth + 18
+                    implicitHeight: 36
+                    buttonRadius: 18
+                    colBackground: Appearance.colors.colLayer2
+                    colBackgroundHover: Appearance.colors.colLayer2Hover
+                    onClicked: chatSettingsPanel.open()
+                    StyledToolTip {
+                        text: {
+                            const used = Ai.tokenCount.total > 0 ? Ai.tokenCount.total : Ai.estimateChatTokens();
+                            const pct = Math.round(used / Ai.contextWindowTokens * 100);
+                            return Translation.tr("Context: %1 of %2 tokens (%3%)").arg(used.toLocaleString()).arg(Ai.contextWindowTokens.toLocaleString()).arg(pct);
+                        }
+                    }
+                    contentItem: RowLayout {
+                        id: contextGaugeRow
+                        spacing: 4
+                        Rectangle {
+                            Layout.alignment: Qt.AlignVCenter
+                            implicitWidth: 34
+                            implicitHeight: 5
+                            radius: 3
+                            color: Appearance.colors.colLayer2Hover
+                            Rectangle {
+                                anchors.left: parent.left
+                                anchors.top: parent.top
+                                anchors.bottom: parent.bottom
+                                radius: 3
+                                width: parent.width * Math.min(1, (Ai.tokenCount.total > 0 ? Ai.tokenCount.total : Ai.estimateChatTokens()) / Ai.contextWindowTokens)
+                                color: {
+                                    const frac = (Ai.tokenCount.total > 0 ? Ai.tokenCount.total : Ai.estimateChatTokens()) / Ai.contextWindowTokens;
+                                    if (frac >= 0.9) return Appearance.colors.colError;
+                                    if (frac >= 0.75) return Appearance.colors.colSecondary;
+                                    return Appearance.m3colors.m3primary;
+                                }
+                                Behavior on width { NumberAnimation { duration: 200 } }
+                            }
+                        }
+                        StyledText {
+                            Layout.alignment: Qt.AlignVCenter
+                            font.pixelSize: Appearance.font.pixelSize.smaller
+                            color: Appearance.colors.colSubtext
+                            text: {
+                                const used = Ai.tokenCount.total > 0 ? Ai.tokenCount.total : Ai.estimateChatTokens();
+                                const fmt = n => n >= 1000 ? (n / 1000).toFixed(1) + "k" : "" + n;
+                                return fmt(used) + "/" + fmt(Ai.contextWindowTokens);
+                            }
+                        }
+                    }
+                }
+
                 RippleButton {
                     // Functions & Thinking popup button
                     id: functionsButton

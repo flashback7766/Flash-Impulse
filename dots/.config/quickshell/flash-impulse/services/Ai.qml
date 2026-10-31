@@ -821,6 +821,101 @@ The shell (Quickshell config "flash-impulse"):
         property int reasoningTokens: 0
     }
 
+    // Send-rate pacing for free-tier models. The gap between the starts of two
+    // requests follows the model's temper: a rate limit widens it, a clean
+    // completion eases it back toward the floor. The server's own retryDelay
+    // (see the 429 handling) stays the authority on how long one wait is.
+    property real minRequestIntervalMs: 2000
+    property real lastRequestStartMs: 0
+    function noteRequestStart() {
+        root.lastRequestStartMs = Date.now();
+    }
+    function noteRateLimitHit() {
+        root.minRequestIntervalMs = Math.min(root.minRequestIntervalMs * 1.5 + 500, 60000);
+    }
+    function noteRequestOk() {
+        root.minRequestIntervalMs = Math.max(2000, root.minRequestIntervalMs * 0.85);
+    }
+
+    // The context window of the model in use, in tokens — what the context bar
+    // compares the running total against. Per-model where the limit is known;
+    // a default keeps the bar honest for models nobody documented.
+    property int contextWindowTokens: {
+        const model = models[currentModelId];
+        return model?.contextWindow ?? 131072;
+    }
+
+    // Explicit Gemini head caching. The head of every request — system prompt
+    // and tools — is byte-identical between turns of a chat; cached server-side
+    // it bills at a fraction and turns the rest of the prefix into an implicit
+    // cache hit. One entry per (model, head fingerprint); the cache is rebuilt
+    // in the background after each turn, so by the time the next message is
+    // sent the reference is usually there. A turn that finds no cache still
+    // goes through uncached — the head lands in the next refresh.
+    property var geminiCacheNames: ({})
+    property bool geminiCacheBuilding: false
+    function headFingerprint(model, systemPrompt, tools) {
+        return model.model + "|" + Qt.md5(systemPrompt + "|" + JSON.stringify(tools ?? []));
+    }
+    function refreshGeminiHeadCache() {
+        const model = models[currentModelId];
+        if (!model || model.api_format !== "gemini" || !model.requires_key) return;
+        if (root.geminiCacheBuilding) return;
+        const toolsForFormat = root.tools[model.api_format] ?? root.tools["openai"];
+        const toolSet = root.withMcpTools(toolsForFormat[root.currentTool] ?? [], model.api_format);
+        const head = root.systemPrompt;
+        const key = root.headFingerprint(model, head, toolSet);
+        if (model.cachedContentKey === key && model.cachedContentName) return;
+        if (root.geminiCacheNames[key]) {
+            model.cachedContentName = root.geminiCacheNames[key];
+            model.cachedContentKey = key;
+            return;
+        }
+
+        const apiKey = root.apiKeys ? (root.apiKeys[model.key_id] ?? "") : "";
+        if (!apiKey) return;
+        const payload = {
+            model: "models/" + model.model,
+            systemInstruction: { parts: [{ text: head }] },
+            tools: toolSet,
+            ttl: "1800s"
+        };
+        const bashCommand = `bash <<'EOP_CACHE'
+curl -s "https://generativelanguage.googleapis.com/v1beta/cachedContents" -H "x-goog-api-key: ${apiKey}" -H 'Content-Type: application/json' -X POST -d '${CF.StringUtils.shellSingleQuoteEscape(JSON.stringify(payload))}'
+EOP_CACHE
+`;
+        root.geminiCacheBuilding = true;
+        geminiCacheProc.headKey = key;
+        geminiCacheProc.modelId = currentModelId;
+        geminiCacheProc.command = ["bash", "-c", bashCommand];
+        geminiCacheProc.running = true;
+    }
+
+    Process {
+        id: geminiCacheProc
+        property string headKey: ""
+        property string modelId: ""
+        stdout: SplitParser {
+            onRead: data => { geminiCacheProc.buffer += data; }
+        }
+        property string buffer: ""
+        onExited: {
+            root.geminiCacheBuilding = false;
+            try {
+                const resp = JSON.parse(geminiCacheProc.buffer);
+                const name = resp.name;
+                if (name && geminiCacheProc.modelId && root.models[geminiCacheProc.modelId]) {
+                    root.geminiCacheNames[geminiCacheProc.headKey] = name;
+                    const model = root.models[geminiCacheProc.modelId];
+                    model.cachedContentName = name;
+                    model.cachedContentKey = geminiCacheProc.headKey;
+                    console.log("[AI] Head cache ready:", name);
+                }
+            } catch (e) { /* a failed cache build costs nothing; the next turn retries */ }
+            geminiCacheProc.buffer = "";
+        }
+    }
+
     // Generation speed & cost tracking
     property real generationStartTime: 0
     property real generationSpeed: 0 // tokens per second
@@ -1092,6 +1187,7 @@ The shell (Quickshell config "flash-impulse"):
             "homepage": "https://aistudio.google.com",
             "endpoint": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:streamGenerateContent",
             "model": "gemini-3.5-flash-lite",
+            "contextWindow": 1048576,
             "requires_key": true,
             "key_id": "gemini",
             "key_get_link": "https://aistudio.google.com/app/apikey",
@@ -1105,6 +1201,7 @@ The shell (Quickshell config "flash-impulse"):
             "homepage": "https://aistudio.google.com",
             "endpoint": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:streamGenerateContent",
             "model": "gemini-3.6-flash",
+            "contextWindow": 1048576,
             "requires_key": true,
             "key_id": "gemini",
             "key_get_link": "https://aistudio.google.com/app/apikey",
@@ -1118,6 +1215,7 @@ The shell (Quickshell config "flash-impulse"):
             "homepage": "https://aistudio.google.com",
             "endpoint": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:streamGenerateContent",
             "model": "gemini-3.1-pro-preview",
+            "contextWindow": 1048576,
             "requires_key": true,
             "key_id": "gemini",
             "key_get_link": "https://aistudio.google.com/app/apikey",
@@ -1131,6 +1229,7 @@ The shell (Quickshell config "flash-impulse"):
             "homepage": "https://anthropic.com",
             "endpoint": "https://api.anthropic.com/v1/messages",
             "model": "claude-haiku-4-5-20251001",
+            "contextWindow": 200000,
             "requires_key": true,
             "key_id": "anthropic",
             "key_get_link": "https://console.anthropic.com/settings/keys",
@@ -1144,6 +1243,7 @@ The shell (Quickshell config "flash-impulse"):
             "homepage": "https://anthropic.com",
             "endpoint": "https://api.anthropic.com/v1/messages",
             "model": "claude-sonnet-5",
+            "contextWindow": 200000,
             "requires_key": true,
             "key_id": "anthropic",
             "key_get_link": "https://console.anthropic.com/settings/keys",
@@ -1157,6 +1257,7 @@ The shell (Quickshell config "flash-impulse"):
             "homepage": "https://anthropic.com",
             "endpoint": "https://api.anthropic.com/v1/messages",
             "model": "claude-opus-4-8",
+            "contextWindow": 200000,
             "requires_key": true,
             "key_id": "anthropic",
             "key_get_link": "https://console.anthropic.com/settings/keys",
@@ -1170,6 +1271,7 @@ The shell (Quickshell config "flash-impulse"):
             "homepage": "https://anthropic.com",
             "endpoint": "https://api.anthropic.com/v1/messages",
             "model": "claude-fable-5",
+            "contextWindow": 200000,
             "requires_key": true,
             "key_id": "anthropic",
             "key_get_link": "https://console.anthropic.com/settings/keys",
@@ -1991,6 +2093,51 @@ The shell (Quickshell config "flash-impulse"):
         root.resetSessionState();
     }
 
+    // Soft compaction. Crossing the threshold only arms a flag: the model
+    // may be mid-task, and cutting its history under it would be exactly the
+    // wrong moment. The next user request compacts first — with a notice in
+    // the chat — and then goes out over the condensed history.
+    //
+    // Thresholds by model class: Google's free tiers get a flat 128k (their
+    // windows are huge and the rate limits, not the window, are the wall);
+    // local models and paid keys spend 60% of their own window first.
+    property bool pendingCompaction: false
+    // Runs after a compaction's summary has landed and the history has been
+    // cut — the deferred request that armed the compaction re-enters here.
+    property var postCompactHook: null
+    function maybeCompactHistory() {
+        if (root.condensing || root.isGenerating) return;
+        const model = models[currentModelId];
+        const threshold = model?.api_format === "gemini"
+            ? 131072
+            : Math.floor(root.contextWindowTokens * 0.6);
+        const used = root.tokenCount.total > 0 ? root.tokenCount.total : estimateChatTokens();
+        if (used < threshold) return;
+        if (root.messageIDs.length <= 6) return; // keep enough live turns to hold a conversation
+        root.pendingCompaction = true;
+    }
+
+    function runPendingCompaction() {
+        root.pendingCompaction = false;
+        const keepCount = 6;
+        const compressCount = root.messageIDs.length - keepCount;
+        if (compressCount < 3) return;
+        let transcript = "";
+        if (root.sessionSummary.length > 0) {
+            transcript += `Existing Context Summary: ${root.sessionSummary}\n\n`;
+        }
+        transcript += "Recent interaction to be compressed:\n";
+        for (let i = 0; i < compressCount; i++) {
+            const msg = root.messageByID[root.messageIDs[i]];
+            if (!msg || msg.role === root.interfaceRole) continue;
+            const role = msg.role === "user" ? "User" : "Assistant";
+            transcript += `${role}: ${msg.rawContent}\n`;
+        }
+        root.addMessage(Translation.tr("Compacting the conversation history — one moment."), root.interfaceRole);
+        root.postCompactHook = () => requester.makeRequest(false);
+        root.performSemanticSummary(transcript, compressCount);
+    }
+
     // Approximate token count for a string (~4 chars per token)
     function estimateTokens(text) {
         return Math.ceil((text?.length ?? 0) / 4);
@@ -2089,6 +2236,13 @@ The shell (Quickshell config "flash-impulse"):
                             "compress", true);
                     }
                 } catch (e) { console.log("[AI] Summarizer parse error:", e); }
+                // Whatever the summary did, the request that armed the
+                // compaction is still owed its turn.
+                if (root.postCompactHook) {
+                    const hook = root.postCompactHook;
+                    root.postCompactHook = null;
+                    hook();
+                }
             }
             summarizerProc.buffer = "";
         }
@@ -2409,6 +2563,8 @@ The shell (Quickshell config "flash-impulse"):
                 root.postResponseHook = null;
             }
             root.persistCurrentChat()
+            root.refreshGeminiHeadCache()
+            root.maybeCompactHistory()
             memorySummaryTimer.restart()
             root.responseFinished()
         }
@@ -2421,6 +2577,26 @@ The shell (Quickshell config "flash-impulse"):
                 requester.dispatchAfterExit = true;
                 return;
             }
+            // Soft compaction fires here: the armed flag from the finished turn
+            // condenses the history before this request goes out, and the hook
+            // re-enters makeRequest once the summary has landed.
+            if (root.pendingCompaction && !retry && !root.condensing) {
+                root.runPendingCompaction();
+                return;
+            }
+
+            // Free-tier pacing: a first-time request waits out the adaptive gap
+            // since the previous start. Retries are exempt — a 429 retry already
+            // waits what the server demanded, which dwarfs this.
+            const sinceLastStart = Date.now() - root.lastRequestStartMs;
+            const paceWait = root.minRequestIntervalMs - sinceLastStart;
+            if (paceWait > 0 && !retry) {
+                pacingTimer.pendingRetry = retry;
+                pacingTimer.interval = paceWait;
+                pacingTimer.start();
+                return;
+            }
+            root.noteRequestStart();
             if (!retry) requester.retryCount = 0;
             requester.retryPending = false;
             requester.dispatchAfterExit = false;
@@ -2445,9 +2621,10 @@ The shell (Quickshell config "flash-impulse"):
             /* Put API key in environment variable */
             if (model.requires_key) requester.environment[`${root.apiKeyEnvVarName}`] = root.apiKeys ? (root.apiKeys[model.key_id] ?? "") : ""
 
-            /* Auto-trim context if it's getting too large (~800k chars ≈ 200k tokens) */
-            // Trim context to 32k tokens to keep responses fast and cheap
-            root.trimContextIfNeeded(32000);
+            // Context compaction moved to markDone: the server's own token
+            // count for the finished turn is the honest measure, and a fixed
+            // 32k threshold compacted a million-token window at three percent
+            // full, summarizing away history nobody needed to lose.
 
             /* Build endpoint, request data */
             const endpoint = root.currentApiStrategy.buildEndpoint(model);
@@ -2591,12 +2768,30 @@ The shell (Quickshell config "flash-impulse"):
                 try {
                     const result = requester.currentStrategy.parseResponseLine(data, requester.message);
 
-                    if (result.errorCode === 503 && requester.retryCount < requester.maxRetries) {
+                    if ((result.errorCode === 503 || result.errorCode === 429) && requester.retryCount < requester.maxRetries) {
                         requester.retryCount++;
                         requester.retryPending = true;
-                        requester.message.content = Translation.tr("*[High demand. Retrying... (%1/%2)]*").arg(requester.retryCount).arg(requester.maxRetries);
-                        retryTimer.interval = 1000 * Math.pow(2, requester.retryCount - 1);
+                        if (result.errorCode === 429) {
+                            // The model said "too fast": widen the send gap so
+                            // the follow-up turns slow down with it, and wait
+                            // exactly what the server asked for.
+                            root.noteRateLimitHit();
+                            const waitSecs = Math.max(result.retryDelay ?? 0, 2);
+                            requester.message.content = Translation.tr("*[Rate limited by Google. Waiting %1s... (%2/%3)]*").arg(Math.round(waitSecs)).arg(requester.retryCount).arg(requester.maxRetries);
+                            retryTimer.interval = 1000 * waitSecs;
+                        } else {
+                            requester.message.content = Translation.tr("*[High demand. Retrying... (%1/%2)]*").arg(requester.retryCount).arg(requester.maxRetries);
+                            retryTimer.interval = 1000 * Math.pow(2, requester.retryCount - 1);
+                        }
                         retryTimer.start();
+                        return;
+                    }
+                    if (result.errorCode === 429) {
+                        // Retries are gone. Say so where the answer would have
+                        // been — a silent empty bubble reads as a hang.
+                        requester.message.rawContent = Translation.tr("**Rate limited by Google** and retries ran out. Wait a minute and send it again — the sidebar will pace itself.");
+                        requester.message.content = requester.message.rawContent;
+                        requester.markDone();
                         return;
                     }
 
@@ -2607,6 +2802,7 @@ The shell (Quickshell config "flash-impulse"):
                         root.tokenCount.cacheRead = result.tokenUsage.cacheRead ?? 0;
                         root.tokenCount.cacheWrite = result.tokenUsage.cacheWrite ?? 0;
                         root.tokenCount.reasoningTokens = result.tokenUsage.reasoningTokens ?? 0;
+                        if (result.tokenUsage.total > 0) root.noteRequestOk();
                     }
                     if (result.functionCall) {
                         // Flush content immediately before function call
@@ -2688,6 +2884,13 @@ The shell (Quickshell config "flash-impulse"):
         id: retryTimer
         interval: 1000
         onTriggered: requester.makeRequest(true)
+    }
+
+    // Holds a fresh request back until the adaptive send gap has passed.
+    Timer {
+        id: pacingTimer
+        property bool pendingRetry: false
+        onTriggered: requester.makeRequest(pendingRetry)
     }
 
     // Debounced content flush: batches rapid token updates into intervals

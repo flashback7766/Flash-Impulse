@@ -149,7 +149,13 @@ while (( offset < total )); do
 
     # Skip the keys a previous run already translated — this is what makes a
     # re-run a continuation instead of a repeat.
-    batch=$(jq -c --argjson b "$batch" --argjson e "$existing" '$b | with_entries(select(.key as $k | ($e | has($k)) | not))' <<< "$batch")
+    # The merged file outgrew --argjson fast: Linux caps a single argument at
+    # 128KB, and a thousand translated strings blow past it (E2BIG, silently
+    # empty). The resume state travels by file instead.
+    existing_file=$(mktemp)
+    printf '%s' "$existing" > "$existing_file"
+    batch=$(jq -c --argjson b "$batch" --slurpfile e "$existing_file" '$b | with_entries(select(.key as $k | ($e[0] | has($k)) | not))' <<< "$batch")
+    rm -f "$existing_file"
     remaining=$(jq 'length' <<< "$batch")
 
     if (( remaining == 0 )); then

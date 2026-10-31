@@ -229,5 +229,9 @@ Button {
 
     contentItem: StyledText {
         text: root.buttonText
+        // Other languages run longer than English: where a layout constrains
+        // the button, the label degrades to an ellipsis instead of painting
+        // over whatever sits beside it. Unconstrained buttons are unaffected.
+        elide: Text.ElideRight
     }
 }

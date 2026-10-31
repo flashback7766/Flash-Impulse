@@ -117,7 +117,10 @@ ColumnLayout {
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                onClicked: root.picked(card.modelData.prompt)
+                // The pool's prompts are English data; the model reads them
+                // just as well in the interface language, and the owner asked
+                // for the cards translated whole.
+                onClicked: root.picked(Translation.tr(card.modelData.prompt))
             }
 
             RowLayout {
@@ -140,7 +143,7 @@ ColumnLayout {
                     maximumLineCount: 1
                     font.pixelSize: Appearance.font.pixelSize.small
                     color: Appearance.colors.colOnLayer2
-                    text: card.modelData.label
+                    text: Translation.tr(card.modelData.label)
                 }
 
                 MaterialSymbol {
