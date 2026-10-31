@@ -108,6 +108,14 @@ Scope {
             id: fingerprintOutputCollector
             onStreamFinished: {
                 root.fingerprintsConfigured = fingerprintOutputCollector.text.includes("Fingerprints for user");
+                // The check and the arming race: both fire on the same state
+                // change, and the arming reads a flag this check has not set
+                // yet — the first lock after a shell start (or a reload)
+                // found the sensor deaf until a password attempt. The check
+                // finishing is the moment the answer exists; arm right here.
+                if (root.fingerprintsConfigured && GlobalStates.screenLocked) {
+                    root.tryFingerUnlock();
+                }
             }
         }
         onExited: (exitCode, exitStatus) => {
