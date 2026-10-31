@@ -35,6 +35,19 @@ cmd_update() {
     cd "$REPO"
     git fetch origin --quiet
 
+    # Every run lands in the state log; the settings page shows its tail.
+    # The log is a convenience — past a couple of screens of history only
+    # the tail is kept.
+    local state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/flash-impulse"
+    local log="$state_dir/ota.log"
+    mkdir -p "$state_dir"
+    if [ -f "$log" ] && [ "$(wc -c < "$log")" -gt 131072 ]; then
+        tail -c 65536 "$log" > "$log.tail" && mv "$log.tail" "$log"
+    fi
+    exec > >(tee -a "$log") 2>&1
+    echo "=== OTA run: $(date '+%Y-%m-%d %H:%M:%S') ==="
+    trap 'echo "=== finished (code $?) ==="' EXIT
+
     local behind
     behind=$(git rev-list --count HEAD..origin/main)
     if [ "$behind" -eq 0 ]; then
