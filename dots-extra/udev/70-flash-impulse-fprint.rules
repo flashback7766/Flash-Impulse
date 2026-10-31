@@ -1,0 +1,6 @@
+# Flash-Impulse: keep the fingerprint reader awake. USB autosuspend put it to
+# sleep two seconds after the last use, and every touch then paid a USB wake
+# and a scanner re-init before the match could even start. While the lock
+# screen is armed, fprintd holds the device open and it never suspends anyway;
+# this only removes the wake from the windows in between.
+ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="04f3", ATTR{idProduct}=="0c8c", ATTR{power/control}="on"
