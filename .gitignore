@@ -19,3 +19,4 @@ __pycache__/
 # Machine-local state: display layout and the pre-install backup
 dots/.config/hypr/monitors.lua
 dots/.config/hypr/custom.pre-flash-impulse/
+dots/.config/quickshell/flash-impulse/translations/*.bak
