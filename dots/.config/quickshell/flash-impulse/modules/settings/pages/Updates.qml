@@ -49,7 +49,7 @@ ContentPage {
             onClicked: {
                 // Execute the update asynchronously
                 // Running in a terminal allows the user to see the output and sudo prompts if needed
-                CF.executeCommand("kitty --title 'OTA Update' --hold -e bash -c 'cd ~/Flash-Impulse && ./dots-manager.sh update || ./dots-backup.sh update; echo; echo \"Done! You can close this window.\"'");
+                CF.executeCommand("kitty --title 'OTA Update' --hold -e bash -c 'cd ~/Flash-Impulse && ./dots-manager.sh update; echo; echo \"Done! You can close this window.\"'");
             }
         }
     }
