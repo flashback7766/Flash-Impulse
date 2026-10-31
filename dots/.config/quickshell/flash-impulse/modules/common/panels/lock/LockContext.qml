@@ -39,7 +39,14 @@ Scope {
         root.resetTargetAction();
         root.clearText();
         root.unlockInProgress = false;
-        stopFingerPam();
+        // The idle timer calls this long after the lock, and the sensor used
+        // to go deaf right here: stopFingerPam took the listener away and
+        // nothing brought it back until the next lock. Only an unlock should.
+        if (GlobalStates.screenLocked) {
+            tryFingerUnlock();
+        } else {
+            stopFingerPam();
+        }
     }
 
     Timer {
@@ -83,7 +90,7 @@ Scope {
         interval: 1500
         repeat: false
         onTriggered: {
-            if (root.fingerprintsConfigured && !root.unlockInProgress) {
+            if (GlobalStates.screenLocked && root.fingerprintsConfigured && !root.unlockInProgress) {
                 root.tryFingerUnlock();
             }
         }
@@ -145,10 +152,15 @@ Scope {
             if (result == PamResult.Success) {
                 root.unlocked(root.targetAction);
                 stopFingerPam();
-            } else if (result == PamResult.Error) {
-                if (root.fingerprintsConfigured) {
-                    fingerRetryTimer.restart();
-                }
+            } else if (GlobalStates.screenLocked) {
+                // A wrong finger lands here as Failed, fprintd's cooldown as
+                // MaxTries, a dead conversation as Error: whichever way the
+                // attempt ended, the sensor goes back to listening after the
+                // wait. Without the screenLocked guard the retry also fired
+                // for the abort of an unlock — and the listener then spun
+                // forever, claiming the reader every thirty seconds while
+                // the desktop was in use.
+                fingerRetryTimer.restart();
             }
         }
     }

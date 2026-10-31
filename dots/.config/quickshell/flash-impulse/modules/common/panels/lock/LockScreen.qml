@@ -90,6 +90,33 @@ Scope {
         id: lock
         locked: GlobalStates.screenLocked
         surface: root.sessionLockSurface
+
+        // The compositor can take the lock away behind this flag's back:
+        // another lock client taking over under session-lock restore, or the
+        // session ending. The flag used to stay true forever — the fingerprint
+        // listener kept spinning while the desktop was in use, and the next
+        // lock did nothing because the flag already claimed the screen was
+        // locked. The compositor is the truth here; the flag follows it.
+        onLockStateChanged: GlobalStates.screenLocked = lock.locked
+
+        Component.onCompleted: {
+            // A reload or a lost race can leave the flag claiming a lock the
+            // compositor does not have — the desktop keeps working while every
+            // lock answers "already locked". On load the compositor is the
+            // truth, once, and the flag falls in line.
+            GlobalStates.screenLocked = lock.locked;
+        }
+    }
+
+    Timer {
+        // Hyprland has been seen to take the keyboard away from a fresh lock
+        // surface; the wake path asks for it back through lockFocus. A manual
+        // lock used to rely on luck, so it asks once more after the surface
+        // has had a beat to exist.
+        id: focusRetryTimer
+        interval: 150
+        repeat: false
+        onTriggered: lockContext.shouldReFocus()
     }
 
     function lock() {
@@ -98,6 +125,7 @@ Scope {
             return;
         }
         GlobalStates.screenLocked = true;
+        focusRetryTimer.restart();
     }
 
     IpcHandler {
