@@ -56,9 +56,18 @@ cmd_update() {
     git log --oneline HEAD@"{1}"..HEAD | sed 's/^/  /'
 
     # Overlay, never --delete: the live config may hold files this repo does
-    # not own, and an OTA must not evict them.
-    rsync -a "$REPO/dots/.config/" "$LIVE_CONFIG/"
-    echo "Configs laid onto $LIVE_CONFIG."
+    # not own, and an OTA must not evict them. Compared by checksum, not by
+    # mtime — a commit that touches no configs (a script, a doc) must not
+    # rewrite the live tree and wake every watcher in the shell for nothing.
+    local changed
+    changed=$(rsync -a --checksum --itemize-changes \
+        "$REPO/dots/.config/" "$LIVE_CONFIG/" | grep -c '^>f' || true)
+
+    if [ "$changed" -eq 0 ]; then
+        echo "Configs already match — nothing to lay down, nothing to reload."
+        return 0
+    fi
+    echo "Laid $changed file(s) onto $LIVE_CONFIG."
 
     hyprctl reload >/dev/null 2>&1 || echo "(hyprctl reload failed — is Hyprland running?)"
     # The shell picks QML changes up on its own; a reload nudge costs nothing.
