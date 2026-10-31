@@ -17,10 +17,15 @@ local qsIpcCall = "qs -c $qsConfig ipc call"
 -- dependency on the IPC surface.
 local qsIsAlive = "pgrep -x 'qs|quickshell' >/dev/null"
 
-hl.bind("SUPER + SUPER_L", hl.dsp.global("quickshell:searchToggleRelease"), { description = "Shell: Toggle search" })
-hl.bind("SUPER + SUPER_R", hl.dsp.global("quickshell:searchToggleRelease"))
-hl.bind("SUPER + SUPER_L", hl.dsp.exec_cmd(qsIsAlive .. " || pkill fuzzel || fuzzel"))
-hl.bind("SUPER + SUPER_R", hl.dsp.exec_cmd(qsIsAlive .. " || pkill fuzzel || fuzzel"))
+-- Release, not press: a press bind fires the instant Super goes down, so
+-- every chord starting with it (Super+1, Super+Q, ...) opened the search
+-- first. On release Hyprland skips the bind when the key was used as a
+-- modifier, so a tap opens the search and a chord stays a chord.
+hl.bind("SUPER + SUPER_L", hl.dsp.global("quickshell:searchToggleRelease"),
+    { release = true, description = "Shell: Toggle search" })
+hl.bind("SUPER + SUPER_R", hl.dsp.global("quickshell:searchToggleRelease"), { release = true })
+hl.bind("SUPER + SUPER_L", hl.dsp.exec_cmd(qsIsAlive .. " || pkill fuzzel || fuzzel"), { release = true })
+hl.bind("SUPER + SUPER_R", hl.dsp.exec_cmd(qsIsAlive .. " || pkill fuzzel || fuzzel"), { release = true })
 
 hl.bind("SUPER_L", hl.dsp.global("quickshell:workspaceNumber"), { ignore_mods = true, transparent = true })
 hl.bind("SUPER_R", hl.dsp.global("quickshell:workspaceNumber"), { ignore_mods = true, transparent = true })
