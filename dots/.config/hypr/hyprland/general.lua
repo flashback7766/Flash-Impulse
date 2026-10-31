@@ -115,11 +115,12 @@ hl.config({
             input_methods_ignorealpha = 0.8
         },
         shadow = {
-            -- render_power is the expensive knob here; 10 is a very soft falloff.
+            -- render_power is the expensive knob here; 4 is the softest falloff
+            -- Hyprland 0.57 takes (the ceiling moved down from 10).
             enabled = not perf,
             range = perf and 8 or 20,
             offset = {0, 2},
-            render_power = perf and 2 or 10,
+            render_power = perf and 2 or 4,
             color = "rgba(00000020)"
 
         },

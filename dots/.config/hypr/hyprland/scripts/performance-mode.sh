@@ -40,7 +40,7 @@ apply_live() {
         hyprctl --batch "keyword decoration:blur:size 10 ; \
             keyword decoration:blur:passes 3 ; \
             keyword decoration:shadow:enabled true ; \
-            keyword decoration:shadow:render_power 10" > /dev/null
+            keyword decoration:shadow:render_power 4" > /dev/null
     fi
     # Animation speeds come from the Lua profile; a reload re-evaluates it.
     hyprctl reload > /dev/null 2>&1
